@@ -11,18 +11,17 @@ const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret';
 const TOKEN_EXPIRY = '7d';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Domain whitelist — only @mitsgwalior.in is allowed
-// Admin accounts (role='admin') bypass this check so admin can always log in
+// Domain whitelist — only @mitsgwalior.in and @mitsgwl.ac.in are allowed
+// @mitsgwalior.in: HODs, Faculty, VC, Admin
+// @mitsgwl.ac.in: Faculty
 // ─────────────────────────────────────────────────────────────────────────────
 
-const ALLOWED_DOMAIN = '@mitsgwalior.in';
+const ALLOWED_DOMAINS = ['@mitsgwalior.in', '@mitsgwl.ac.in'];
 
-function isAllowedEmail(email, role) {
+function isAllowedDomain(email) {
   if (!email) return false;
-  const lower = email.toLowerCase();
-  // Admin accounts bypass domain restriction
-  if (role === 'admin') return true;
-  return lower.endsWith(ALLOWED_DOMAIN);
+  const lower = email.toLowerCase().trim();
+  return ALLOWED_DOMAINS.some(domain => lower.endsWith(domain));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -109,14 +108,18 @@ function signToken(user, roles, activeWorkspace) {
 
 router.post('/register', async (req, res) => {
   try {
-    let { name, email, password, role, department } = req.body;
+    let { name, email, password, department } = req.body;
 
-    // Institution email → always faculty
-    if (email && email.toLowerCase().endsWith('@mitsgwalior.in')) {
-      role = 'faculty';
+    if (!email) return res.status(400).json({ error: 'Email is required' });
+    const cleanEmail = email.toLowerCase().trim();
+
+    if (!isAllowedDomain(cleanEmail)) {
+      return res.status(403).json({
+        error: 'Only @mitsgwalior.in and @mitsgwl.ac.in institutional emails are permitted to register.',
+      });
     }
 
-    const existing = await User.findOne({ email });
+    const existing = await User.findOne({ email: cleanEmail });
     if (existing) return res.status(400).json({ error: 'Email already registered' });
 
     const hashed = await bcrypt.hash(password, 10);
@@ -125,7 +128,7 @@ router.post('/register', async (req, res) => {
     const safeRole = 'faculty';
 
     const user = await User.create({
-      name, email,
+      name, email: cleanEmail,
       password:        hashed,
       role:            safeRole,
       roles:           [safeRole],
@@ -158,15 +161,26 @@ router.post('/register', async (req, res) => {
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
-    const user = await User.findOne({ email });
+    if (!email) return res.status(400).json({ error: 'Email is required' });
+    const cleanEmail = email.toLowerCase().trim();
+
+    const user = await User.findOne({ email: cleanEmail });
     if (!user) {
-      console.warn(`[Auth] Login failed — unknown email: ${email}`);
+      console.warn(`[Auth] Login failed — unknown email: ${cleanEmail}`);
       return res.status(400).json({ error: 'Invalid credentials' });
+    }
+
+    // Domain restriction: only @mitsgwalior.in and @mitsgwl.ac.in
+    // Pre-authorized system accounts (admin, hod, vc) created by admin bypass if pre-existing
+    if (!isAllowedDomain(cleanEmail) && !['admin', 'hod', 'vc'].includes(user.role)) {
+      return res.status(403).json({
+        error: 'Access is restricted to @mitsgwalior.in and @mitsgwl.ac.in accounts.',
+      });
     }
 
     const match = await bcrypt.compare(password, user.password);
     if (!match) {
-      console.warn(`[Auth] Login failed — wrong password for: ${email}`);
+      console.warn(`[Auth] Login failed — wrong password for: ${cleanEmail}`);
       return res.status(400).json({ error: 'Invalid credentials' });
     }
 
@@ -384,11 +398,12 @@ router.post('/google', async (req, res) => {
     const { email, name, picture, sub } = googlePayload;
 
     // ── Step 3: Enforce institutional domain restriction ──
-    let user = await User.findOne({ email: email.toLowerCase() });
-    if (!email.toLowerCase().endsWith(ALLOWED_DOMAIN) && !user) {
-      console.warn(`[Auth] Google OAuth — blocked non-institutional email: ${email}`);
+    const cleanEmail = email.toLowerCase().trim();
+    let user = await User.findOne({ email: cleanEmail });
+    if (!isAllowedDomain(cleanEmail) && !user) {
+      console.warn(`[Auth] Google OAuth — blocked non-institutional email: ${cleanEmail}`);
       return res.status(403).json({
-        error: `Only ${ALLOWED_DOMAIN} accounts or authorized accounts are allowed. Please use your institutional Google account.`,
+        error: `Only @mitsgwalior.in and @mitsgwl.ac.in accounts are allowed. Please use your institutional Google account.`,
       });
     }
 
