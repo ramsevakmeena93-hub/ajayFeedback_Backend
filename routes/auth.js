@@ -11,12 +11,10 @@ const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret';
 const TOKEN_EXPIRY = '7d';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Domain whitelist — only @mitsgwalior.in and @mitsgwl.ac.in are allowed
-// @mitsgwalior.in: HODs, Faculty, VC, Admin
-// @mitsgwl.ac.in: Faculty
+// Domain whitelist — only @mitsgwalior.in is allowed
 // ─────────────────────────────────────────────────────────────────────────────
 
-const ALLOWED_DOMAINS = ['@mitsgwalior.in', '@mitsgwl.ac.in'];
+const ALLOWED_DOMAINS = ['@mitsgwalior.in'];
 
 function isAllowedDomain(email) {
   if (!email) return false;
@@ -115,7 +113,7 @@ router.post('/register', async (req, res) => {
 
     if (!isAllowedDomain(cleanEmail)) {
       return res.status(403).json({
-        error: 'Only @mitsgwalior.in and @mitsgwl.ac.in institutional emails are permitted to register.',
+        error: 'Only @mitsgwalior.in institutional emails are permitted to register.',
       });
     }
 
@@ -170,11 +168,11 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ error: 'Invalid credentials' });
     }
 
-    // Domain restriction: only @mitsgwalior.in and @mitsgwl.ac.in
+    // Domain restriction: only @mitsgwalior.in
     // Pre-authorized system accounts (admin, hod, vc) created by admin bypass if pre-existing
     if (!isAllowedDomain(cleanEmail) && !['admin', 'hod', 'vc'].includes(user.role)) {
       return res.status(403).json({
-        error: 'Access is restricted to @mitsgwalior.in and @mitsgwl.ac.in accounts.',
+        error: 'Access is restricted to @mitsgwalior.in accounts.',
       });
     }
 
@@ -403,7 +401,7 @@ router.post('/google', async (req, res) => {
     if (!isAllowedDomain(cleanEmail) && !user) {
       console.warn(`[Auth] Google OAuth — blocked non-institutional email: ${cleanEmail}`);
       return res.status(403).json({
-        error: `Only @mitsgwalior.in and @mitsgwl.ac.in accounts are allowed. Please use your institutional Google account.`,
+        error: `Only @mitsgwalior.in accounts are allowed. Please use your institutional Google account.`,
       });
     }
 
