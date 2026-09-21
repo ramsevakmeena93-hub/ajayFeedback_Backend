@@ -96,6 +96,13 @@ mongoose.connect(MONGO_URI)
   .then(async () => {
     console.log('MongoDB connected');
 
+    // ── Cleanup stale local PDF files on startup (disk space) ──
+    try {
+      const { cleanupOldLocalFiles } = require('./services/cloudStorage');
+      cleanupOldLocalFiles(3); // delete local copies older than 3 days
+    } catch {}
+
+
     // ── Socket.IO setup ──
     const { Server } = require('socket.io');
     const jwt = require('jsonwebtoken');

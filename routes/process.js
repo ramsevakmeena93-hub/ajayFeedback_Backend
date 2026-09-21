@@ -18,10 +18,11 @@ const { log } = require('../services/logger');
 // CSV upload: 5MB limit
 const csvUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
-// Batch upload (multiple PDFs or ZIP): up to 150MB, 500 files
+// Batch upload (multiple PDFs or ZIP): up to 500MB, 500 files
+// Uses memoryStorage — buffers are released after each file is processed
 const batchUpload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 150 * 1024 * 1024, files: 500 }
+  limits: { fileSize: 500 * 1024 * 1024, files: 500 }
 });
 
 // PDF upload: up to 50 files, 20MB each
@@ -323,6 +324,8 @@ router.post('/upload-batch', authMiddleware, batchUpload.any(), async (req, res)
               }
             }
           }
+          // Release ZIP buffer from memory immediately after extraction
+          file.buffer = null;
         } catch (zipErr) {
           console.error('[UploadBatch] Failed to parse ZIP:', zipErr.message);
           return res.status(400).json({ error: `Failed to extract ZIP: ${zipErr.message}` });
@@ -358,8 +361,8 @@ router.post('/upload-batch', authMiddleware, batchUpload.any(), async (req, res)
       console.warn('[UploadBatch] Folder creation notice:', folderErr.message);
     }
 
-    // Process each PDF file concurrently (limit: 5 concurrent)
-    const limit = pLimit(5);
+    // Process each PDF file concurrently (limit: 3 concurrent to control RAM usage)
+    const limit = pLimit(3);
     const results = [];
     const errors = [];
 
@@ -392,6 +395,9 @@ router.post('/upload-batch', authMiddleware, batchUpload.any(), async (req, res)
               responseCount: meta.responseCount || null
             };
           }
+
+          // Release buffer from memory as early as possible
+          file.buffer = null;
 
           const pdfMeta = analysis.meta || {};
           const detectedFacultyName = pdfMeta.facultyName || file.originalname.replace(/\.pdf$/i, '').replace(/[_\-]/g, ' ').trim();

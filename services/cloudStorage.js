@@ -90,15 +90,56 @@ function saveLocally(buffer, fileName, { hodEmail, department } = {}) {
 // Main export
 // ─────────────────────────────────────────────────────────────────
 async function uploadPdf(buffer, fileName, meta = {}) {
-  // Always save a local copy for instant 100% reliable viewing
-  const localRes = saveLocally(buffer, fileName, meta);
-
+  // Try GCS first — if it succeeds, no local copy is needed (saves disk space)
   const gcsUrl = await uploadToGCS(buffer, fileName, meta);
   if (gcsUrl) {
-    return { url: gcsUrl, localFilePath: localRes.localFilePath, storage: "google_cloud_storage" };
+    return { url: gcsUrl, localFilePath: null, storage: "google_cloud_storage" };
   }
 
+  // GCS not configured or failed — fall back to local storage
+  const localRes = saveLocally(buffer, fileName, meta);
   return { url: localRes.url || "", localFilePath: localRes.localFilePath, storage: "local" };
 }
 
-module.exports = { uploadPdf, uploadToGCS, saveLocally };
+/**
+ * Delete all files in uploads/reports older than `maxAgeDays` days.
+ * Called on server startup to reclaim disk space from old local fallback copies.
+ */
+function cleanupOldLocalFiles(maxAgeDays = 3) {
+  try {
+    const fs   = require("fs");
+    const path = require("path");
+    const dir  = path.join(__dirname, "..", "uploads", "reports");
+    if (!fs.existsSync(dir)) return;
+
+    const cutoff = Date.now() - maxAgeDays * 24 * 60 * 60 * 1000;
+    let deleted = 0;
+
+    function recurse(d) {
+      const entries = fs.readdirSync(d, { withFileTypes: true });
+      for (const e of entries) {
+        const full = path.join(d, e.name);
+        if (e.isDirectory()) {
+          recurse(full);
+          // remove empty dirs
+          try {
+            if (fs.readdirSync(full).length === 0) fs.rmdirSync(full);
+          } catch {}
+        } else if (e.isFile()) {
+          const stat = fs.statSync(full);
+          if (stat.mtimeMs < cutoff) {
+            fs.unlinkSync(full);
+            deleted++;
+          }
+        }
+      }
+    }
+
+    recurse(dir);
+    if (deleted > 0) console.log(`[Storage] Cleaned up ${deleted} old local PDF file(s)`);
+  } catch (e) {
+    console.warn("[Storage] Cleanup error:", e.message);
+  }
+}
+
+module.exports = { uploadPdf, uploadToGCS, saveLocally, cleanupOldLocalFiles };
