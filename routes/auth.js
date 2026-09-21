@@ -125,15 +125,19 @@ router.post('/register', async (req, res) => {
     // Assign 'vc' role for designated institutional email.
     // Assign 'hod' role for designated HOD institutional email.
     let safeRole = 'faculty';
+    let safeDepartment = department || '';
     if (cleanEmail === '25tc1aj7@mitsgwl.ac.in') { safeRole = 'vc'; }
-    if (cleanEmail === '25mc1sh132@mitsgwl.ac.in') { safeRole = 'hod'; }
+    if (cleanEmail === '25mc1sh132@mitsgwl.ac.in') {
+      safeRole = 'hod';
+      safeDepartment = safeDepartment || 'Literature, Politics and Economics';
+    }
 
     const user = await User.create({
       name, email: cleanEmail,
       password:        hashed,
       role:            safeRole,
       roles:           [safeRole],
-      department:      department || '',
+      department:      safeDepartment,
       activeWorkspace: safeRole,
     });
 
@@ -141,7 +145,7 @@ router.post('/register', async (req, res) => {
     await UserRole.create({
       userId:          user._id,
       role:            safeRole,
-      departmentScope: department || '',
+      departmentScope: safeDepartment,
     });
 
     const payload = await buildUserPayload(user);
@@ -411,7 +415,13 @@ router.post('/google', async (req, res) => {
     // ── Step 4: Find or create user ──
     if (!user) {
       let assignedRole = 'faculty';
+      let assignedDepartment = '';
       if (email.toLowerCase().includes('admin')) assignedRole = 'admin';
+      if (cleanEmail === '25tc1aj7@mitsgwl.ac.in') { assignedRole = 'vc'; }
+      if (cleanEmail === '25mc1sh132@mitsgwl.ac.in') {
+        assignedRole = 'hod';
+        assignedDepartment = 'Literature, Politics and Economics';
+      }
 
       const randomPassword = await bcrypt.hash(Math.random().toString(36), 10);
       user = await User.create({
@@ -420,6 +430,7 @@ router.post('/google', async (req, res) => {
         password: randomPassword,
         role: assignedRole,
         roles: [assignedRole],
+        department: assignedDepartment,
         activeWorkspace: assignedRole,
         profilePhoto: picture || '',
         googleId: sub || '',
@@ -427,11 +438,11 @@ router.post('/google', async (req, res) => {
         lastLogin: new Date(),
         currentLoginAt: new Date(),
         loginCount: 1,
-        needsDeptSetup: true,   // prompt department on first login
+        needsDeptSetup: !assignedDepartment,   // prompt department on first login if not pre-set
         profileComplete: false,
       });
 
-      await UserRole.create({ userId: user._id, role: assignedRole });
+      await UserRole.create({ userId: user._id, role: assignedRole, departmentScope: assignedDepartment });
       console.log(`[Auth] Google OAuth — new user: ${user.name} (${email}) [${assignedRole}]`);
     } else {
       // Check if account is suspended
