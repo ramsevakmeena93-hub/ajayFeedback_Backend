@@ -501,7 +501,7 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
   }
 
   // VC name + signature
-  txt(coverPage, (vcUser && vcUser.name) || "Vice Chancellor",
+  txt(coverPage, (vcUser && vcUser.name) || "Pro Vice-Chancellor",
       c3X + 4, bY - 12, 9, boldFont, black);
   if (vcSig) {
     const sc = Math.min((c3W - 10) / vcSig.width, (sBH - 22) / vcSig.height, 1);

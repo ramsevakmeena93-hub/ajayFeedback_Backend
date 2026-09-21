@@ -140,14 +140,15 @@ async function extractHighlightedText(buffer) {
       const text = inside.map(t => t.str).join(' ').trim().replace(/\s+/g, ' ');
       if (text.length < 3) continue;
 
-      if (rect.color === 'red') pushUnique(appreciation, text);
-      else if (rect.color === 'yellow') pushUnique(commentsNeedingAttention, text);
+      // RED is Attention (needs attention / problems), YELLOW is Appreciation (positive feedback)
+      if (rect.color === 'red') pushUnique(commentsNeedingAttention, text);
+      else if (rect.color === 'yellow') pushUnique(appreciation, text);
     }
   }
 
-  console.log(`\n[PDF Analyzer] RED (appreciation): ${appreciation.length}`);
+  console.log(`\n[PDF Analyzer] YELLOW (appreciation): ${appreciation.length}`);
   appreciation.forEach((t, i) => console.log(`  [${i+1}] ${t}`));
-  console.log(`[PDF Analyzer] YELLOW (attention): ${commentsNeedingAttention.length}`);
+  console.log(`[PDF Analyzer] RED (attention): ${commentsNeedingAttention.length}`);
   commentsNeedingAttention.forEach((t, i) => console.log(`  [${i+1}] ${t}`));
 
   return { appreciation, commentsNeedingAttention };
@@ -191,6 +192,11 @@ function isValidComment(text) {
   // Reject pure numbers or punctuation
   if (/^[\d\s.,\-–/\\%]+$/.test(clean)) return false;
 
+  // Reject survey questions with numerical rating tables (e.g. "1 Classes are useful ... 0 7 14 11 16 3.75")
+  if (/^\d+\s+[A-Za-z]/.test(clean) && /\b\d+\s+\d+\s+\d+\b/.test(clean)) return false;
+  if (/^\d+\s+Total\b/i.test(clean)) return false;
+  if (/\b(Below Average|Very good|Average)\b/i.test(clean) && /\d+/.test(clean)) return false;
+
   // Must have at least 1 letter
   if (!/[a-zA-Z]/.test(clean)) return false;
 
@@ -206,7 +212,7 @@ function isValidComment(text) {
 async function extractAllStudentComments(buffer, targetCourseCode) {
   const uint8 = new Uint8Array(buffer);
   const doc = await pdfjsLib.getDocument({ data: uint8, verbosity: 0 }).promise;
-  const comments = [];
+  let comments = [];
   const rawCommentPages = [];
 
   // Pass 1: Identify pages that have raw student comments
@@ -215,21 +221,21 @@ async function extractAllStudentComments(buffer, targetCourseCode) {
     const tc = await page.getTextContent();
     const fullText = tc.items.map(i => i.str).join(' ').toLowerCase();
 
-    const hasSubmitted = fullText.includes('submitted') && fullText.includes('answer');
-    const hasStudentFeedbackHeader = fullText.includes('student') && fullText.includes('feedback') && fullText.includes('comment');
+    const hasSubmitted = fullText.includes('submitted') && (fullText.includes('answer') || fullText.includes('response'));
+    const hasStudentFeedbackHeader = fullText.includes('feedback') && (fullText.includes('comment') || fullText.includes('student'));
     const hasQuestionsTable = fullText.includes('label') && fullText.includes('question') && fullText.includes('qv');
 
-    if ((hasSubmitted || hasStudentFeedbackHeader) && !hasQuestionsTable) {
-      rawCommentPages.push({ pageNum: p, page, tc, fullText });
+    // Prefer pages dedicated to comments, but keep all potential pages
+    if (hasSubmitted || hasStudentFeedbackHeader || !hasQuestionsTable) {
+      rawCommentPages.push({ pageNum: p, page, tc, fullText, hasQuestionsTable });
     }
   }
 
-  // Pass 2: If raw comment pages exist, extract each comment row
-  if (rawCommentPages.length > 0) {
-    for (const { pageNum, tc, fullText } of rawCommentPages) {
-      // If targetCourseCode was provided and PDF has multiple courses, check if this page belongs to targetCourseCode
-      if (targetCourseCode) {
-        const cleanTarget = targetCourseCode.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+  const extractRowsFromPages = (pages, filterCode) => {
+    const res = [];
+    for (const { pageNum, tc, fullText } of pages) {
+      if (filterCode) {
+        const cleanTarget = filterCode.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
         const pageCodeMatch = fullText.match(/\d{5,}\s*-?\s*batch\s*-?\s*[a-z0-9]+/i);
         if (pageCodeMatch) {
           const pageCode = pageCodeMatch[0].replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
@@ -252,10 +258,10 @@ async function extractAllStudentComments(buffer, targetCourseCode) {
       const yKeys = Object.keys(rowMap).map(Number).sort((a, b) => b - a);
 
       // Find the header line after which comments start
-      let commentStartY = 700;
+      let commentStartY = 750;
       for (const y of yKeys) {
         const line = rowMap[y].sort((a, b) => a.transform[4] - b.transform[4]).map(i => i.str).join(' ').toLowerCase();
-        if ((line.includes('submitted') && line.includes('answer')) || (line.includes('student') && line.includes('feedback'))) {
+        if ((line.includes('submitted') && (line.includes('answer') || line.includes('response'))) || (line.includes('student') && line.includes('feedback'))) {
           commentStartY = y;
           break;
         }
@@ -267,8 +273,6 @@ async function extractAllStudentComments(buffer, targetCourseCode) {
         return { y, text };
       });
 
-      // Merge continuation lines: ONLY when line gap is <= 16pt (intra-paragraph wrap)
-      // Separate comments have line gap >= 20pt and are NEVER merged together!
       let i = 0;
       while (i < commentRows.length) {
         let curr = commentRows[i].text;
@@ -277,15 +281,23 @@ async function extractAllStudentComments(buffer, targetCourseCode) {
           i++;
         }
         if (isValidComment(curr)) {
-          comments.push(curr.trim().replace(/\s+/g, ' '));
+          res.push(curr.trim().replace(/\s+/g, ' '));
         }
         i++;
       }
     }
+    return res;
+  };
+
+  // Pass 2: Extract rows from identified pages
+  if (rawCommentPages.length > 0) {
+    comments = extractRowsFromPages(rawCommentPages, targetCourseCode);
+    if (comments.length === 0 && targetCourseCode) {
+      comments = extractRowsFromPages(rawCommentPages, null);
+    }
   }
 
-  // Pass 3: If NO raw comments pages were found (e.g. pure 1-page Action Taken Report PDF)
-  // Extract bulleted items from the "Needs Attention" and "Appreciation" table columns
+  // Pass 3: Action Taken Report summary tables (Page 1-2) with bullet points
   if (comments.length === 0) {
     for (let p = 1; p <= doc.numPages; p++) {
       const page = await doc.getPage(p);
@@ -295,7 +307,7 @@ async function extractAllStudentComments(buffer, targetCourseCode) {
 
       if (fullText.includes('action taken report') || (fullText.includes('needs attention') && fullText.includes('appreciation'))) {
         const tableComments = items
-          .filter(i => i.transform[4] >= 370 && i.transform[4] < 680 && i.transform[5] < 340)
+          .filter(i => i.transform[4] >= 340 && i.transform[4] < 680 && i.transform[5] > 30 && i.transform[5] < 750)
           .map(i => i.str)
           .join(' ');
         
@@ -305,6 +317,23 @@ async function extractAllStudentComments(buffer, targetCourseCode) {
             comments.push(b.trim().replace(/\s+/g, ' '));
           }
         });
+      }
+    }
+  }
+
+  // Pass 4: Fallback scan for valid feedback comments anywhere in doc
+  if (comments.length === 0) {
+    for (let p = 1; p <= doc.numPages; p++) {
+      const page = await doc.getPage(p);
+      const tc = await page.getTextContent();
+      const items = tc.items.filter(i => i.str && i.str.trim());
+      for (const item of items) {
+        const str = item.str.trim();
+        if (str.length > 3 && isValidComment(str)) {
+          if (/good|nice|excellent|poor|best|worst|speed|voice|doubt|explain|notes|exam|quiz|teach|clear|improve|slow|fast|audible|helpful/i.test(str)) {
+            comments.push(str.replace(/\s+/g, ' '));
+          }
+        }
       }
     }
   }
@@ -484,9 +513,21 @@ function calculateCommentPercentages(allComments, responseCount) {
 async function analyzePDFBuffer(buffer) {
   const { analyzeCommentsWithAI } = require('./aiAnalyzer');
 
-  // Extract meta first, then extract comments (targeted to detected subject code)
+  // Extract meta, highlights, and text comments
   const meta = await extractMetaFromBuffer(buffer);
+  const highlights = await extractHighlightedText(buffer).catch(e => {
+    console.warn('[PDF Analyzer] Highlight extraction error:', e.message);
+    return { appreciation: [], commentsNeedingAttention: [] };
+  });
   const allComments = await extractAllStudentComments(buffer, meta?.subjectCode);
+
+  // Include any highlighted comments in allComments
+  (highlights?.appreciation || []).forEach(c => {
+    if (!allComments.some(x => x.toLowerCase() === c.toLowerCase())) allComments.push(c);
+  });
+  (highlights?.commentsNeedingAttention || []).forEach(c => {
+    if (!allComments.some(x => x.toLowerCase() === c.toLowerCase())) allComments.push(c);
+  });
 
   let appreciation = [];
   let commentsNeedingAttention = [];
@@ -495,16 +536,43 @@ async function analyzePDFBuffer(buffer) {
   if (allComments.length > 0) {
     try {
       const aiResult = await analyzeCommentsWithAI(allComments);
-      appreciation = aiResult.appreciation;
-      commentsNeedingAttention = aiResult.commentsNeedingAttention;
+      appreciation = aiResult.appreciation || [];
+      commentsNeedingAttention = aiResult.commentsNeedingAttention || [];
       commentCategories = aiResult.commentCategories || {};
     } catch (aiErr) {
-      console.warn('[PDF] AI analysis failed, all comments go to appreciation:', aiErr.message);
-      appreciation = allComments;
+      console.warn('[PDF] AI analysis failed, falling back to rule-based sorting:', aiErr.message);
     }
   }
 
-  const commentPercentages = calculateCommentPercentages(allComments, meta.responseCount);
+  // Guarantee that detected highlighted text is included in final lists
+  (highlights?.appreciation || []).forEach(c => {
+    pushUnique(appreciation, c);
+  });
+  (highlights?.commentsNeedingAttention || []).forEach(c => {
+    pushUnique(commentsNeedingAttention, c);
+    // Categorize attention comment if categories exist
+    if (commentCategories) {
+      const lower = c.toLowerCase();
+      if (/speed|fast|slow|rush|pace/i.test(lower)) {
+        commentCategories.Speed = commentCategories.Speed || [];
+        if (!commentCategories.Speed.includes(c)) commentCategories.Speed.push(c);
+      } else if (/voice|audible|volume|sound|mic|hear|loud/i.test(lower)) {
+        commentCategories.Clarity = commentCategories.Clarity || [];
+        if (!commentCategories.Clarity.includes(c)) commentCategories.Clarity.push(c);
+      } else if (/note|material|pdf|ppt|slide|book|bank|question/i.test(lower)) {
+        commentCategories.Materials = commentCategories.Materials || [];
+        if (!commentCategories.Materials.includes(c)) commentCategories.Materials.push(c);
+      } else if (/doubt|interactive|discuss|ask|talk/i.test(lower)) {
+        commentCategories.Interaction = commentCategories.Interaction || [];
+        if (!commentCategories.Interaction.includes(c)) commentCategories.Interaction.push(c);
+      } else {
+        commentCategories.General = commentCategories.General || [];
+        if (!commentCategories.General.includes(c)) commentCategories.General.push(c);
+      }
+    }
+  });
+
+  const commentPercentages = calculateCommentPercentages(allComments, meta?.responseCount);
 
   return {
     appreciation,
@@ -515,8 +583,8 @@ async function analyzePDFBuffer(buffer) {
     commentCategories,
     rawStudentComments: allComments,
     meta, // Include full meta object
-    ffiScore: meta.ffiScore ?? null,
-    responseCount: meta.responseCount ?? null,
+    ffiScore: meta?.ffiScore ?? null,
+    responseCount: meta?.responseCount ?? null,
     analyzedAt: new Date()
   };
 }
@@ -526,4 +594,4 @@ async function extractMetaFromPDF(buffer) {
   catch { return { facultyName: '', subjectCode: '', programme: '', semester: '', ffiScore: null }; }
 }
 
-module.exports = { analyzePDF, analyzePDFBuffer, extractMetaFromPDF, convertDriveLink };
+module.exports = { analyzePDF, analyzePDFBuffer, extractMetaFromPDF, extractHighlightedText, convertDriveLink };

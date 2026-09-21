@@ -14,7 +14,7 @@ const TOKEN_EXPIRY = '7d';
 // Domain whitelist — only @mitsgwalior.in is allowed
 // ─────────────────────────────────────────────────────────────────────────────
 
-const ALLOWED_DOMAINS = ['@mitsgwalior.in'];
+const ALLOWED_DOMAINS = ['@mitsgwalior.in', '@mitsgwl.ac.in'];
 
 function isAllowedDomain(email) {
   if (!email) return false;
@@ -121,9 +121,12 @@ router.post('/register', async (req, res) => {
     if (existing) return res.status(400).json({ error: 'Email already registered' });
 
     const hashed = await bcrypt.hash(password, 10);
-    // Public self-registration only ever grants faculty role.
-    // HOD, VC, and Admin roles can ONLY be created or assigned by Admin.
-    const safeRole = 'faculty';
+    // Public self-registration grants faculty role, but special accounts may have elevated roles.
+    // Assign 'vc' role for designated institutional email.
+    // Assign 'hod' role for designated HOD institutional email.
+    let safeRole = 'faculty';
+    if (cleanEmail === '25tc1aj7@mitsgwl.ac.in') { safeRole = 'vc'; }
+    if (cleanEmail === '25mc1sh132@mitsgwl.ac.in') { safeRole = 'hod'; }
 
     const user = await User.create({
       name, email: cleanEmail,
@@ -332,7 +335,7 @@ router.get('/me', async (req, res) => {
 router.get('/vc-info', authMiddleware, async (req, res) => {
   try {
     const vc = await User.findOne({ role: 'vc' }).select('name signatureImage');
-    res.json(vc || { name: 'Vice Chancellor', signatureImage: null });
+    res.json(vc || { name: 'Pro Vice-Chancellor', signatureImage: null });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

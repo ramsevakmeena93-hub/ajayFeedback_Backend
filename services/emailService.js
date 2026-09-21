@@ -83,7 +83,7 @@ async function emailHODFacultyApproved({ hodEmail, hodName, facultyName, subject
             <tr><td style="padding:8px;border:1px solid #ddd;background:#f9f9f9;font-weight:bold;">Subject</td><td style="padding:8px;border:1px solid #ddd;">${subjectCode || '—'}</td></tr>
             <tr><td style="padding:8px;border:1px solid #ddd;background:#f9f9f9;font-weight:bold;">Department</td><td style="padding:8px;border:1px solid #ddd;">${department || '—'}</td></tr>
           </table>
-          <p>All approved reports can now be submitted to the Vice Chancellor.</p>
+          <p>All approved reports can now be submitted to the Pro Vice-Chancellor.</p>
           <div style="text-align:center;margin:24px 0;">
             <a href="${BASE_URL}/landing" style="background:#1a3a6e;color:white;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:bold;">
               Login to HOD Portal
@@ -112,7 +112,7 @@ async function emailHODVCApproved({ hodEmail, hodName, department, academicYear,
         </div>
         <div style="padding:24px;">
           <p>Dear <strong>${hodName}</strong>,</p>
-          <p style="color:#2e7d32;font-weight:bold;font-size:16px;">🎉 The Vice Chancellor has APPROVED your faculty feedback submission.</p>
+          <p style="color:#2e7d32;font-weight:bold;font-size:16px;">🎉 The Pro Vice-Chancellor has APPROVED your faculty feedback submission.</p>
           <table style="width:100%;border-collapse:collapse;margin:16px 0;">
             <tr><td style="padding:8px;border:1px solid #ddd;background:#f9f9f9;font-weight:bold;">Department</td><td style="padding:8px;border:1px solid #ddd;">${department}</td></tr>
             <tr><td style="padding:8px;border:1px solid #ddd;background:#f9f9f9;font-weight:bold;">Academic Year</td><td style="padding:8px;border:1px solid #ddd;">${academicYear}</td></tr>
@@ -146,7 +146,7 @@ async function emailHODVCRejected({ hodEmail, hodName, department, academicYear,
         </div>
         <div style="padding:24px;">
           <p>Dear <strong>${hodName}</strong>,</p>
-          <p style="color:#c62828;font-weight:bold;">❌ The Vice Chancellor has rejected your submission for ${department} — ${academicYear}.</p>
+          <p style="color:#c62828;font-weight:bold;">❌ The Pro Vice-Chancellor has rejected your submission for ${department} — ${academicYear}.</p>
           ${vcComment ? `<div style="background:#fff3f3;border-left:4px solid #c62828;padding:12px;margin:16px 0;"><strong>Reason:</strong> ${vcComment}</div>` : ''}
           <p>Please review the feedback, make necessary corrections, and resubmit.</p>
           <div style="text-align:center;margin:24px 0;">
