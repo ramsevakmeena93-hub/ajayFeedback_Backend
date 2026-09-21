@@ -450,6 +450,37 @@ router.post('/google', async (req, res) => {
         return res.status(403).json({ error: 'Account suspended. Contact admin.' });
       }
 
+      // ── Re-apply hardcoded role overrides for designated accounts ──
+      // This ensures the role is always correct even if the DB was modified
+      // externally (e.g. by a seed script that didn't know about this account).
+      let correctedRole = null;
+      let correctedDept = null;
+      if (cleanEmail === '25tc1aj7@mitsgwl.ac.in') {
+        correctedRole = 'vc';
+      }
+      if (cleanEmail === '25mc1sh132@mitsgwl.ac.in') {
+        correctedRole = 'hod';
+        correctedDept = 'Literature, Politics and Economics';
+      }
+
+      if (correctedRole && user.role !== correctedRole) {
+        console.log(`[Auth] Google OAuth — correcting role for ${cleanEmail}: ${user.role} → ${correctedRole}`);
+        user.role            = correctedRole;
+        user.roles           = correctedRole === 'hod' ? ['hod', 'faculty'] : [correctedRole];
+        user.activeWorkspace = correctedRole;
+        if (correctedDept && !user.department) user.department = correctedDept;
+
+        // Rebuild UserRole documents to match
+        await UserRole.deleteMany({ userId: user._id });
+        const roleDocs = correctedRole === 'hod'
+          ? [
+              { userId: user._id, role: 'hod',    departmentScope: correctedDept || user.department || '', active: true },
+              { userId: user._id, role: 'faculty', departmentScope: correctedDept || user.department || '', active: true },
+            ]
+          : [{ userId: user._id, role: correctedRole, departmentScope: user.department || '', active: true }];
+        await UserRole.create(roleDocs);
+      }
+
       user.googleId       = sub || user.googleId;
       user.googleVerified = true;
       user.lastLogin      = new Date();
@@ -457,10 +488,12 @@ router.post('/google', async (req, res) => {
       if (picture) user.profilePhoto = picture;
       await user.save();
 
-      // Backfill UserRole if missing
-      const hasRole = await UserRole.findOne({ userId: user._id, active: true });
-      if (!hasRole) {
-        await UserRole.create({ userId: user._id, role: user.role, departmentScope: user.department || '' });
+      // Backfill UserRole if missing (for all other users)
+      if (!correctedRole) {
+        const hasRole = await UserRole.findOne({ userId: user._id, active: true });
+        if (!hasRole) {
+          await UserRole.create({ userId: user._id, role: user.role, departmentScope: user.department || '' });
+        }
       }
       console.log(`[Auth] Google OAuth — login: ${user.name} (${email}) [${user.role}]`);
     }

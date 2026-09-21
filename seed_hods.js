@@ -21,12 +21,19 @@ const officialHods = [
   { name: "Praveen Bansal",           email: "pbansal444@mitsgwalior.in",      department: "Centre for Internet of Things",                       designation: "HOD" },
   { name: "Punit Kumar Johari",       email: "pkjohari@mitsgwalior.in",        department: "School of Information Technology",                    designation: "HOD" },
   { name: "R R Singh",                email: "rrsingh@mitsgwalior.in",         department: "Centre for Artificial Intelligence",                  designation: "HOD" },
+  { name: "HOD",                      email: "25mc1sh132@mitsgwl.ac.in",       department: "Literature, Politics and Economics",                   designation: "HOD" },
 ];
 
 const systemAccounts = [
   { name: "System Administrator", email: "admin@mits.ac.in", password: "admin123", role: "admin", department: "Administration" },
   { name: "System Administrator", email: "admin@mitsgwalior.in", password: "admin123", role: "admin", department: "Administration" },
   { name: "Prof. R. K. Pandit (VC)", email: "vc@mits.ac.in", password: "vc123", role: "vc", department: "Vice Chancellor Office" },
+];
+
+// These emails are given special roles by the system — exclude them from the HOD demotion sweep
+const protectedEmails = [
+  '25tc1aj7@mitsgwl.ac.in',    // VC account
+  '25mc1sh132@mitsgwl.ac.in',  // HOD account
 ];
 
 async function seedHODs() {
@@ -38,9 +45,10 @@ async function seedHODs() {
     const hashedPassword = await bcrypt.hash(defaultPassword, 10);
 
     const officialEmails = officialHods.map(h => h.email.toLowerCase());
+    const exemptEmails   = [...officialEmails, ...protectedEmails];
 
-    // Demote any user with role 'hod' who is NOT in the official 14 list
-    const nonOfficialHods = await User.find({ role: "hod", email: { $nin: officialEmails } });
+    // Demote any user with role 'hod' who is NOT in the official list or protected list
+    const nonOfficialHods = await User.find({ role: "hod", email: { $nin: exemptEmails } });
     for (const nonHod of nonOfficialHods) {
       console.log(`Demoting unauthorized HOD ${nonHod.email} -> faculty`);
       nonHod.role = "faculty";
