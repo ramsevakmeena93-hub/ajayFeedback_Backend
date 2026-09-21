@@ -744,20 +744,35 @@ router.get('/:id/pdf', async (req, res) => {
 
     const link = report.driveLink || report.pdfLink || '';
 
-    // 1. Cloud URL (Google Cloud Storage, Google Drive, AWS S3, etc.)
-    const isCloud =
-      link.startsWith('http://') || link.startsWith('https://') ? (
-        link.includes('storage.googleapis.com') ||
-        link.includes('drive.google.com') ||
-        link.includes('googleusercontent.com') ||
-        link.includes('s3.amazonaws.com') ||
-        link.includes('s3.') ||
-        link.includes('cloudinary.com') ||
-        link.includes('amazonaws.com')
-      ) : false;
+    // 1. Real cloud URL — redirect directly
+    const isCloud = (link.startsWith('https://') || link.startsWith('http://')) && (
+      link.includes('storage.googleapis.com') ||
+      link.includes('drive.google.com') ||
+      link.includes('googleusercontent.com') ||
+      link.includes('s3.amazonaws.com') ||
+      link.includes('s3.') ||
+      link.includes('cloudinary.com') ||
+      link.includes('amazonaws.com')
+    );
 
     if (isCloud) {
       return res.redirect(302, link);
+    }
+
+    // 1b. If the stored link is a localhost / old-server URL, the file no longer
+    //     exists on this server (Render's disk is ephemeral). Return a clear JSON
+    //     error so the frontend can show a useful message rather than a generic 404.
+    const isStaleLocalUrl =
+      link.includes('localhost') ||
+      link.includes('127.0.0.1') ||
+      (link.startsWith('http') && !isCloud);
+
+    if (isStaleLocalUrl) {
+      return res.status(404).json({
+        error: 'PDF not available',
+        reason: 'stale_url',
+        message: 'This PDF was uploaded to the previous server and is no longer stored. Please re-upload the feedback PDF.',
+      });
     }
 
     // 2. Locate original uploaded file on disk
