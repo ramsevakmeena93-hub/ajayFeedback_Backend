@@ -201,6 +201,29 @@ router.post('/login', async (req, res) => {
       $inc: { loginCount: 1 },
     });
 
+    // Re-apply hardcoded role overrides for designated accounts
+    if (cleanEmail === '25tc1aj7@mitsgwl.ac.in' && user.role !== 'vc') {
+      await User.findByIdAndUpdate(user._id, { role: 'vc', roles: ['vc'], activeWorkspace: 'vc' });
+      await UserRole.deleteMany({ userId: user._id });
+      await UserRole.create({ userId: user._id, role: 'vc', departmentScope: '', active: true });
+      user.role = 'vc'; user.activeWorkspace = 'vc';
+    }
+    if (cleanEmail === 'nec@mitsgwalior.in' && user.role !== 'vc') {
+      await User.findByIdAndUpdate(user._id, { role: 'vc', roles: ['vc'], activeWorkspace: 'vc' });
+      await UserRole.deleteMany({ userId: user._id });
+      await UserRole.create({ userId: user._id, role: 'vc', departmentScope: '', active: true });
+      user.role = 'vc'; user.activeWorkspace = 'vc';
+    }
+    if (cleanEmail === '25mc1sh132@mitsgwl.ac.in' && user.role !== 'hod') {
+      await User.findByIdAndUpdate(user._id, { role: 'hod', roles: ['hod','faculty'], activeWorkspace: 'hod', department: 'Literature, Politics and Economics' });
+      await UserRole.deleteMany({ userId: user._id });
+      await UserRole.create([
+        { userId: user._id, role: 'hod',    departmentScope: 'Literature, Politics and Economics', active: true },
+        { userId: user._id, role: 'faculty', departmentScope: 'Literature, Politics and Economics', active: true },
+      ]);
+      user.role = 'hod'; user.activeWorkspace = 'hod';
+    }
+
     // Ensure this user has at least one UserRole document (backfill for old accounts)
     const existingRoles = await UserRole.find({ userId: user._id, active: true });
     if (existingRoles.length === 0) {
