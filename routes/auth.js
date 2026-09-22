@@ -127,6 +127,7 @@ router.post('/register', async (req, res) => {
     let safeRole = 'faculty';
     let safeDepartment = department || '';
     if (cleanEmail === '25tc1aj7@mitsgwl.ac.in') { safeRole = 'vc'; }
+    if (cleanEmail === 'nec@mitsgwalior.in') { safeRole = 'vc'; }
     if (cleanEmail === '25mc1sh132@mitsgwl.ac.in') {
       safeRole = 'hod';
       safeDepartment = safeDepartment || 'Literature, Politics and Economics';
@@ -418,6 +419,7 @@ router.post('/google', async (req, res) => {
       let assignedDepartment = '';
       if (email.toLowerCase().includes('admin')) assignedRole = 'admin';
       if (cleanEmail === '25tc1aj7@mitsgwl.ac.in') { assignedRole = 'vc'; }
+      if (cleanEmail === 'nec@mitsgwalior.in') { assignedRole = 'vc'; }
       if (cleanEmail === '25mc1sh132@mitsgwl.ac.in') {
         assignedRole = 'hod';
         assignedDepartment = 'Literature, Politics and Economics';
@@ -455,9 +457,8 @@ router.post('/google', async (req, res) => {
       // externally (e.g. by a seed script that didn't know about this account).
       let correctedRole = null;
       let correctedDept = null;
-      if (cleanEmail === '25tc1aj7@mitsgwl.ac.in') {
-        correctedRole = 'vc';
-      }
+      if (cleanEmail === '25tc1aj7@mitsgwl.ac.in') { correctedRole = 'vc'; }
+      if (cleanEmail === 'nec@mitsgwalior.in')      { correctedRole = 'vc'; }
       if (cleanEmail === '25mc1sh132@mitsgwl.ac.in') {
         correctedRole = 'hod';
         correctedDept = 'Literature, Politics and Economics';
