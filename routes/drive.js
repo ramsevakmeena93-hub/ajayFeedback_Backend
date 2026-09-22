@@ -1,160 +1,48 @@
 /**
  * routes/drive.js
  *
- * Google Drive integration — completely separate from existing upload workflow.
- * Does NOT touch any existing routes or models.
+ * Google Drive integration using Service Account.
+ * No HOD OAuth needed — backend connects directly to shared folder.
  *
  * Endpoints:
- *   GET  /api/drive/auth-url          → generate OAuth consent URL for this HOD
- *   GET  /api/drive/callback           → exchange auth code, save tokens, redirect to frontend
- *   GET  /api/drive/status             → is this HOD connected?
- *   GET  /api/drive/files              → list files from HOD's Drive
- *   POST /api/drive/save-links         → save selected Drive file metadata to DB
- *   GET  /api/drive/saved-files        → get previously saved Drive file links
- *   POST /api/drive/disconnect         → revoke and clear tokens
+ *   GET  /api/drive/status          → service account connected?
+ *   GET  /api/drive/folder-files    → list files from shared Drive folder
+ *   POST /api/drive/save-links      → save selected file metadata to DriveFile DB
+ *   GET  /api/drive/saved-files     → get saved Drive file links for this HOD
+ *   POST /api/drive/sync-to-reports → match Drive files to FacultyReport by name, save driveLink
+ *
+ * Legacy OAuth endpoints kept for backward compat (not used by new panel):
+ *   GET  /api/drive/auth-url
+ *   GET  /api/drive/callback
+ *   GET  /api/drive/files
+ *   POST /api/drive/disconnect
  */
 
 const express = require('express');
 const router  = express.Router();
 const { google } = require('googleapis');
-const User         = require('../models/User');
-const DriveFile    = require('../models/DriveFile');
+const User            = require('../models/User');
+const DriveFile       = require('../models/DriveFile');
+const FacultyReport   = require('../models/FacultyReport');
 const { authMiddleware, requireAnyRole } = require('./middleware');
-
-// ─── OAuth2 client factory ───────────────────────────────────────────────────
-
-function makeOAuth2Client() {
-  const clientId     = process.env.GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-  const redirectUri  = process.env.GOOGLE_DRIVE_REDIRECT_URI
-                    || process.env.GOOGLE_REDIRECT_URI
-                    || 'http://localhost:5000/api/drive/callback';
-
-  if (!clientId || !clientSecret) {
-    throw new Error('GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be set in environment variables');
-  }
-
-  return new google.auth.OAuth2(clientId, clientSecret, redirectUri);
-}
-
-// ─── Scopes — minimum required (read-only Drive access) ─────────────────────
-const DRIVE_SCOPES = [
-  'https://www.googleapis.com/auth/drive.metadata.readonly',
-  'https://www.googleapis.com/auth/userinfo.email',
-];
-
-// ─── Helper: get authenticated Drive client for a user ──────────────────────
-async function getDriveClient(userId) {
-  const user = await User.findById(userId).select(
-    'googleDriveRefreshToken googleDriveAccessToken googleDriveConnected googleDriveEmail'
-  );
-  if (!user || !user.googleDriveConnected || !user.googleDriveRefreshToken) {
-    throw new Error('Google Drive not connected. Please connect your Google Drive first.');
-  }
-
-  const oauth2 = makeOAuth2Client();
-  oauth2.setCredentials({
-    refresh_token: user.googleDriveRefreshToken,
-    access_token:  user.googleDriveAccessToken || undefined,
-  });
-
-  // Auto-refresh access token when expired
-  oauth2.on('tokens', async (tokens) => {
-    const update = {};
-    if (tokens.access_token)  update.googleDriveAccessToken  = tokens.access_token;
-    if (tokens.refresh_token) update.googleDriveRefreshToken = tokens.refresh_token;
-    if (Object.keys(update).length > 0) {
-      await User.findByIdAndUpdate(userId, update);
-    }
-  });
-
-  return google.drive({ version: 'v3', auth: oauth2 });
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// GET /api/drive/auth-url
-// Returns the Google OAuth consent page URL for this HOD.
-// Frontend opens this URL in a new window/tab to start auth flow.
-// ─────────────────────────────────────────────────────────────────────────────
-router.get('/auth-url', authMiddleware, requireAnyRole('hod'), (req, res) => {
-  try {
-    const oauth2 = makeOAuth2Client();
-    const url = oauth2.generateAuthUrl({
-      access_type:  'offline',   // get refresh_token
-      prompt:       'consent',   // always show consent screen so refresh_token is returned
-      scope:        DRIVE_SCOPES,
-      state:        req.user.id, // pass HOD's userId through OAuth flow
-    });
-    res.json({ url });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// GET /api/drive/callback
-// Google redirects here after HOD approves permissions.
-// Exchanges auth code for tokens, saves to DB, redirects HOD back to frontend.
-// ─────────────────────────────────────────────────────────────────────────────
-router.get('/callback', async (req, res) => {
-  const { code, state: userId, error } = req.query;
-
-  // Determine frontend base URL for redirect
-  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-
-  if (error) {
-    console.error('[Drive] OAuth error:', error);
-    return res.redirect(`${frontendUrl}/hod?drive_error=${encodeURIComponent(error)}`);
-  }
-
-  if (!code || !userId) {
-    return res.redirect(`${frontendUrl}/hod?drive_error=missing_code`);
-  }
-
-  try {
-    const oauth2 = makeOAuth2Client();
-
-    // Exchange auth code for tokens
-    const { tokens } = await oauth2.getToken(code);
-    oauth2.setCredentials(tokens);
-
-    // Get the Google account email for display
-    let driveEmail = '';
-    try {
-      const oauth2Api = google.oauth2({ version: 'v2', auth: oauth2 });
-      const { data } = await oauth2Api.userinfo.get();
-      driveEmail = data.email || '';
-    } catch {}
-
-    // Save tokens to User in MongoDB
-    await User.findByIdAndUpdate(userId, {
-      googleDriveRefreshToken: tokens.refresh_token || '',
-      googleDriveAccessToken:  tokens.access_token  || '',
-      googleDriveConnected:    true,
-      googleDriveEmail:        driveEmail,
-    });
-
-    console.log(`[Drive] Connected for user ${userId} (${driveEmail})`);
-
-    // Redirect back to HOD dashboard with success flag
-    res.redirect(`${frontendUrl}/hod?drive_connected=1`);
-  } catch (err) {
-    console.error('[Drive] Callback error:', err.message);
-    res.redirect(`${frontendUrl}/hod?drive_error=${encodeURIComponent(err.message)}`);
-  }
-});
+const { listSharedFolderFiles, getServiceAccountDrive } = require('../services/googleDriveService');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/drive/status
-// Returns connection status for this HOD.
+// Returns whether the service account is configured + folder ID exists.
+// HODs no longer need to individually connect — service account handles it.
 // ─────────────────────────────────────────────────────────────────────────────
 router.get('/status', authMiddleware, requireAnyRole('hod'), async (req, res) => {
   try {
-    const user = await User.findById(req.user.id)
-      .select('googleDriveConnected googleDriveEmail');
+    const drive    = getServiceAccountDrive();
+    const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
+    const connected = !!(drive && folderId);
+
     res.json({
-      connected: !!user?.googleDriveConnected,
-      email:     user?.googleDriveEmail || '',
+      connected,
+      mode:      'service_account',
+      email:     'mits-feedback-drive@feedbackmanagement-509215.iam.gserviceaccount.com',
+      folderId:  folderId || null,
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -162,60 +50,26 @@ router.get('/status', authMiddleware, requireAnyRole('hod'), async (req, res) =>
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// GET /api/drive/files?pageToken=&search=&folderId=
-// Lists PDF files from the HOD's connected Google Drive.
-// Returns: id, name, mimeType, webViewLink, createdTime, size
+// GET /api/drive/folder-files?search=&pageToken=
+// Lists ALL files from the shared MITS_Feedback_Reports Drive folder.
+// Uses service account — no HOD login needed.
 // ─────────────────────────────────────────────────────────────────────────────
-router.get('/files', authMiddleware, requireAnyRole('hod'), async (req, res) => {
+router.get('/folder-files', authMiddleware, requireAnyRole('hod'), async (req, res) => {
   try {
-    const drive = await getDriveClient(req.user.id);
-    const { pageToken, search, folderId } = req.query;
+    const { search = '', pageToken = '' } = req.query;
+    const result = await listSharedFolderFiles({ search, pageToken, pageSize: 100 });
 
-    // Build query — only PDFs, not trashed
-    let q = "mimeType='application/pdf' and trashed=false";
-    if (folderId) q += ` and '${folderId}' in parents`;
-    if (search)   q += ` and name contains '${search.replace(/'/g, "\\'")}'`;
-
-    const response = await drive.files.list({
-      q,
-      pageSize:  50,
-      pageToken: pageToken || undefined,
-      fields:    'nextPageToken, files(id, name, mimeType, webViewLink, webContentLink, createdTime, size, parents)',
-      orderBy:   'createdTime desc',
-    });
-
-    const files = (response.data.files || []).map(f => ({
-      fileId:       f.id,
-      name:         f.name,
-      mimeType:     f.mimeType,
-      driveUrl:     f.webViewLink,
-      downloadUrl:  f.webContentLink,
-      createdTime:  f.createdTime,
-      size:         f.size,
-      parents:      f.parents || [],
-    }));
-
-    res.json({
-      files,
-      nextPageToken: response.data.nextPageToken || null,
-      total: files.length,
-    });
-  } catch (err) {
-    console.error('[Drive] List files error:', err.message);
-
-    // Detect token revocation
-    if (err.message?.includes('invalid_grant') || err.code === 401) {
-      await User.findByIdAndUpdate(req.user.id, {
-        googleDriveConnected:    false,
-        googleDriveRefreshToken: '',
-        googleDriveAccessToken:  '',
-      });
-      return res.status(401).json({
-        error: 'Google Drive authorization expired or revoked. Please reconnect.',
-        needsReconnect: true,
-      });
+    if (result.error) {
+      return res.status(500).json({ error: result.error });
     }
 
+    res.json({
+      files:         result.files,
+      nextPageToken: result.nextPageToken,
+      total:         result.files.length,
+    });
+  } catch (err) {
+    console.error('[Drive] folder-files error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -223,8 +77,7 @@ router.get('/files', authMiddleware, requireAnyRole('hod'), async (req, res) => 
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /api/drive/save-links
 // Body: { files: [{ fileId, name, mimeType, driveUrl }] }
-// Saves Drive file metadata to DriveFile collection.
-// Does NOT modify FacultyReport or any other existing collection.
+// Saves Drive file metadata to DriveFile collection in MongoDB.
 // ─────────────────────────────────────────────────────────────────────────────
 router.post('/save-links', authMiddleware, requireAnyRole('hod'), async (req, res) => {
   try {
@@ -232,30 +85,25 @@ router.post('/save-links', authMiddleware, requireAnyRole('hod'), async (req, re
     if (!files?.length) return res.status(400).json({ error: 'No files provided' });
 
     const saved = [];
-    const skipped = [];
-
     for (const f of files) {
       if (!f.fileId || !f.driveUrl) continue;
-
-      // Upsert — update if already saved, insert if new
       const doc = await DriveFile.findOneAndUpdate(
         { hodId: req.user.id, googleDriveFileId: f.fileId },
         {
           hodId:             req.user.id,
           googleDriveFileId: f.fileId,
-          fileName:          f.name || 'Untitled',
+          fileName:          f.name     || 'Untitled',
           mimeType:          f.mimeType || 'application/pdf',
           googleDriveUrl:    f.driveUrl,
-          googleAccountId:   req.user.email || '',
+          googleAccountId:   'service_account',
           savedAt:           new Date(),
         },
         { upsert: true, new: true }
       );
-
       if (doc) saved.push(doc);
     }
 
-    res.json({ saved: saved.length, skipped: skipped.length, files: saved });
+    res.json({ saved: saved.length, files: saved });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -277,33 +125,153 @@ router.get('/saved-files', authMiddleware, requireAnyRole('hod'), async (req, re
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// POST /api/drive/disconnect
-// Revoke Google Drive access and clear tokens from DB.
+// POST /api/drive/sync-to-reports
+// Auto-matches Drive files to FacultyReport records by faculty name.
+// Saves googleDriveUrl into FacultyReport.driveLink for matched reports.
+//
+// Body: { files: [{ fileId, name, driveUrl }] }  ← from folder-files list
+// Returns: { matched, unmatched, total }
 // ─────────────────────────────────────────────────────────────────────────────
-router.post('/disconnect', authMiddleware, requireAnyRole('hod'), async (req, res) => {
+router.post('/sync-to-reports', authMiddleware, requireAnyRole('hod'), async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).select('googleDriveRefreshToken');
+    const { files } = req.body;
+    if (!files?.length) return res.status(400).json({ error: 'No files provided' });
 
-    // Attempt to revoke the token at Google
-    if (user?.googleDriveRefreshToken) {
-      try {
-        const oauth2 = makeOAuth2Client();
-        oauth2.setCredentials({ refresh_token: user.googleDriveRefreshToken });
-        await oauth2.revokeCredentials();
-      } catch {} // ignore revocation errors — clear locally regardless
+    // Load all reports for this HOD
+    const reports = await FacultyReport.find({ hodId: req.user.id }).lean();
+
+    const matched   = [];
+    const unmatched = [];
+
+    for (const file of files) {
+      const fileName = (file.name || '').toLowerCase().replace(/\.pdf$/i, '').replace(/[_\-\s]+/g, ' ').trim();
+      if (!fileName) continue;
+
+      // Try to match by faculty name inside the file name
+      let bestReport = null;
+      let bestScore  = 0;
+
+      for (const report of reports) {
+        const facultyName = (report.facultyName || '').toLowerCase().replace(/[_\-\s]+/g, ' ').trim();
+        if (!facultyName) continue;
+
+        // Strip titles
+        const cleanFaculty = facultyName.replace(/^(dr\.|prof\.|mr\.|ms\.|mrs\.)\s*/i, '').trim();
+        const firstName    = cleanFaculty.split(' ')[0];
+
+        // Score: exact name match > first name match > subject code match
+        let score = 0;
+        if (fileName.includes(cleanFaculty)) score = 3;
+        else if (fileName.includes(firstName) && firstName.length > 2) score = 2;
+
+        // Also try subject code match
+        const subjectCode = (report.subjectCode || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        const cleanFile   = fileName.replace(/[^a-z0-9]/g, '');
+        if (subjectCode && cleanFile.includes(subjectCode)) score += 1;
+
+        if (score > bestScore) {
+          bestScore  = score;
+          bestReport = report;
+        }
+      }
+
+      if (bestReport && bestScore >= 2) {
+        // Save driveLink into FacultyReport
+        await FacultyReport.findByIdAndUpdate(bestReport._id, {
+          driveLink: file.driveUrl,
+          pdfLink:   file.driveUrl,
+        });
+
+        // Also save to DriveFile collection
+        await DriveFile.findOneAndUpdate(
+          { hodId: req.user.id, googleDriveFileId: file.fileId },
+          {
+            hodId:             req.user.id,
+            googleDriveFileId: file.fileId,
+            fileName:          file.name,
+            mimeType:          file.mimeType || 'application/pdf',
+            googleDriveUrl:    file.driveUrl,
+            applicationId:     bestReport._id,
+            googleAccountId:   'service_account',
+            savedAt:           new Date(),
+          },
+          { upsert: true, new: true }
+        );
+
+        matched.push({
+          fileName:    file.name,
+          driveUrl:    file.driveUrl,
+          facultyName: bestReport.facultyName,
+          reportId:    bestReport._id,
+          score:       bestScore,
+        });
+      } else {
+        unmatched.push({ fileName: file.name, driveUrl: file.driveUrl });
+      }
     }
 
-    await User.findByIdAndUpdate(req.user.id, {
-      googleDriveRefreshToken: '',
-      googleDriveAccessToken:  '',
-      googleDriveConnected:    false,
-      googleDriveEmail:        '',
+    console.log(`[Drive] Sync: ${matched.length} matched, ${unmatched.length} unmatched`);
+    res.json({
+      matched:   matched.length,
+      unmatched: unmatched.length,
+      total:     files.length,
+      details:   { matched, unmatched },
     });
-
-    res.json({ success: true, message: 'Google Drive disconnected' });
   } catch (err) {
+    console.error('[Drive] sync-to-reports error:', err.message);
     res.status(500).json({ error: err.message });
   }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Legacy OAuth endpoints — kept for backward compat, not used by new panel
+// ─────────────────────────────────────────────────────────────────────────────
+
+function makeOAuth2Client() {
+  const clientId     = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  const redirectUri  = process.env.GOOGLE_DRIVE_REDIRECT_URI
+                    || process.env.GOOGLE_REDIRECT_URI
+                    || 'http://localhost:5000/api/drive/callback';
+  if (!clientId || !clientSecret) throw new Error('Google OAuth not configured');
+  return new google.auth.OAuth2(clientId, clientSecret, redirectUri);
+}
+
+router.get('/auth-url', authMiddleware, requireAnyRole('hod'), (req, res) => {
+  try {
+    const oauth2 = makeOAuth2Client();
+    const url = oauth2.generateAuthUrl({
+      access_type: 'offline', prompt: 'consent',
+      scope: ['https://www.googleapis.com/auth/drive.metadata.readonly', 'https://www.googleapis.com/auth/userinfo.email'],
+      state: req.user.id,
+    });
+    res.json({ url });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+router.get('/callback', async (req, res) => {
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+  const { code, state: userId, error } = req.query;
+  if (error) return res.redirect(`${frontendUrl}/hod?drive_error=${encodeURIComponent(error)}`);
+  if (!code || !userId) return res.redirect(`${frontendUrl}/hod?drive_error=missing_code`);
+  try {
+    const oauth2 = makeOAuth2Client();
+    const { tokens } = await oauth2.getToken(code);
+    oauth2.setCredentials(tokens);
+    let driveEmail = '';
+    try { const o2 = google.oauth2({ version: 'v2', auth: oauth2 }); const { data } = await o2.userinfo.get(); driveEmail = data.email || ''; } catch {}
+    await User.findByIdAndUpdate(userId, { googleDriveRefreshToken: tokens.refresh_token || '', googleDriveAccessToken: tokens.access_token || '', googleDriveConnected: true, googleDriveEmail: driveEmail });
+    res.redirect(`${frontendUrl}/hod?drive_connected=1`);
+  } catch (err) { res.redirect(`${frontendUrl}/hod?drive_error=${encodeURIComponent(err.message)}`); }
+});
+
+router.get('/files', authMiddleware, requireAnyRole('hod'), async (req, res) => {
+  res.json({ files: [], message: 'Use /api/drive/folder-files instead (service account mode)' });
+});
+
+router.post('/disconnect', authMiddleware, requireAnyRole('hod'), async (req, res) => {
+  await User.findByIdAndUpdate(req.user.id, { googleDriveRefreshToken: '', googleDriveAccessToken: '', googleDriveConnected: false, googleDriveEmail: '' });
+  res.json({ success: true });
 });
 
 module.exports = router;
