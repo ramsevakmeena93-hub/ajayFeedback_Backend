@@ -226,7 +226,7 @@ router.post('/sync-to-reports', authMiddleware, requireAnyRole('hod'), async (re
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/drive/test — debug endpoint to check service account status
 // ─────────────────────────────────────────────────────────────────────────────
-router.get('/test', authMiddleware, requireAnyRole('hod'), async (req, res) => {
+router.get('/test', async (req, res) => {
   try {
     const keyRaw   = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
     const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
