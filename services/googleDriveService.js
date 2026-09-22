@@ -25,10 +25,32 @@ function getServiceAccountDrive() {
   }
 
   try {
-    // Handle both single-line and multi-line JSON
-    keyRaw = keyRaw.trim();
-    // Fix common issue: actual newlines in private_key replaced with \n
-    const credentials = JSON.parse(keyRaw);
+    // Try multiple parsing strategies to handle different formats
+    let credentials = null;
+
+    // Strategy 1: direct parse
+    try { credentials = JSON.parse(keyRaw.trim()); } catch {}
+
+    // Strategy 2: replace literal \n with actual newlines then parse
+    if (!credentials) {
+      try { credentials = JSON.parse(keyRaw.trim().replace(/\\n/g, '\n')); } catch {}
+    }
+
+    // Strategy 3: remove all actual newlines/spaces between JSON tokens then parse
+    if (!credentials) {
+      try {
+        // Keep \n inside string values but remove real line breaks between fields
+        const oneLine = keyRaw.replace(/\r?\n/g, ' ').trim();
+        credentials = JSON.parse(oneLine);
+      } catch {}
+    }
+
+    if (!credentials) {
+      console.error("[Drive] Could not parse GOOGLE_SERVICE_ACCOUNT_KEY — check format in Render");
+      return null;
+    }
+
+    // Fix private key newlines
     if (credentials.private_key) {
       credentials.private_key = credentials.private_key.replace(/\\n/g, '\n');
     }

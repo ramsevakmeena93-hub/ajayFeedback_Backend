@@ -224,8 +224,53 @@ router.post('/sync-to-reports', authMiddleware, requireAnyRole('hod'), async (re
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Legacy OAuth endpoints — kept for backward compat, not used by new panel
+// GET /api/drive/test — debug endpoint to check service account status
 // ─────────────────────────────────────────────────────────────────────────────
+router.get('/test', authMiddleware, requireAnyRole('hod'), async (req, res) => {
+  try {
+    const keyRaw   = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
+    const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
+
+    if (!keyRaw) return res.json({ ok: false, error: 'GOOGLE_SERVICE_ACCOUNT_KEY not set in Render' });
+    if (!folderId) return res.json({ ok: false, error: 'GOOGLE_DRIVE_FOLDER_ID not set in Render' });
+
+    // Try to parse the key
+    let credentials;
+    try {
+      let k = keyRaw.trim();
+      credentials = JSON.parse(k);
+    } catch (e1) {
+      // Try replacing literal \n with actual newlines
+      try {
+        let k = keyRaw.trim().replace(/\\n/g, '\n');
+        credentials = JSON.parse(k);
+      } catch (e2) {
+        return res.json({ ok: false, error: `JSON parse failed: ${e2.message}`, keyLength: keyRaw.length, keyStart: keyRaw.substring(0, 30) });
+      }
+    }
+
+    // Try to connect
+    const drive = getServiceAccountDrive();
+    if (!drive) return res.json({ ok: false, error: 'Drive client failed to initialize', clientEmail: credentials?.client_email });
+
+    // Try to list files
+    const result = await drive.files.list({
+      q: `'${folderId}' in parents and trashed=false`,
+      pageSize: 1,
+      fields: 'files(id, name)',
+    });
+
+    res.json({
+      ok: true,
+      clientEmail: credentials?.client_email,
+      folderId,
+      filesFound: result.data.files?.length ?? 0,
+      firstFile: result.data.files?.[0]?.name || 'none',
+    });
+  } catch (err) {
+    res.json({ ok: false, error: err.message, code: err.code });
+  }
+});
 
 function makeOAuth2Client() {
   const clientId     = process.env.GOOGLE_CLIENT_ID;
