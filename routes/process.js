@@ -369,10 +369,20 @@ router.post('/upload-batch', authMiddleware, batchUpload.any(), async (req, res)
     const tasks = pdfFiles.map((file) =>
       limit(async () => {
         try {
-          // 1. Upload to Google Cloud Storage (organized by HOD email/department)
+          // 0. Split multi-faculty PDF into individual slices first
+          const { splitPdfByFaculty } = require('../services/pdfSliceService');
+          const facultySlices = await splitPdfByFaculty(file.buffer);
+
+          for (const slice of facultySlices) {
+            const sliceBuffer = slice.buffer;
+            const sliceName   = slice.facultyName
+              ? `${slice.facultyName.replace(/\s+/g, '_')}_${file.originalname}`
+              : file.originalname;
+
+          // 1. Upload to Google Drive (organized by HOD email/department)
           const driveResult = await uploadPdfToDrive({
-            fileName: file.originalname,
-            buffer:   file.buffer,
+            fileName: sliceName,
+            buffer:   sliceBuffer,
             hodUser:  user,
             academicYear,
             session

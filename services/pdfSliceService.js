@@ -58,4 +58,117 @@ async function slicePdfForReport(buffer, { subjectCode, facultyName } = {}) {
   }
 }
 
-module.exports = { slicePdfForReport };
+// module.exports moved to bottom of file — see splitPdfByFaculty export
+
+/**
+ * splitPdfByFaculty
+ * Splits a multi-faculty PDF into individual buffers, one per faculty.
+ * Each faculty's pages are detected by locating their name in the page text.
+ *
+ * Returns an array of:
+ *   { facultyName, subjectCode, buffer }
+ *
+ * If the PDF has 3 or fewer pages (already individual), returns a single entry
+ * with the full buffer.
+ */
+async function splitPdfByFaculty(buffer) {
+  try {
+    const uint8    = new Uint8Array(buffer);
+    const doc      = await pdfjsLib.getDocument({ data: uint8, verbosity: 0 }).promise;
+    const { PDFDocument } = require('pdf-lib');
+
+    // Single-faculty PDF — return as-is
+    if (doc.numPages <= 3) {
+      return [{ facultyName: null, subjectCode: null, buffer }];
+    }
+
+    // Step 1: Extract text + detect faculty boundaries per page
+    const pages = [];
+    for (let i = 1; i <= doc.numPages; i++) {
+      const page = await doc.getPage(i);
+      const tc   = await page.getTextContent();
+      const text = tc.items.map(t => t.str).join(' ');
+
+      // Detect if this page starts a new faculty section
+      // Look for the MITS feedback form header row
+      const isHeader =
+        /Faculty\s+Name.*Course\s+Code/i.test(text) ||
+        /Faculty\s+Name.*Code\s*\/\s*Batch/i.test(text);
+
+      // Extract faculty name from the data row below the header
+      let facultyName = null;
+      let subjectCode = null;
+
+      const nameMatch = text.match(/([A-Z][a-z]+(?:\s+[A-Z][a-z.]+){1,4})\s+(\d{5,})/);
+      if (nameMatch) {
+        facultyName = nameMatch[1].trim();
+        subjectCode = nameMatch[2].trim();
+      }
+
+      pages.push({ pageIndex: i - 1, text, isHeader, facultyName, subjectCode });
+    }
+
+    // Step 2: Group pages into faculty sections
+    // A new section starts when we find a header row or a new faculty name
+    const sections = [];
+    let current = null;
+
+    for (const page of pages) {
+      if (page.facultyName && (!current || page.facultyName !== current.facultyName)) {
+        // New faculty section
+        if (current) sections.push(current);
+        current = {
+          facultyName: page.facultyName,
+          subjectCode: page.subjectCode,
+          pageIndices: [page.pageIndex],
+        };
+      } else if (current) {
+        current.pageIndices.push(page.pageIndex);
+      } else {
+        // First pages before any faculty name detected
+        current = { facultyName: null, subjectCode: null, pageIndices: [page.pageIndex] };
+      }
+    }
+    if (current) sections.push(current);
+
+    // If we couldn't split (only 1 section or no names found), return full buffer
+    if (sections.length <= 1) {
+      return [{ facultyName: null, subjectCode: null, buffer }];
+    }
+
+    // Step 3: Build individual PDF buffers for each faculty
+    const srcDoc  = await PDFDocument.load(buffer);
+    const results = [];
+
+    for (const section of sections) {
+      if (!section.facultyName || section.pageIndices.length === 0) continue;
+
+      try {
+        const subDoc  = await PDFDocument.create();
+        const copied  = await subDoc.copyPages(srcDoc, section.pageIndices);
+        copied.forEach(p => subDoc.addPage(p));
+        const slicedBuffer = Buffer.from(await subDoc.save());
+
+        results.push({
+          facultyName: section.facultyName,
+          subjectCode: section.subjectCode,
+          buffer:      slicedBuffer,
+        });
+      } catch (e) {
+        console.warn(`[PDF Split] Failed to slice pages for ${section.facultyName}:`, e.message);
+      }
+    }
+
+    if (results.length === 0) {
+      return [{ facultyName: null, subjectCode: null, buffer }];
+    }
+
+    console.log(`[PDF Split] Split into ${results.length} faculty sections`);
+    return results;
+  } catch (err) {
+    console.warn('[PDF Split] Error splitting PDF:', err.message);
+    return [{ facultyName: null, subjectCode: null, buffer }];
+  }
+}
+
+module.exports = { slicePdfForReport, splitPdfByFaculty };
