@@ -75,6 +75,9 @@ app.use('/api/roles',       require('./routes/roles'));       // role assignment
 app.use('/api/assignments', require('./routes/assignments')); // teaching assignments
 app.use('/api/audit',       require('./routes/audit'));       // audit log (admin + /my)
 
+// ── Google Drive integration (separate panel — does not affect existing upload flow) ──
+app.use('/api/drive',       require('./routes/drive'));
+
 // Health check
 app.get('/api/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
 
