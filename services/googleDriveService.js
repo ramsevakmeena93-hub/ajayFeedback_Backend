@@ -18,14 +18,20 @@ let _driveClient = null;
 function getServiceAccountDrive() {
   if (_driveClient) return _driveClient;
 
-  const keyRaw = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
+  let keyRaw = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
   if (!keyRaw) {
     console.warn("[Drive] GOOGLE_SERVICE_ACCOUNT_KEY not set — Drive upload disabled");
     return null;
   }
 
   try {
-    const credentials = typeof keyRaw === "string" ? JSON.parse(keyRaw) : keyRaw;
+    // Handle both single-line and multi-line JSON
+    keyRaw = keyRaw.trim();
+    // Fix common issue: actual newlines in private_key replaced with \n
+    const credentials = JSON.parse(keyRaw);
+    if (credentials.private_key) {
+      credentials.private_key = credentials.private_key.replace(/\\n/g, '\n');
+    }
     const auth = new google.auth.GoogleAuth({
       credentials,
       scopes: ["https://www.googleapis.com/auth/drive"],

@@ -27,7 +27,9 @@ async function uploadToGCS(buffer, fileName, { hodEmail, department, academicYea
 
   try {
     const { Storage } = require("@google-cloud/storage");
-    const credentials = typeof keyRaw === "string" ? JSON.parse(keyRaw) : keyRaw;
+    let keyRaw2 = keyRaw.trim();
+    const credentials = JSON.parse(keyRaw2);
+    if (credentials.private_key) credentials.private_key = credentials.private_key.replace(/\\n/g, '\n');
     const storage     = new Storage({ credentials });
     const bucket      = storage.bucket(bucketName);
 
