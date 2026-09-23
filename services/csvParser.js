@@ -14,7 +14,7 @@ function parseCSV(buffer) {
 
   // 1. Try reading with XLSX (supports .xlsx, .xls, .ods)
   try {
-    const workbook = XLSX.read(buffer, { type: 'buffer', cellFormula: true });
+    const workbook = XLSX.read(buffer, { type: 'buffer', cellFormula: true, cellStyles: true, cellHTML: false, bookVBA: false });
     for (const sheetName of workbook.SheetNames) {
       const sheet = workbook.Sheets[sheetName];
       if (!sheet || !sheet['!ref']) continue;
@@ -42,7 +42,12 @@ function parseCSV(buffer) {
           // If formula is =HYPERLINK("url", ...), extract url
           if (!link && formula) {
             const m = formula.match(/HYPERLINK\s*\(\s*["']([^"']+)["']/i);
-            if (m) link = m[1].trim();
+            if (m) link = m[1].trim().replace(/&amp;/g, '&');
+          }
+
+          // If val itself looks like a URL, use it as link too
+          if (!link && val.startsWith('http')) {
+            link = val.replace(/&amp;/g, '&');
           }
 
           rowCells.push({ val, link, formula });
