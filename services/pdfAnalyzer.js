@@ -347,8 +347,13 @@ async function extractAllStudentComments(buffer, targetCourseCode) {
 // GOOGLE DRIVE LINK CONVERTER
 // ─────────────────────────────────────────────────────────────────
 function convertDriveLink(url) {
-  const m = url.match(/\/d\/([a-zA-Z0-9_-]+)/) || url.match(/id=([a-zA-Z0-9_-]+)/);
-  if (m) return `https://drive.google.com/uc?export=download&id=${m[1]}`;
+  if (!url) return url;
+  // Handle /d/FILE_ID/... format
+  const m1 = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+  if (m1) return `https://drive.google.com/uc?export=download&id=${m1[1]}`;
+  // Handle ?id=FILE_ID or open?id=FILE_ID format
+  const m2 = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  if (m2) return `https://drive.google.com/uc?export=download&id=${m2[1]}`;
   return url;
 }
 
