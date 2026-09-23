@@ -76,7 +76,19 @@ app.use('/api/assignments', require('./routes/assignments')); // teaching assign
 app.use('/api/audit',       require('./routes/audit'));       // audit log (admin + /my)
 
 // Health check + version
-app.get('/api/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime(), version: '2.2.0' }));
+app.get('/api/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime(), version: '2.3.0' }));
+
+// Debug: test parser with a sample xlsx to verify hyperlink extraction works on this server
+app.post('/api/debug/parse-excel', require('multer')({ storage: require('multer').memoryStorage() }).single('file'), (req, res) => {
+  try {
+    const { parseCSV } = require('./services/csvParser');
+    if (!req.file) return res.status(400).json({ error: 'No file' });
+    const results = parseCSV(req.file.buffer);
+    res.json({ count: results.length, results });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
 
 // Global error handler — catches unhandled errors and logs them
 app.use((err, req, res, next) => {
