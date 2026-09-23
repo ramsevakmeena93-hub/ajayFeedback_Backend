@@ -91,11 +91,16 @@ function parseCSV(buffer) {
     for (let r = 0; r < Math.min(rows.length, 15); r++) {
       const row = rows[r];
       const texts = row.map(c => c.val.toLowerCase());
+      const rowStr = texts.join(' ');
 
-      const isHeader = texts.some(t => 
+      // Skip rows that actually contain URLs — those are data rows
+      const hasUrl = row.some(c => /https?:\/\//i.test(c.val) || (c.link && c.link.startsWith('http')));
+      if (hasUrl) continue;
+
+      const isHeader = texts.some(t =>
         t.includes('faculty') || t.includes('teacher') || t.includes('instructor') ||
-        t.includes('link') || t.includes('drive') || t.includes('url') || 
-        t.includes('course') || t.includes('subject')
+        t.includes('link') || t.includes('url') ||
+        t.includes('course') || t.includes('subject') || t.includes('name')
       );
 
       if (isHeader) {
@@ -150,16 +155,11 @@ function parseCSV(buffer) {
         }
       }
 
-      // Scan row for Drive or HTTP string
+      // Scan row for any HTTP/HTTPS URL (not just Drive)
       if (!foundUrl) {
         const fullRowStr = row.map(c => c.val).join(' ');
-        const driveM = fullRowStr.match(/https?:\/\/(?:drive\.google\.com|docs\.google\.com)[^\s"',;<>]+/i);
-        if (driveM) {
-          foundUrl = driveM[0];
-        } else {
-          const httpM = fullRowStr.match(/https?:\/\/[^\s"',;<>]+/i);
-          if (httpM) foundUrl = httpM[0];
-        }
+        const httpM = fullRowStr.match(/https?:\/\/[^\s"',;<>\]]+/i);
+        if (httpM) foundUrl = httpM[0];
       }
 
       if (!foundUrl) continue;

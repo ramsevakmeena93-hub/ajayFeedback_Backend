@@ -41,7 +41,18 @@ router.post('/upload-csv', authMiddleware, csvUpload.any(), async (req, res) => 
     if (!file) return res.status(400).json({ error: 'No CSV or Excel file uploaded' });
 
     const entries = parseCSV(file.buffer);
-    if (entries.length === 0) return res.status(400).json({ error: 'No valid Drive or PDF links found in the uploaded file. Please ensure your file contains URL links.' });
+    console.log(`[upload-csv] Parsed ${entries.length} entries from file: ${file.originalname}, size: ${file.size}`);
+    if (entries.length === 0) {
+      // Log first few rows to help debug
+      try {
+        const XLSX = require('xlsx');
+        const wb = XLSX.read(file.buffer, { type: 'buffer' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const preview = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' }).slice(0, 5);
+        console.log('[upload-csv] First 5 rows preview:', JSON.stringify(preview));
+      } catch(e) { console.log('[upload-csv] Could not preview:', e.message); }
+      return res.status(400).json({ error: 'No valid PDF links found in the uploaded file. Make sure your Excel contains a column with PDF/HTTP URLs.' });
+    }
 
     // Return just the links — don't create DB records yet
     res.json({
