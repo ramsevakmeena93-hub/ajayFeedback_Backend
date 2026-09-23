@@ -345,115 +345,96 @@ router.post('/upload-batch', authMiddleware, batchUpload.any(), async (req, res)
     const tasks = pdfFiles.map((file) =>
       limit(async () => {
         try {
-          // 0. Split multi-faculty PDF into individual slices first
+          const { uploadPdf } = require('../services/cloudStorage');
           const { splitPdfByFaculty } = require('../services/pdfSliceService');
           const facultySlices = await splitPdfByFaculty(file.buffer);
 
           for (const slice of facultySlices) {
             const sliceBuffer = slice.buffer;
-            const sliceName   = slice.facultyName
+            const sliceName = slice.facultyName
               ? `${slice.facultyName.replace(/\s+/g, '_')}_${file.originalname}`
               : file.originalname;
 
-          // 1. Save PDF locally via cloudStorage
-          const { uploadPdf } = require('../services/cloudStorage');
-          const driveResult = await uploadPdf({
-            fileName: sliceName,
-            buffer:   sliceBuffer,
-            hodUser:  user,
-            academicYear,
-            session
-          });
-
-          // 2. Analyze PDF buffer in-memory with AI & Regex parser
-          let analysis = null;
-          try {
-            analysis = await analyzePDFBuffer(file.buffer);
-          } catch (aiErr) {
-            console.warn(`[UploadBatch] AI analysis failed for ${file.originalname}:`, aiErr.message);
-            const meta = await extractMetaFromPDF(file.buffer).catch(() => ({}));
-            analysis = {
-              meta,
-              appreciation: [],
-              commentsNeedingAttention: [],
-              appreciationCount: 0,
-              attentionCount: 0,
-              ffiScore: meta.ffiScore || null,
-              responseCount: meta.responseCount || null
-            };
-          }
-
-          // Release buffer from memory as early as possible
-          file.buffer = null;
-
-          const pdfMeta = analysis.meta || {};
-          const detectedFacultyName = pdfMeta.facultyName || file.originalname.replace(/\.pdf$/i, '').replace(/[_\-]/g, ' ').trim();
-
-          // 3. Auto-match faculty to User in MongoDB
-          let facultyUserId = null;
-          if (detectedFacultyName) {
-            let matchedUser = await User.findOne({
-              name: { $regex: new RegExp(`^${detectedFacultyName.trim()}$`, 'i') }
+            const driveResult = await uploadPdf({
+              fileName: sliceName,
+              buffer: sliceBuffer,
+              hodUser: user,
+              academicYear,
+              session
             });
 
-            if (!matchedUser) {
-              const strippedName = detectedFacultyName.replace(/^(Dr\.|Prof\.|Mr\.|Ms\.|Mrs\.)\s+/i, '').trim();
-              matchedUser = await User.findOne({
-                name: { $regex: new RegExp(strippedName, 'i') }
-              });
+            let analysis = null;
+            try {
+              analysis = await analyzePDFBuffer(sliceBuffer);
+            } catch (aiErr) {
+              console.warn(`[UploadBatch] AI analysis failed for ${sliceName}:`, aiErr.message);
+              const meta = await extractMetaFromPDF(sliceBuffer).catch(() => ({}));
+              analysis = {
+                meta,
+                appreciation: [],
+                commentsNeedingAttention: [],
+                appreciationCount: 0,
+                attentionCount: 0,
+                ffiScore: meta.ffiScore || null,
+                responseCount: meta.responseCount || null
+              };
             }
 
-            if (matchedUser) {
-              facultyUserId = matchedUser._id;
+            const pdfMeta = analysis.meta || {};
+            const detectedFacultyName = pdfMeta.facultyName || file.originalname.replace(/\.pdf$/i, '').replace(/[_\-]/g, ' ').trim();
+
+            let facultyUserId = null;
+            if (detectedFacultyName) {
+              let matchedUser = await User.findOne({ name: { $regex: new RegExp(`^${detectedFacultyName.trim()}$`, 'i') } });
+              if (!matchedUser) {
+                const strippedName = detectedFacultyName.replace(/^(Dr\.|Prof\.|Mr\.|Ms\.|Mrs\.)\s+/i, '').trim();
+                matchedUser = await User.findOne({ name: { $regex: new RegExp(strippedName, 'i') } });
+              }
+              if (matchedUser) facultyUserId = matchedUser._id;
             }
+
+            const report = await FacultyReport.create({
+              hodId: req.user.id,
+              facultyUserId,
+              facultyName: detectedFacultyName,
+              subjectCode: pdfMeta.subjectCode || '',
+              programme: pdfMeta.programme || '',
+              semester: pdfMeta.semester || '',
+              branch: pdfMeta.branch || department || user?.department || '',
+              section: pdfMeta.section || '',
+              academicYear: academicYear || new Date().getFullYear().toString(),
+              pdfLink: driveResult.webViewLink || driveResult.localFilePath || '',
+              driveLink: driveResult.webViewLink || '',
+              pdfFilePath: driveResult.localFilePath || '',
+              appreciation: analysis.appreciation || [],
+              commentsNeedingAttention: analysis.commentsNeedingAttention || [],
+              appreciationCount: analysis.appreciationCount || 0,
+              attentionCount: analysis.attentionCount || 0,
+              ffiScore: analysis.ffiScore ?? pdfMeta.ffiScore ?? null,
+              responseCount: analysis.responseCount ?? pdfMeta.responseCount ?? null,
+              responsePercent: analysis.responsePercent ?? pdfMeta.responsePercent ?? null,
+              registeredStudents: analysis.registeredStudents ?? pdfMeta.registeredStudents ?? null,
+              linkSent: analysis.linkSent ?? pdfMeta.linkSent ?? null,
+              rawStudentComments: analysis.rawStudentComments || [],
+              commentCategories: analysis.commentCategories || {},
+              commentPercentages: analysis.commentPercentages || {},
+              hodRemarks: `Session: ${session || ''} | Form: ${feedbackFormNo || ''}`,
+              status: 'processed',
+              analyzedAt: new Date()
+            });
+
+            results.push({
+              reportId: report._id,
+              fileName: sliceName,
+              facultyName: detectedFacultyName,
+              matched: !!facultyUserId,
+              subjectCode: pdfMeta.subjectCode || '',
+              status: 'success'
+            });
           }
-
-          // 4. Save FacultyReport to MongoDB
-          const report = await FacultyReport.create({
-            hodId: req.user.id,
-            facultyUserId,
-            facultyName: detectedFacultyName,
-            subjectCode: pdfMeta.subjectCode || '',
-            programme: pdfMeta.programme || '',
-            semester: pdfMeta.semester || '',
-            branch: pdfMeta.branch || department || user?.department || '',
-            section: pdfMeta.section || '',
-            academicYear: academicYear || new Date().getFullYear().toString(),
-            pdfLink: driveResult.webViewLink,
-            driveLink: driveResult.webViewLink,
-            pdfFilePath: driveResult.localFilePath || '',
-            appreciation: analysis.appreciation || [],
-            commentsNeedingAttention: analysis.commentsNeedingAttention || [],
-            appreciationCount: analysis.appreciationCount || 0,
-            attentionCount: analysis.attentionCount || 0,
-            ffiScore: analysis.ffiScore ?? pdfMeta.ffiScore ?? null,
-            responseCount: analysis.responseCount ?? pdfMeta.responseCount ?? null,
-            responsePercent: analysis.responsePercent ?? pdfMeta.responsePercent ?? null,
-            registeredStudents: analysis.registeredStudents ?? pdfMeta.registeredStudents ?? null,
-            linkSent: analysis.linkSent ?? pdfMeta.linkSent ?? null,
-            rawStudentComments: analysis.rawStudentComments || [],
-            commentCategories: analysis.commentCategories || {},
-            commentPercentages: analysis.commentPercentages || {},
-            hodRemarks: `Session: ${session || ''} | Form: ${feedbackFormNo || ''}`,
-            status: 'processed',
-            analyzedAt: new Date()
-          });
-
-          results.push({
-            reportId: report._id,
-            fileName: file.originalname,
-            facultyName: detectedFacultyName,
-            matched: !!facultyUserId,
-            subjectCode: pdfMeta.subjectCode || '',
-            driveLink: driveResult.webViewLink,
-            status: 'success'
-          });
         } catch (fileErr) {
           console.error(`[UploadBatch] Error processing ${file.originalname}:`, fileErr.message);
-          errors.push({
-            fileName: file.originalname,
-            error: fileErr.message
-          });
+          errors.push({ fileName: file.originalname, error: fileErr.message });
         }
       })
     );
