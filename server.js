@@ -76,7 +76,7 @@ app.use('/api/assignments', require('./routes/assignments')); // teaching assign
 app.use('/api/audit',       require('./routes/audit'));       // audit log (admin + /my)
 
 // Health check + version
-app.get('/api/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime(), version: '2.1.0' }));
+app.get('/api/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime(), version: '2.2.0' }));
 
 // Global error handler — catches unhandled errors and logs them
 app.use((err, req, res, next) => {
