@@ -11,12 +11,11 @@ const { analyzePDF, analyzePDFBuffer, extractMetaFromPDF, convertDriveLink } = r
 const { getCached, setCache } = require('../services/cache');
 const FacultyReport = require('../models/FacultyReport');
 const User = require('../models/User');
-const { getDriveClientForUser, ensureDriveFolder, uploadPdfToDrive } = require('../services/googleDriveService');
 const { authMiddleware } = require('./middleware');
 const { log } = require('../services/logger');
 
-// CSV upload: 5MB limit
-const csvUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
+// CSV / Excel upload: 20MB limit
+const csvUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 
 // Batch upload (multiple PDFs or ZIP): up to 500MB, 500 files
 // Uses memoryStorage — buffers are released after each file is processed
@@ -35,13 +34,14 @@ const pdfUpload = multer({
   }
 });
 
-// ─── CSV UPLOAD — just parse links, don't process yet ──────────────────────
-router.post('/upload-csv', authMiddleware, csvUpload.single('csv'), async (req, res) => {
+// ─── CSV / EXCEL UPLOAD — parse links, don't process yet ──────────────────
+router.post('/upload-csv', authMiddleware, csvUpload.any(), async (req, res) => {
   try {
-    if (!req.file) return res.status(400).json({ error: 'No CSV file uploaded' });
+    const file = req.files && req.files.length > 0 ? req.files[0] : req.file;
+    if (!file) return res.status(400).json({ error: 'No CSV or Excel file uploaded' });
 
-    const entries = parseCSV(req.file.buffer);
-    if (entries.length === 0) return res.status(400).json({ error: 'No valid Drive links found in CSV' });
+    const entries = parseCSV(file.buffer);
+    if (entries.length === 0) return res.status(400).json({ error: 'No valid Drive or PDF links found in the uploaded file. Please ensure your file contains URL links.' });
 
     // Return just the links — don't create DB records yet
     res.json({
@@ -50,6 +50,7 @@ router.post('/upload-csv', authMiddleware, csvUpload.single('csv'), async (req, 
       total: entries.length
     });
   } catch (err) {
+    console.error('[upload-csv] Error parsing file:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -113,6 +114,9 @@ router.post('/process-one', authMiddleware, async (req, res) => {
       attentionCount: result.attentionCount,
       ffiScore: result.ffiScore ?? meta.ffiScore ?? null,
       responseCount: req.body.responseCount ?? result.responseCount ?? meta.responseCount ?? null,
+      responsePercent: req.body.responsePercent ?? result.responsePercent ?? meta.responsePercent ?? null,
+      registeredStudents: meta.registeredStudents ?? null,
+      linkSent: meta.linkSent ?? null,
       rawStudentComments: result.rawStudentComments || [],
       commentCategories: result.commentCategories || {},
       commentPercentages: result.commentPercentages || {},
@@ -202,7 +206,6 @@ router.post('/upload-pdfs', authMiddleware, pdfUpload.array('pdfs', 50), async (
 
     const reports = await FacultyReport.insertMany(reportDocs);
 
-    const user = await User.findById(req.user.id);
     const limit = pLimit(5);
     const processTasks = reports.map((report, idx) =>
       limit(async () => {
@@ -211,16 +214,11 @@ router.post('/upload-pdfs', authMiddleware, pdfUpload.array('pdfs', 50), async (
         const cacheKey = `pdf_buf_${crypto.createHash('md5').update(fileBuffer).digest('hex')}`;
         let result = getCached(cacheKey);
 
-        // Upload to Google Cloud Storage (organized by HOD email/department)
+        // Save locally via cloudStorage
         let storageResult = null;
         try {
-          storageResult = await uploadPdfToDrive({
-            fileName,
-            buffer: fileBuffer,
-            hodUser: user,
-            academicYear: req.body.academicYear,
-            session: req.body.session
-          });
+          const { uploadPdf } = require('../services/cloudStorage');
+          storageResult = await uploadPdf({ fileName, buffer: fileBuffer, hodUser: user, academicYear: req.body.academicYear, session: req.body.session });
         } catch (uploadErr) {
           console.warn(`[DirectUpload] Storage upload warning for ${fileName}:`, uploadErr.message);
         }
@@ -274,23 +272,7 @@ router.post('/upload-pdfs', authMiddleware, pdfUpload.array('pdfs', 50), async (
   }
 });
 
-// ─── GET DRIVE STATUS ───────────────────────────────────────────────────────
-router.get('/drive-status', authMiddleware, async (req, res) => {
-  try {
-    const user = await User.findById(req.user.id);
-    const { mode, email } = getDriveClientForUser(user);
-    res.json({
-      connected: !!user?.googleDriveConnected || mode === 'user_oauth',
-      mode,
-      email: user?.googleDriveEmail || email || user?.email,
-      hasServiceAccount: !!process.env.GOOGLE_SERVICE_ACCOUNT_KEY
-    });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ─── BATCH UPLOAD: PDF files or ZIP, saves to Google Drive, analyzes with AI ───
+// ─── BATCH UPLOAD: PDF files or ZIP, analyzes with AI ───
 router.post('/upload-batch', authMiddleware, batchUpload.any(), async (req, res) => {
   req.setTimeout(600000);
   res.setTimeout(600000);
@@ -342,24 +324,7 @@ router.post('/upload-batch', authMiddleware, batchUpload.any(), async (req, res)
       return res.status(400).json({ error: 'No valid PDF files found in the upload' });
     }
 
-    // Get HOD's Google Drive Client
     const user = await User.findById(req.user.id);
-    const { drive, mode, email: driveEmail } = getDriveClientForUser(user);
-
-    // Ensure target folder structure in Google Drive
-    let targetFolderId = null;
-    try {
-      const rootFolderId = await ensureDriveFolder(drive, 'AjayFeedback_Reports');
-      const deptName = department || user?.department || 'General';
-      const yearName = academicYear || new Date().getFullYear().toString();
-      const sessName = session === 'jul-dec' ? 'Jul-Dec' : (session === 'jan-may' ? 'Jan-Jun' : (session || 'Session'));
-      const formName = feedbackFormNo ? `Form-${feedbackFormNo}` : 'Form-I';
-      const folderTitle = `${deptName} - ${yearName} - ${sessName} - ${formName}`;
-
-      targetFolderId = await ensureDriveFolder(drive, folderTitle, rootFolderId);
-    } catch (folderErr) {
-      console.warn('[UploadBatch] Folder creation notice:', folderErr.message);
-    }
 
     // Process each PDF file concurrently (limit: 3 concurrent to control RAM usage)
     const limit = pLimit(3);
@@ -379,8 +344,9 @@ router.post('/upload-batch', authMiddleware, batchUpload.any(), async (req, res)
               ? `${slice.facultyName.replace(/\s+/g, '_')}_${file.originalname}`
               : file.originalname;
 
-          // 1. Upload to Google Drive (organized by HOD email/department)
-          const driveResult = await uploadPdfToDrive({
+          // 1. Save PDF locally via cloudStorage
+          const { uploadPdf } = require('../services/cloudStorage');
+          const driveResult = await uploadPdf({
             fileName: sliceName,
             buffer:   sliceBuffer,
             hodUser:  user,
@@ -451,6 +417,9 @@ router.post('/upload-batch', authMiddleware, batchUpload.any(), async (req, res)
             attentionCount: analysis.attentionCount || 0,
             ffiScore: analysis.ffiScore ?? pdfMeta.ffiScore ?? null,
             responseCount: analysis.responseCount ?? pdfMeta.responseCount ?? null,
+            responsePercent: analysis.responsePercent ?? pdfMeta.responsePercent ?? null,
+            registeredStudents: analysis.registeredStudents ?? pdfMeta.registeredStudents ?? null,
+            linkSent: analysis.linkSent ?? pdfMeta.linkSent ?? null,
             rawStudentComments: analysis.rawStudentComments || [],
             commentCategories: analysis.commentCategories || {},
             commentPercentages: analysis.commentPercentages || {},
@@ -485,8 +454,6 @@ router.post('/upload-batch', authMiddleware, batchUpload.any(), async (req, res)
       total: pdfFiles.length,
       successful: results.length,
       failed: errors.length,
-      driveMode: mode,
-      driveEmail: driveEmail,
       results,
       errors
     });

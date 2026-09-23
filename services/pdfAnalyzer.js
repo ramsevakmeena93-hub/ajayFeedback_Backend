@@ -373,52 +373,166 @@ async function extractMetaFromBuffer(buffer) {
 
   let bestMeta = null;
 
-  // Format 2 Regex (Standard MITS Individual Feedback Form Table)
-  const fmt2Regex = /Faculty\s+Name\s+Course\s+Code\s+Course\s+Name\s+Semester\s+Registered\s+Students\s+Link\s+Send\s+to\s+Students\s+Response\s+%\s*Resp\.?\s+FFI\s+([A-Za-z\s.]+?)\s+(\d{5,}(?:\s*-\s*Batch\s*-\s*[A-Z0-9]+|\s*-\s*[A-Za-z0-9]+|\s+Batch\s*-\s*[A-Z0-9]+)?)\s+(.+?)\s+(\d{1,2})\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)/i;
-
-  // Format 1 Regex (Action Taken Report Table)
-  const fmt1Regex = /Faculty\s+Name\s+Code\s*\/\s*Batch\s+Programme\s+Sem(?:ester)?\s+FFI\s+Resp\.?\s+Needs\s+Attention\s+Appreciation\s+Action\s+Taken\s+Faculty\s+Signature\s+(\d+)\s+([A-Za-z\s.]+?)\s+(\d{5,}(?:\s*Batch\s*-\s*[A-Z0-9]+|\s*-\s*[A-Za-z0-9]+)?)\s+(.+?)\s+(\d{1,2})\s+(\d+(?:\.\d+)?)\s+([\d\-]+)/i;
-
-  for (let p = 1; p <= doc.numPages; p++) {
-    const page = await doc.getPage(p);
+  // 1. First attempt: Coordinate-based extraction on Page 1 (robust against line breaks and multi-row headers)
+  try {
+    const page = await doc.getPage(1);
     const tc = await page.getTextContent();
-    const text = tc.items.map(i => i.str.trim()).filter(Boolean).join(' ');
+    const items = tc.items
+      .filter(i => i.str && i.str.trim())
+      .map(i => ({ str: i.str.trim(), x: Math.round(i.transform[4]), y: Math.round(i.transform[5]) }));
 
-    const m2 = text.match(fmt2Regex);
-    if (m2) {
-      bestMeta = {
-        facultyName: m2[1].trim(),
-        subjectCode: m2[2].replace(/\s+/g, '-').replace(/-+/g, '-'),
-        programme: m2[3].trim(),
-        semester: m2[4].trim(),
-        registeredStudents: parseInt(m2[5], 10),
-        linkSent: parseInt(m2[6], 10),
-        responseCount: parseInt(m2[7], 10),
-        responsePercent: parseFloat(m2[8]),
-        ffiScore: parseFloat(m2[9])
-      };
-      // Format 2 is the most detailed and accurate, stop if found
-      break;
+    // Group items by Y coordinate with 4px tolerance
+    const rowMap = {};
+    items.forEach(item => {
+      const yKey = Math.round(item.y / 4) * 4;
+      if (!rowMap[yKey]) rowMap[yKey] = [];
+      rowMap[yKey].push(item);
+    });
+
+    const yKeys = Object.keys(rowMap).map(Number).sort((a, b) => b - a);
+    let headerY = null;
+    let dataY = null;
+
+    for (const y of yKeys) {
+      const rowText = rowMap[y].map(i => i.str.toLowerCase()).join(' ');
+      if (rowText.includes('faculty') && (rowText.includes('code') || rowText.includes('name')) && (rowText.includes('semester') || rowText.includes('sem') || rowText.includes('ffi') || rowText.includes('resp'))) {
+        headerY = y;
+        const lowerRows = yKeys.filter(k => k < y).sort((a, b) => b - a);
+        for (const ky of lowerRows) {
+          if (rowMap[ky].length >= 5) {
+            dataY = ky;
+            break;
+          }
+        }
+        break;
+      }
     }
 
-    if (!bestMeta) {
-      const m1 = text.match(fmt1Regex);
-      if (m1) {
+    if (headerY && dataY) {
+      const dataRowItems = rowMap[dataY].sort((a, b) => a.x - b.x);
+
+      // Extract FFI Score (float with decimal point, usually rightmost at ~X 540-560)
+      const ffiItem = dataRowItems.filter(i => /^\d+\.\d+$/.test(i.str)).sort((a, b) => b.x - a.x)[0];
+      const ffiScore = ffiItem ? parseFloat(ffiItem.str) : null;
+      const ffiX = ffiItem ? ffiItem.x : 547;
+
+      // Extract % Resp. (Response Percent): float or number just to the left of FFI (X between ffiX - 55 and ffiX - 10)
+      let responsePercent = null;
+      const pctItem = dataRowItems.find(i => i.x < ffiX - 10 && i.x >= ffiX - 60 && /^\d+(?:\.\d+)?$/.test(i.str));
+      if (pctItem) {
+        responsePercent = parseFloat(pctItem.str);
+      }
+
+      // Extract Response Count: integer to the left of % Resp. (X between ffiX - 110 and ffiX - 60)
+      let responseCount = null;
+      const respItem = dataRowItems.find(i => i.x < ffiX - 60 && i.x >= ffiX - 110 && /^\d+$/.test(i.str));
+      if (respItem) {
+        responseCount = parseInt(respItem.str, 10);
+      }
+
+      // Extract Link Sent: integer at X ~ 410-440
+      let linkSent = null;
+      const linkItem = dataRowItems.find(i => i.x >= 400 && i.x < 450 && /^\d+$/.test(i.str));
+      if (linkItem) linkSent = parseInt(linkItem.str, 10);
+
+      // Extract Registered Students: integer at X ~ 350-380
+      let registeredStudents = null;
+      const regItem = dataRowItems.find(i => i.x >= 340 && i.x < 390 && /^\d+$/.test(i.str));
+      if (regItem) registeredStudents = parseInt(regItem.str, 10);
+
+      // Extract Semester: 1 or 2 digits at X ~ 300-340
+      let semester = '';
+      const semItem = dataRowItems.find(i => i.x >= 300 && i.x < 340 && /^\d{1,2}$/.test(i.str));
+      if (semItem) semester = semItem.str;
+
+      // Extract Faculty Name: items at X < 140
+      const facultyName = dataRowItems.filter(i => i.x < 140).map(i => i.str).join(' ').trim();
+
+      // Extract Course Code: items between X 140 and 240
+      const codeItems = dataRowItems.filter(i => i.x >= 140 && i.x < 240).map(i => i.str).join('');
+      const subjectCode = codeItems ? codeItems.replace(/\s+/g, '-').replace(/-+/g, '-') : '';
+
+      // Extract Course Name (Programme): items between X 240 and 310, check dataY and any immediately adjacent upper row (e.g. dataY + 8)
+      const courseNameParts = [];
+      const aboveY = yKeys.find(k => k > dataY && k < headerY);
+      if (aboveY && rowMap[aboveY]) {
+        rowMap[aboveY].filter(i => i.x >= 240 && i.x < 310).forEach(i => courseNameParts.push(i.str));
+      }
+      dataRowItems.filter(i => i.x >= 240 && i.x < 310).forEach(i => courseNameParts.push(i.str));
+      const programme = courseNameParts.join(' ').trim();
+
+      if (facultyName || subjectCode || ffiScore !== null) {
+        // If responsePercent missing but responseCount and linkSent/registeredStudents exist, calculate
+        if (responsePercent === null && responseCount !== null) {
+          const base = linkSent || registeredStudents;
+          if (base && base > 0) {
+            responsePercent = Math.round((responseCount / base) * 10000) / 100;
+          }
+        }
+
         bestMeta = {
-          facultyName: m1[2].trim(),
-          subjectCode: m1[3].replace(/\s+/g, '-').replace(/-+/g, '-'),
-          programme: m1[4].trim(),
-          semester: m1[5].trim(),
-          ffiScore: parseFloat(m1[6]),
-          responseCount: /^\d+$/.test(m1[7]) ? parseInt(m1[7], 10) : null
+          facultyName,
+          subjectCode,
+          programme,
+          semester,
+          registeredStudents,
+          linkSent,
+          responseCount,
+          responsePercent,
+          ffiScore
         };
+      }
+    }
+  } catch (err) {
+    console.warn('[extractMeta] Coordinate extraction warning:', err.message);
+  }
+
+  // 2. Second attempt: Format 2 & Format 1 Regex
+  if (!bestMeta || !bestMeta.facultyName || bestMeta.ffiScore === null) {
+    const fmt2Regex = /Faculty\s+Name\s+Course\s+Code\s+Course\s+Name\s+Semester\s+Registered\s+Students\s+Link\s+Send\s+to\s+Students\s+Response\s+%\s*Resp\.?\s+FFI\s+([A-Za-z\s.]+?)\s+(\d{5,}(?:\s*-\s*Batch\s*-\s*[A-Z0-9]+|\s*-\s*[A-Za-z0-9]+|\s+Batch\s*-\s*[A-Z0-9]+)?)\s+(.+?)\s+(\d{1,2})\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)/i;
+    const fmt1Regex = /Faculty\s+Name\s+Code\s*\/\s*Batch\s+Programme\s+Sem(?:ester)?\s+FFI\s+Resp\.?\s+Needs\s+Attention\s+Appreciation\s+Action\s+Taken\s+Faculty\s+Signature\s+(\d+)\s+([A-Za-z\s.]+?)\s+(\d{5,}(?:\s*Batch\s*-\s*[A-Z0-9]+|\s*-\s*[A-Za-z0-9]+)?)\s+(.+?)\s+(\d{1,2})\s+(\d+(?:\.\d+)?)\s+([\d\-]+)/i;
+
+    for (let p = 1; p <= doc.numPages; p++) {
+      const page = await doc.getPage(p);
+      const tc = await page.getTextContent();
+      const text = tc.items.map(i => i.str.trim()).filter(Boolean).join(' ');
+
+      const m2 = text.match(fmt2Regex);
+      if (m2) {
+        bestMeta = {
+          facultyName: m2[1].trim(),
+          subjectCode: m2[2].replace(/\s+/g, '-').replace(/-+/g, '-'),
+          programme: m2[3].trim(),
+          semester: m2[4].trim(),
+          registeredStudents: parseInt(m2[5], 10),
+          linkSent: parseInt(m2[6], 10),
+          responseCount: parseInt(m2[7], 10),
+          responsePercent: parseFloat(m2[8]),
+          ffiScore: parseFloat(m2[9])
+        };
+        break;
+      }
+
+      if (!bestMeta) {
+        const m1 = text.match(fmt1Regex);
+        if (m1) {
+          bestMeta = {
+            facultyName: m1[2].trim(),
+            subjectCode: m1[3].replace(/\s+/g, '-').replace(/-+/g, '-'),
+            programme: m1[4].trim(),
+            semester: m1[5].trim(),
+            ffiScore: parseFloat(m1[6]),
+            responseCount: /^\d+$/.test(m1[7]) ? parseInt(m1[7], 10) : null,
+            responsePercent: null
+          };
+        }
       }
     }
   }
 
-  // Fallback if full table header regex missed
+  // 3. Fallback: individual field regex search
   if (!bestMeta) {
-    let facultyName = '', subjectCode = '', programme = '', semester = '', ffiScore = null, responseCount = null;
+    let facultyName = '', subjectCode = '', programme = '', semester = '', ffiScore = null, responseCount = null, responsePercent = null;
     for (let p = 1; p <= doc.numPages; p++) {
       const page = await doc.getPage(p);
       const tc = await page.getTextContent();
@@ -448,8 +562,12 @@ async function extractMetaFromBuffer(buffer) {
         const m = fullText.match(/(?:submitted\s*answers|responses?)\s*[:\-–]?\s*(\d+)/i);
         if (m) responseCount = parseInt(m[1], 10);
       }
+      if (responsePercent === null) {
+        const m = fullText.match(/(?:%\s*resp\.?|response\s*%|resp\s*%)\s*[:\-–]?\s*(\d+(?:\.\d+)?)/i);
+        if (m) responsePercent = parseFloat(m[1]);
+      }
     }
-    bestMeta = { facultyName, subjectCode, programme, semester, ffiScore, responseCount };
+    bestMeta = { facultyName, subjectCode, programme, semester, ffiScore, responseCount, responsePercent };
   }
 
   return bestMeta;
@@ -585,13 +703,16 @@ async function analyzePDFBuffer(buffer) {
     meta, // Include full meta object
     ffiScore: meta?.ffiScore ?? null,
     responseCount: meta?.responseCount ?? null,
+    responsePercent: meta?.responsePercent ?? null,
+    registeredStudents: meta?.registeredStudents ?? null,
+    linkSent: meta?.linkSent ?? null,
     analyzedAt: new Date()
   };
 }
 
 async function extractMetaFromPDF(buffer) {
   try { return await extractMetaFromBuffer(buffer); }
-  catch { return { facultyName: '', subjectCode: '', programme: '', semester: '', ffiScore: null }; }
+  catch { return { facultyName: '', subjectCode: '', programme: '', semester: '', ffiScore: null, responseCount: null, responsePercent: null }; }
 }
 
 module.exports = { analyzePDF, analyzePDFBuffer, extractMetaFromPDF, extractHighlightedText, convertDriveLink };

@@ -74,8 +74,6 @@ async function buildUserPayload(user) {
     hasSignature:             !!user.signatureImage,
     profilePhoto:             user.profilePhoto || '',
     defaultAlternateApproverId: user.defaultAlternateApproverId || null,
-    googleDriveConnected:     !!user.googleDriveRefreshToken || !!user.googleDriveConnected,
-    googleDriveEmail:         user.googleDriveEmail || user.email,
   };
 }
 
@@ -126,8 +124,10 @@ router.post('/register', async (req, res) => {
     // Assign 'hod' role for designated HOD institutional email.
     let safeRole = 'faculty';
     let safeDepartment = department || '';
-    if (cleanEmail === '25tc1aj7@mitsgwl.ac.in') { safeRole = 'vc'; }
-    if (cleanEmail === 'nec@mitsgwalior.in') { safeRole = 'vc'; }
+    if (cleanEmail === '25tc1aj7@mitsgwl.ac.in') {
+      safeRole = 'hod';
+      safeDepartment = safeDepartment || 'Computer Science and Engineering';
+    }
     if (cleanEmail === '25mc1sh132@mitsgwl.ac.in') {
       safeRole = 'hod';
       safeDepartment = safeDepartment || 'Literature, Politics and Economics';
@@ -202,17 +202,14 @@ router.post('/login', async (req, res) => {
     });
 
     // Re-apply hardcoded role overrides for designated accounts
-    if (cleanEmail === '25tc1aj7@mitsgwl.ac.in' && user.role !== 'vc') {
-      await User.findByIdAndUpdate(user._id, { role: 'vc', roles: ['vc'], activeWorkspace: 'vc' });
+    if (cleanEmail === '25tc1aj7@mitsgwl.ac.in' && (user.role !== 'hod' || user.department !== 'Computer Science and Engineering')) {
+      await User.findByIdAndUpdate(user._id, { role: 'hod', roles: ['hod', 'faculty'], activeWorkspace: 'hod', department: 'Computer Science and Engineering' });
       await UserRole.deleteMany({ userId: user._id });
-      await UserRole.create({ userId: user._id, role: 'vc', departmentScope: '', active: true });
-      user.role = 'vc'; user.activeWorkspace = 'vc';
-    }
-    if (cleanEmail === 'nec@mitsgwalior.in' && user.role !== 'vc') {
-      await User.findByIdAndUpdate(user._id, { role: 'vc', roles: ['vc'], activeWorkspace: 'vc' });
-      await UserRole.deleteMany({ userId: user._id });
-      await UserRole.create({ userId: user._id, role: 'vc', departmentScope: '', active: true });
-      user.role = 'vc'; user.activeWorkspace = 'vc';
+      await UserRole.create([
+        { userId: user._id, role: 'hod',     departmentScope: 'Computer Science and Engineering', active: true },
+        { userId: user._id, role: 'faculty', departmentScope: 'Computer Science and Engineering', active: true },
+      ]);
+      user.role = 'hod'; user.activeWorkspace = 'hod'; user.department = 'Computer Science and Engineering';
     }
     if (cleanEmail === '25mc1sh132@mitsgwl.ac.in' && user.role !== 'hod') {
       await User.findByIdAndUpdate(user._id, { role: 'hod', roles: ['hod','faculty'], activeWorkspace: 'hod', department: 'Literature, Politics and Economics' });
@@ -441,8 +438,7 @@ router.post('/google', async (req, res) => {
       let assignedRole = 'faculty';
       let assignedDepartment = '';
       if (email.toLowerCase().includes('admin')) assignedRole = 'admin';
-      if (cleanEmail === '25tc1aj7@mitsgwl.ac.in') { assignedRole = 'vc'; }
-      if (cleanEmail === 'nec@mitsgwalior.in') { assignedRole = 'vc'; }
+      if (cleanEmail === '25tc1aj7@mitsgwl.ac.in') { assignedRole = 'hod'; assignedDepartment = 'Computer Science and Engineering'; }
       if (cleanEmail === '25mc1sh132@mitsgwl.ac.in') {
         assignedRole = 'hod';
         assignedDepartment = 'Literature, Politics and Economics';
@@ -480,8 +476,7 @@ router.post('/google', async (req, res) => {
       // externally (e.g. by a seed script that didn't know about this account).
       let correctedRole = null;
       let correctedDept = null;
-      if (cleanEmail === '25tc1aj7@mitsgwl.ac.in') { correctedRole = 'vc'; }
-      if (cleanEmail === 'nec@mitsgwalior.in')      { correctedRole = 'vc'; }
+      if (cleanEmail === '25tc1aj7@mitsgwl.ac.in') { correctedRole = 'hod'; correctedDept = 'Computer Science and Engineering'; }
       if (cleanEmail === '25mc1sh132@mitsgwl.ac.in') {
         correctedRole = 'hod';
         correctedDept = 'Literature, Politics and Economics';
@@ -532,57 +527,6 @@ router.post('/google', async (req, res) => {
     });
   } catch (err) {
     console.error(`[Auth] Google OAuth error: ${err.message}`);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ── Google Drive OAuth connection ─────────────────────────────────────────
-router.post('/google/drive-connect', authMiddleware, async (req, res) => {
-  try {
-    const { code, tokens, email } = req.body;
-    const { getOAuth2Client } = require('../services/googleDriveService');
-    const oauth2Client = getOAuth2Client();
-
-    let resolvedTokens = tokens;
-    if (code && oauth2Client) {
-      const resp = await oauth2Client.getToken(code);
-      resolvedTokens = resp.tokens;
-    }
-
-    const user = await User.findById(req.user.id);
-    if (!user) return res.status(404).json({ error: 'User not found' });
-
-    if (resolvedTokens?.refresh_token) {
-      user.googleDriveRefreshToken = resolvedTokens.refresh_token;
-    }
-    if (resolvedTokens?.access_token) {
-      user.googleDriveAccessToken = resolvedTokens.access_token;
-    }
-
-    const targetEmail = email || user.email || '25tc1aj7@mitsgwl.ac.in';
-    user.googleDriveConnected = true;
-    user.googleDriveEmail = targetEmail;
-    await user.save();
-
-    const payload = await buildUserPayload(user);
-    res.json({ success: true, message: `Google Drive connected successfully (${targetEmail})`, user: payload });
-  } catch (err) {
-    console.error('[Auth] Drive connect error:', err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-router.post('/google/drive-disconnect', authMiddleware, async (req, res) => {
-  try {
-    const user = await User.findById(req.user.id);
-    if (!user) return res.status(404).json({ error: 'User not found' });
-    user.googleDriveRefreshToken = '';
-    user.googleDriveAccessToken = '';
-    user.googleDriveConnected = false;
-    await user.save();
-    const payload = await buildUserPayload(user);
-    res.json({ success: true, message: 'Google Drive disconnected', user: payload });
-  } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });

@@ -285,12 +285,7 @@ router.get('/all', authMiddleware, requireRole('vc'), async (req, res) => {
  */
 router.patch('/:id/status', authMiddleware, async (req, res) => {
     try {
-      // Ensure the approver has uploaded a signature
       const User = require('../models/User');
-      const approver = await User.findById(req.user.id);
-      if (!approver?.signatureImage) {
-        return res.status(400).json({ error: 'Signature required', needSignature: true });
-      }
       // Determine if caller is VC or an authorized alternate approver
       const callerRoles = new Set([
         ...(req.user?.roles || []),

@@ -32,7 +32,8 @@
     "pdf-parse": "^1.1.1",
     "pdfjs-dist": "^3.11.174",
     "sharp": "^0.33.0",
-    "socket.io": "^4.7.5"
+    "socket.io": "^4.7.5",
+    "xlsx": "^0.18.5"
   },
   "optionalDependencies": {
     "canvas": "^3.2.3"

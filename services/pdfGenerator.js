@@ -11,7 +11,7 @@ try {
   }
 } catch (e) {}
 
-async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser, approvedAt, isPreview = false }) {
+async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser, approvedAt, isPreview = false, withoutSignatures = false }) {
   const User = require("../models/User");
   const axios = require("axios");
 
@@ -209,7 +209,7 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
     { label: "S.No",              x: ML,        w: 24  },
     { label: "Faculty Name",      x: ML + 24,   w: 90  },
     { label: "Code/Batch",        x: ML + 114,  w: 65  },
-    { label: "Programme",         x: ML + 179,  w: 70  },
+    { label: "Course Name",       x: ML + 179,  w: 70  },
     { label: "Sem",               x: ML + 249,  w: 24  },
     { label: "FFI",               x: ML + 273,  w: 38  },
     { label: "Resp. %",           x: ML + 311,  w: 40  },
@@ -237,7 +237,9 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
     const HLH = 12.5;
     COLS.forEach(col => {
       let hLines;
-      if (col.label === "Needs Attention") {
+      if (col.label === "Course Name") {
+        hLines = ["Course", "Name"];
+      } else if (col.label === "Needs Attention") {
         hLines = ["Needs", "Attention"];
       } else if (col.label === "Action Taken") {
         hLines = ["Action", "Taken"];
@@ -312,10 +314,11 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
   const avgFFI   = allFFIs.length
     ? (allFFIs.reduce((s, v) => s + v, 0) / allFFIs.length).toFixed(2)
     : "\u2014";
+  const allRespPcts = uniqueReports.map(r => r.responsePercent).filter(v => v != null);
   const allResp  = uniqueReports.map(r => r.responseCount || r.totalResponses || 0).filter(Boolean);
-  const avgResp  = allResp.length
-    ? (allResp.reduce((s, v) => Number(s) + Number(v), 0) / allResp.length).toFixed(2)
-    : "\u2014";
+  const avgResp  = allRespPcts.length
+    ? (allRespPcts.reduce((s, v) => Number(s) + Number(v), 0) / allRespPcts.length).toFixed(2) + "%"
+    : (allResp.length ? (allResp.reduce((s, v) => Number(s) + Number(v), 0) / allResp.length).toFixed(2) : "\u2014");
   const avgFFIText  = "Average FFI \u2013 " + avgFFI;
   const avgRespText = "Average Response \u2013 " + avgResp;
   
@@ -394,6 +397,10 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
     const ffi = r.ffiScore;
     const ffiColor = ffi != null ? (ffi >= 4 ? green : ffi >= 3 ? amber : red) : black;
 
+    const respDisplay = r.responsePercent != null
+      ? (typeof r.responsePercent === 'number' ? r.responsePercent.toFixed(2) + '%' : r.responsePercent + '%')
+      : (r.responseCount != null ? String(r.responseCount) : (r.totalResponses != null ? String(r.totalResponses) : "-"));
+
     const cellValues = [
       { v: String(i + 1),                                  bold: true,  center: true },
       { v: r.facultyName || "-" },
@@ -401,7 +408,7 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
       { v: r.programme  || "-" },
       { v: r.semester   || "-",                            center: true },
       { v: ffi != null ? ffi.toFixed(2) : "-",            color: ffiColor, bold: true, center: true },
-      { v: r.responseCount != null ? String(r.responseCount) : (r.totalResponses != null ? String(r.totalResponses) : "-"), center: true },
+      { v: respDisplay,                                    center: true },
       { v: attText },
       { v: appText },
       { v: r.actionTaken || "-" },
@@ -413,12 +420,16 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
 
       if (val.sig) {
         // Faculty signature cell — fits within 62pt column
-        const sigImg = facultySigMap[(r.facultyName || "").toLowerCase().trim()];
-        if (sigImg) {
-          const sW = 50, sH = 25;
-          const sigX = col.x + (col.w - sW) / 2;
-          const sigY = y - ROW_H + 22;
-          coverPage.drawImage(sigImg, { x: sigX, y: sigY, width: sW, height: sH });
+        if (!withoutSignatures) {
+          const sigImg = facultySigMap[(r.facultyName || "").toLowerCase().trim()];
+          if (sigImg) {
+            const sW = 50, sH = 25;
+            const sigX = col.x + (col.w - sW) / 2;
+            const sigY = y - ROW_H + 22;
+            coverPage.drawImage(sigImg, { x: sigX, y: sigY, width: sW, height: sH });
+          } else {
+            line(coverPage, col.x + 4, y - ROW_H + 24, col.x + col.w - 4, y - ROW_H + 24, 0.5, gray);
+          }
         } else {
           line(coverPage, col.x + 4, y - ROW_H + 24, col.x + col.w - 4, y - ROW_H + 24, 0.5, gray);
         }
@@ -490,7 +501,7 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
   // HOD name + signature
   txt(coverPage, (hodUser && hodUser.name) || "Head of Department",
       c2X + 4, bY - 12, 9, boldFont, black);
-  if (hodSig) {
+  if (hodSig && !withoutSignatures) {
     const sc = Math.min((c2W - 10) / hodSig.width, (sBH - 22) / hodSig.height, 1);
     coverPage.drawImage(hodSig, {
       x: c2X + 4, y: bY - sBH + 8,
@@ -503,7 +514,7 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
   // VC name + signature
   txt(coverPage, (vcUser && vcUser.name) || "Pro Vice-Chancellor",
       c3X + 4, bY - 12, 9, boldFont, black);
-  if (vcSig) {
+  if (vcSig && !withoutSignatures) {
     const sc = Math.min((c3W - 10) / vcSig.width, (sBH - 22) / vcSig.height, 1);
     coverPage.drawImage(vcSig, {
       x: c3X + 4, y: bY - sBH + 8,
@@ -562,69 +573,71 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
       const pagesBefore = pdfDoc.getPageCount();
       copied.forEach(p => pdfDoc.addPage(p));
 
-      // Stamp HOD + VC signatures on the signature row of the appended CSV PDF
-      const fSig = facultySigMap[(rp.facultyName || "").toLowerCase().trim()];
-      try {
-        const pdfjsLib = require("pdfjs-dist/legacy/build/pdf.js");
-        const rawUint8 = new Uint8Array(data);
-        const pdfJsDoc = await pdfjsLib.getDocument({ data: rawUint8 }).promise;
+      // Stamp HOD + VC signatures on the signature row of the appended CSV PDF (only if signatures requested)
+      if (!withoutSignatures) {
+        const fSig = facultySigMap[(rp.facultyName || "").toLowerCase().trim()];
+        try {
+          const pdfjsLib = require("pdfjs-dist/legacy/build/pdf.js");
+          const rawUint8 = new Uint8Array(data);
+          const pdfJsDoc = await pdfjsLib.getDocument({ data: rawUint8 }).promise;
 
-        let sigPageIdx = null;
-        let facItem = null;
-        let hodItem = null;
-        let vcItem = null;
+          let sigPageIdx = null;
+          let facItem = null;
+          let hodItem = null;
+          let vcItem = null;
 
-        for (let pi = 1; pi <= pdfJsDoc.numPages; pi++) {
-          const pg = await pdfJsDoc.getPage(pi);
-          const tc = await pg.getTextContent();
-          
-          const foundHod = tc.items.find(item => item.str.trim() === "HOD");
-          if (foundHod) {
-            sigPageIdx = pi - 1;
-            hodItem = foundHod;
-            // The PDF often splits "Faculty Name" and "Signature" into separate items.
-            // Look for the "Signature" item itself.
-            facItem = tc.items.find(item => item.str.trim().includes("Signature") && !item.str.trim().includes("Faculty Name & Signature"));
-            if (!facItem) facItem = tc.items.find(item => item.str.trim().includes("Faculty"));
+          for (let pi = 1; pi <= pdfJsDoc.numPages; pi++) {
+            const pg = await pdfJsDoc.getPage(pi);
+            const tc = await pg.getTextContent();
             
-            vcItem = tc.items.find(item => item.str.trim() === "PRO - VC" || item.str.trim() === "PRO-VC" || item.str.trim() === "PRO - VC ");
-            break;
+            const foundHod = tc.items.find(item => item.str.trim() === "HOD");
+            if (foundHod) {
+              sigPageIdx = pi - 1;
+              hodItem = foundHod;
+              // The PDF often splits "Faculty Name" and "Signature" into separate items.
+              // Look for the "Signature" item itself.
+              facItem = tc.items.find(item => item.str.trim().includes("Signature") && !item.str.trim().includes("Faculty Name & Signature"));
+              if (!facItem) facItem = tc.items.find(item => item.str.trim().includes("Faculty"));
+              
+              vcItem = tc.items.find(item => item.str.trim() === "PRO - VC" || item.str.trim() === "PRO-VC" || item.str.trim() === "PRO - VC ");
+              break;
+            }
           }
-        }
 
-        if (sigPageIdx !== null) {
-          const targetPage = pdfDoc.getPage(pagesBefore + sigPageIdx);
-          const SIG_W = 75; // Adjust width to fit nicely in the cell
+          if (sigPageIdx !== null) {
+            const targetPage = pdfDoc.getPage(pagesBefore + sigPageIdx);
+            const SIG_W = 75; // Adjust width to fit nicely in the cell
 
-          // Fallback baseline Y if we only found HOD
-          const baseY = hodItem ? hodItem.transform[5] : 100;
-          
-          // Image drawing helper to position signatures
-          const drawSig = (sigImg, labelItem, defaultX, paddingX = 10, sigW = SIG_W) => {
-            if (!sigImg) return;
-            const itemX = labelItem ? labelItem.transform[4] : null;
-            const itemW = labelItem ? (labelItem.width || 0) : null;
-            const itemY = labelItem ? labelItem.transform[5] : baseY;
+            // Fallback baseline Y if we only found HOD
+            const baseY = hodItem ? hodItem.transform[5] : 100;
             
-            // X: paddingX points to the right of the text label
-            const x = (itemX !== null && itemW !== null) ? itemX + itemW + paddingX : defaultX;
-            // Y: Text baseline is usually bottom of text. Center image vertically around baseline + 5.
-            const h = Math.min(sigW * (sigImg.height / sigImg.width), 22);
-            const y = itemY - 6; 
-            
-            targetPage.drawImage(sigImg, { x, y, width: sigW, height: h });
-          };
+            // Image drawing helper to position signatures
+            const drawSig = (sigImg, labelItem, defaultX, paddingX = 10, sigW = SIG_W) => {
+              if (!sigImg) return;
+              const itemX = labelItem ? labelItem.transform[4] : null;
+              const itemW = labelItem ? (labelItem.width || 0) : null;
+              const itemY = labelItem ? labelItem.transform[5] : baseY;
+              
+              // X: paddingX points to the right of the text label
+              const x = (itemX !== null && itemW !== null) ? itemX + itemW + paddingX : defaultX;
+              // Y: Text baseline is usually bottom of text. Center image vertically around baseline + 5.
+              const h = Math.min(sigW * (sigImg.height / sigImg.width), 22);
+              const y = itemY - 6; 
+              
+              targetPage.drawImage(sigImg, { x, y, width: sigW, height: h });
+            };
 
-          drawSig(fSig, facItem, 250, 10); 
-          drawSig(hodSig, hodItem, 380, 10); 
-          drawSig(vcSig, vcItem, 545, 10, 45); // Reduced width to 45 and tweaked defaultX so it fits inside the cell boundary
+            drawSig(fSig, facItem, 250, 10); 
+            drawSig(hodSig, hodItem, 380, 10); 
+            drawSig(vcSig, vcItem, 545, 10, 45); // Reduced width to 45 and tweaked defaultX so it fits inside the cell boundary
 
-          console.log(`[PDF] Stamped sigs inline on page ${sigPageIdx+1}`);
-        } else {
-          console.warn("[PDF] HOD label not found for " + rp.facultyName);
+            console.log(`[PDF] Stamped sigs inline on page ${sigPageIdx+1}`);
+          } else {
+            console.warn("[PDF] HOD label not found for " + rp.facultyName);
+          }
+        } catch (e) {
+          console.warn("[PDF] Stamp error:", e.message);
         }
-      } catch (e) {
-        console.warn("[PDF] Stamp error:", e.message);
       }
 
       console.log("[PDF] Added " + copied.length + " pages for " + rp.facultyName);
@@ -757,7 +770,7 @@ async function generateIndividualFacultyPDF(report) {
   page.drawText(report.subjectCode || "—", { x: leftX + 85, y: lineY, size: 10, font: boldFont, color: navy });
 
   lineY -= 18;
-  page.drawText("Programme / Sem:", { x: leftX, y: lineY, size: 9, font: boldFont, color: gray });
+  page.drawText("Course Name / Sem:", { x: leftX, y: lineY, size: 9, font: boldFont, color: gray });
   const progSem = [report.programme, report.semester ? `Semester ${report.semester}` : "", report.branch ? `(${report.branch})` : ""].filter(Boolean).join(" · ") || "—";
   page.drawText(progSem, { x: leftX + 85, y: lineY, size: 9, font, color: black });
 

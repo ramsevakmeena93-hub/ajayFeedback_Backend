@@ -348,48 +348,25 @@ async function analyzeCommentsWithAI(rawComments) {
     });
   });
 
-  // Step 2: AI classification for genuinely ambiguous long comments only
+  // Step 2: Instant classification for remaining comments (0ms overhead)
   if (toClassifyWithAI.length > 0) {
-    try {
-      const classifier = await getSentimentPipeline();
-      const BATCH_SIZE = 16;
+    toClassifyWithAI.forEach(({ comment }) => {
+      const lower = comment.toLowerCase();
+      const hasNegativeTrait = NEGATIVE_PATTERNS.some(p => p.test(lower)) ||
+        /\b(not|never|hardly|don't|doesn't|didn't|can't|cannot|less|poor|improve|issue|problem|slow|fast|rude|absent|late|lack|difficult|hard)\b/i.test(lower);
 
-      for (let i = 0; i < toClassifyWithAI.length; i += BATCH_SIZE) {
-        const batch = toClassifyWithAI.slice(i, i + BATCH_SIZE);
-        await Promise.all(batch.map(async ({ comment }) => {
-          try {
-            const res = await classifier(comment, { truncation: true });
-            const label = res[0].label;
-            const score = res[0].score;
-            const lower = comment.toLowerCase();
+      const hasPositiveTrait = POSITIVE_PATTERNS.some(p => p.test(lower)) ||
+        /\b(good|great|nice|excellent|best|helpful|clear|interactive|supportive|punctual|effective|understand|wonderful|awesome|thanks|accha|mast)\b/i.test(lower);
 
-            // Explicit check for negations and negative patterns
-            const hasNegativeTrait = NEGATIVE_PATTERNS.some(p => p.test(lower)) ||
-              /\b(not|never|hardly|don't|doesn't|didn't|can't|cannot)\b/i.test(lower);
-
-            if (hasNegativeTrait || label === 'NEGATIVE') {
-              addAttention(comment);
-            } else if (label === 'POSITIVE' || score > 0.6) {
-              result.appreciation.push(comment);
-            } else {
-              // Default to appreciation
-              result.appreciation.push(comment);
-            }
-          } catch {
-            result.appreciation.push(comment);
-          }
-        }));
+      if (hasNegativeTrait && !hasPositiveTrait) {
+        addAttention(comment);
+      } else if (hasNegativeTrait && hasPositiveTrait) {
+        // Mixed sentiment with negative indicator -> flag for attention
+        addAttention(comment);
+      } else {
+        result.appreciation.push(comment);
       }
-    } catch (err) {
-      console.warn('[AI] Classification failed, using rule-based fallback:', err.message);
-      // Fallback: use simple keyword check
-      toClassifyWithAI.forEach(({ comment }) => {
-        const lower = comment.toLowerCase();
-        const hasNegative = NEGATIVE_PATTERNS.some(p => p.test(lower));
-        if (hasNegative) addAttention(comment);
-        else result.appreciation.push(comment);
-      });
-    }
+    });
   }
 
   console.log(`[AI] Classified ${rawComments.length} comments → ${result.appreciation.length} positive, ${result.commentsNeedingAttention.length} attention needed`);

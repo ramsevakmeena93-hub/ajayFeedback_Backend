@@ -237,14 +237,15 @@ router.get('/my/export', authMiddleware, requireAnyRole('hod'), async (req, res)
   try {
     const reports = await FacultyReport.find({ hodId: req.user.id });
     const rows = [
-      ['S.No','Faculty Name','Subject Code','Programme','Branch','Section','FFI Score',
-       'Appreciation','Attention','Status','Faculty Acknowledged','HOD Remarks','Action Taken','Year'],
+      ['S.No','Faculty Name','Subject Code','Course Name','Branch','Section','FFI Score',
+       'Response %','Appreciation','Attention','Status','Faculty Acknowledged','HOD Remarks','Action Taken','Year'],
     ];
     reports.forEach((r, i) => {
       rows.push([
         i+1, r.facultyName||'', r.subjectCode||'', r.programme||'',
         r.branch||'', r.section||'',
         r.ffiScore?.toFixed(2)||'',
+        r.responsePercent!=null ? `${r.responsePercent}%` : (r.responseCount!=null ? r.responseCount : ''),
         r.appreciationCount||0, r.attentionCount||0,
         r.status||'', r.facultyAcknowledged?'Yes':'No',
         r.hodRemarks||'', r.actionTaken||'', r.academicYear||'',
@@ -330,6 +331,7 @@ router.patch('/:id/edit', authMiddleware, requireAnyRole('hod'), async (req, res
     const {
       programme, semester, goodComments, badComments, hodRemarks,
       facultyName, subjectCode, status, actionTaken, branch, section,
+      commentsNeedingAttention, appreciation, responsePercent, responseCount,
     } = req.body;
 
     const update = {};
@@ -343,6 +345,24 @@ router.patch('/:id/edit', authMiddleware, requireAnyRole('hod'), async (req, res
     if (actionTaken  !== undefined) update.actionTaken  = actionTaken;
     if (branch       !== undefined) update.branch       = branch;
     if (section      !== undefined) update.section      = section;
+    if (responseCount !== undefined) update.responseCount = responseCount !== null && responseCount !== '' ? Number(responseCount) : null;
+    if (responsePercent !== undefined) update.responsePercent = responsePercent !== null && responsePercent !== '' ? Number(responsePercent) : null;
+
+    if (commentsNeedingAttention !== undefined) {
+      const list = Array.isArray(commentsNeedingAttention)
+        ? commentsNeedingAttention
+        : String(commentsNeedingAttention).split('\n').map(s => s.trim()).filter(Boolean);
+      update.commentsNeedingAttention = list;
+      update.attentionCount = list.length;
+    }
+
+    if (appreciation !== undefined) {
+      const list = Array.isArray(appreciation)
+        ? appreciation
+        : String(appreciation).split('\n').map(s => s.trim()).filter(Boolean);
+      update.appreciation = list;
+      update.appreciationCount = list.length;
+    }
 
     // HOD force-approve (bypasses faculty ACK)
     if (status === 'faculty_approved') {
@@ -678,30 +698,50 @@ router.patch('/:id/remarks', authMiddleware, requireAnyRole('hod'), async (req, 
 // HOD: Preview PDF before VC
 // ─────────────────────────────────────────────────────────────────────────────
 
-router.get('/my/preview-pdf', authMiddleware, requireAnyRole('hod'), async (req, res) => {
+const handleHODExportPDF = async (req, res) => {
   try {
     const User = require('../models/User');
     const vcUser = await User.findOne({ role: 'vc' }).select('name signatureImage');
     const hodUser = await User.findById(req.user.id).select('name email department signatureImage');
-    const reports = await FacultyReport.find({ hodId: req.user.id, status: 'faculty_approved' });
-    if (reports.length === 0) return res.status(400).json({ error: 'No faculty-approved reports to preview' });
+    
+    const query = { hodId: req.user.id };
+    const reportIds = req.body?.reportIds || (req.query?.reportIds ? req.query.reportIds.split(',') : null);
+    if (reportIds && reportIds.length > 0) {
+      query._id = { $in: reportIds };
+    }
+
+    let reports = await FacultyReport.find(query).sort({ createdAt: -1 });
+    if (reports.length === 0) {
+      // Fallback: check any reports belonging to HOD
+      reports = await FacultyReport.find({ hodId: req.user.id });
+    }
+    if (reports.length === 0) return res.status(400).json({ error: 'No reports found to export' });
 
     const { generateFeedbackReportPDF } = require('../services/pdfGenerator');
     const pdfBuffer = await generateFeedbackReportPDF({
-      submission: { academicYear: reports[0]?.academicYear || '', department: req.user.department || '' },
+      submission: {
+        academicYear: reports[0]?.academicYear || new Date().getFullYear().toString(),
+        department: req.user.department || hodUser?.department || ''
+      },
       reports,
       hodUser,
       vcUser,
       approvedAt: null,
+      withoutSignatures: true, // Same as final PDF but without signatures attached
     });
 
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', 'inline; filename="preview-report.pdf"');
+    res.setHeader('Content-Disposition', 'attachment; filename="hod-feedback-report.pdf"');
     res.send(pdfBuffer);
   } catch (err) {
+    console.error('[HOD Export PDF Error]:', err);
     res.status(500).json({ error: err.message });
   }
-});
+};
+
+router.get('/my/preview-pdf', authMiddleware, requireAnyRole('hod'), handleHODExportPDF);
+router.get('/my/export-pdf', authMiddleware, requireAnyRole('hod'), handleHODExportPDF);
+router.post('/my/export-pdf', authMiddleware, requireAnyRole('hod'), handleHODExportPDF);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // VC: Get submission reports
