@@ -36,7 +36,7 @@ function parseCSV(buffer) {
 
           rowHasContent = true;
           const val = cell.w !== undefined ? String(cell.w).trim() : cell.v !== undefined ? String(cell.v).trim() : '';
-          let link = (cell.l && cell.l.Target) ? String(cell.l.Target).trim() : '';
+          let link = (cell.l && cell.l.Target) ? String(cell.l.Target).trim().replace(/&amp;/g, '&') : '';
           const formula = cell.f ? String(cell.f).trim() : '';
 
           // If formula is =HYPERLINK("url", ...), extract url
@@ -191,7 +191,7 @@ function parseCSV(buffer) {
 
       // Emit one result per URL found in this row
       for (const url of allUrlsInRow) {
-        const cleanUrl = url.replace(/[.,;)]+$/, '');
+        const cleanUrl = url.replace(/&amp;/g, '&').replace(/[.,;)]+$/, '');
         if (!cleanUrl.startsWith('http')) continue;
         if (seenUrls.has(cleanUrl)) continue;
         seenUrls.add(cleanUrl);
