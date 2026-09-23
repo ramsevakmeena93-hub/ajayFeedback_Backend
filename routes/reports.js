@@ -140,6 +140,29 @@ router.post('/my/fix-metadata', authMiddleware, requireAnyRole('hod'), async (re
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Delete single report (HOD) — only non-approved, non-submitted
+// ─────────────────────────────────────────────────────────────────────────────
+
+router.delete('/:id', authMiddleware, requireAnyRole('hod'), async (req, res) => {
+  try {
+    const Submission = require('../models/Submission');
+    // Prevent deleting if report is part of any submission
+    const inSubmission = await Submission.findOne({ reports: req.params.id });
+    if (inSubmission) return res.status(400).json({ error: 'Cannot delete a report that has been submitted to VC' });
+
+    const report = await FacultyReport.findOneAndDelete({
+      _id: req.params.id,
+      hodId: req.user.id,
+      status: { $ne: 'faculty_approved' },
+    });
+    if (!report) return res.status(404).json({ error: 'Report not found or cannot be deleted' });
+    res.json({ message: 'Report deleted' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Delete all unapproved reports for HOD
 // ─────────────────────────────────────────────────────────────────────────────
 
