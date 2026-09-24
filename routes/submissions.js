@@ -441,6 +441,9 @@ router.patch('/:id/status', authMiddleware, async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 router.get('/:id/download-pdf', authMiddleware, async (req, res) => {
+  // Set longer timeout for PDF generation (multiple Drive downloads)
+  req.setTimeout(120000);
+  res.setTimeout(120000);
   try {
     const submission = await Submission.findById(req.params.id)
       .populate('hodId', 'name email department signatureImage')

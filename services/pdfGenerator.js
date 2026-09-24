@@ -527,17 +527,21 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
   // ── Append CSV PDFs with HOD + VC signature stamps ────────────────────────
   function convertDriveLink(url) {
     if (!url) return null;
-    const m = url.match(/\/d\/([a-zA-Z0-9_-]+)/) || url.match(/id=([a-zA-Z0-9_-]+)/);
-    if (m) return "https://drive.google.com/uc?export=download&id=" + m[1];
+    // Handle /d/FILE_ID/ format
+    const m1 = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+    if (m1) return "https://drive.google.com/uc?export=download&id=" + m1[1];
+    // Handle ?id= or open?id= format
+    const m2 = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+    if (m2) return "https://drive.google.com/uc?export=download&id=" + m2[1];
     return url;
   }
 
-  async function downloadWithRetry(url, retries = 3) {
+  async function downloadWithRetry(url, retries = 2) {
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
         const res = await axios.get(url, {
           responseType: "arraybuffer",
-          timeout: 30000,
+          timeout: 15000,
           headers: { "User-Agent": "Mozilla/5.0" },
           maxRedirects: 10
         });
@@ -546,7 +550,7 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
         return res.data;
       } catch (err) {
         console.warn("[PDF] Attempt " + attempt + ": " + err.message);
-        if (attempt < retries) await new Promise(r => setTimeout(r, 2000 * attempt));
+        if (attempt < retries) await new Promise(r => setTimeout(r, 1000 * attempt));
       }
     }
     return null;
@@ -554,17 +558,32 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
 
   const seenLinks = new Set();
   if (!isPreview) {
+  // Download PDFs in parallel with concurrency limit to avoid timeout
+  const downloadQueue = [];
   for (let ri = 0; ri < uniqueReports.length; ri++) {
-    const rp  = uniqueReports[ri];
+    const rp = uniqueReports[ri];
     const raw = rp.driveLink || rp.pdfLink;
     if (!raw || raw.startsWith("uploaded:")) continue;
-
     const lk = convertDriveLink(raw);
     if (!lk || seenLinks.has(lk)) continue;
     seenLinks.add(lk);
+    downloadQueue.push({ rp, lk });
+  }
 
-    console.log("[PDF] Downloading CSV PDF for " + rp.facultyName + "...");
-    const data = await downloadWithRetry(lk);
+  // Download all in parallel (max 3 at a time)
+  const pLimit = require('p-limit');
+  const limit = pLimit(3);
+  const downloadResults = await Promise.all(
+    downloadQueue.map(({ rp, lk }) =>
+      limit(async () => {
+        console.log("[PDF] Downloading for " + rp.facultyName + "...");
+        const data = await downloadWithRetry(lk);
+        return { rp, data };
+      })
+    )
+  );
+
+  for (const { rp, data } of downloadResults) {
     if (!data) { console.warn("[PDF] Skipped " + rp.facultyName); continue; }
 
     try {
