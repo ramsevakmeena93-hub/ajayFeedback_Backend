@@ -558,6 +558,7 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
 
   const seenLinks = new Set();
   if (!isPreview) {
+  try {
   // Download PDFs in parallel with concurrency limit to avoid timeout
   const downloadQueue = [];
   for (let ri = 0; ri < uniqueReports.length; ri++) {
@@ -592,10 +593,10 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
       const pagesBefore = pdfDoc.getPageCount();
       copied.forEach(p => pdfDoc.addPage(p));
 
-      // Stamp HOD + VC signatures on the signature row of the appended CSV PDF (only if signatures requested)
+      // Stamp HOD + VC signatures — wrapped in try/catch so stamp failure never kills PDF gen
       if (!withoutSignatures) {
-        const fSig = facultySigMap[(rp.facultyName || "").toLowerCase().trim()];
         try {
+          const fSig = facultySigMap[(rp.facultyName || "").toLowerCase().trim()];
           const pdfjsLib = require("pdfjs-dist/legacy/build/pdf.js");
           const rawUint8 = new Uint8Array(data);
           const pdfJsDoc = await pdfjsLib.getDocument({ data: rawUint8 }).promise;
@@ -608,61 +609,47 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
           for (let pi = 1; pi <= pdfJsDoc.numPages; pi++) {
             const pg = await pdfJsDoc.getPage(pi);
             const tc = await pg.getTextContent();
-            
             const foundHod = tc.items.find(item => item.str.trim() === "HOD");
             if (foundHod) {
               sigPageIdx = pi - 1;
               hodItem = foundHod;
-              // The PDF often splits "Faculty Name" and "Signature" into separate items.
-              // Look for the "Signature" item itself.
               facItem = tc.items.find(item => item.str.trim().includes("Signature") && !item.str.trim().includes("Faculty Name & Signature"));
               if (!facItem) facItem = tc.items.find(item => item.str.trim().includes("Faculty"));
-              
-              vcItem = tc.items.find(item => item.str.trim() === "PRO - VC" || item.str.trim() === "PRO-VC" || item.str.trim() === "PRO - VC ");
+              vcItem = tc.items.find(item => /PRO\s*-?\s*VC/i.test(item.str.trim()));
               break;
             }
           }
 
           if (sigPageIdx !== null) {
             const targetPage = pdfDoc.getPage(pagesBefore + sigPageIdx);
-            const SIG_W = 75; // Adjust width to fit nicely in the cell
-
-            // Fallback baseline Y if we only found HOD
+            const SIG_W = 75;
             const baseY = hodItem ? hodItem.transform[5] : 100;
-            
-            // Image drawing helper to position signatures
             const drawSig = (sigImg, labelItem, defaultX, paddingX = 10, sigW = SIG_W) => {
               if (!sigImg) return;
               const itemX = labelItem ? labelItem.transform[4] : null;
               const itemW = labelItem ? (labelItem.width || 0) : null;
               const itemY = labelItem ? labelItem.transform[5] : baseY;
-              
-              // X: paddingX points to the right of the text label
               const x = (itemX !== null && itemW !== null) ? itemX + itemW + paddingX : defaultX;
-              // Y: Text baseline is usually bottom of text. Center image vertically around baseline + 5.
               const h = Math.min(sigW * (sigImg.height / sigImg.width), 22);
-              const y = itemY - 6; 
-              
-              targetPage.drawImage(sigImg, { x, y, width: sigW, height: h });
+              targetPage.drawImage(sigImg, { x, y: itemY - 6, width: sigW, height: h });
             };
-
-            drawSig(fSig, facItem, 250, 10); 
-            drawSig(hodSig, hodItem, 380, 10); 
-            drawSig(vcSig, vcItem, 545, 10, 45); // Reduced width to 45 and tweaked defaultX so it fits inside the cell boundary
-
-            console.log(`[PDF] Stamped sigs inline on page ${sigPageIdx+1}`);
-          } else {
-            console.warn("[PDF] HOD label not found for " + rp.facultyName);
+            drawSig(fSig,  facItem, 250, 10);
+            drawSig(hodSig, hodItem, 380, 10);
+            drawSig(vcSig,  vcItem,  545, 10, 45);
+            console.log("[PDF] Stamped sigs on page " + (sigPageIdx + 1));
           }
-        } catch (e) {
-          console.warn("[PDF] Stamp error:", e.message);
+        } catch (stampErr) {
+          console.warn("[PDF] Sig stamp skipped for " + rp.facultyName + ": " + stampErr.message);
         }
       }
 
       console.log("[PDF] Added " + copied.length + " pages for " + rp.facultyName);
     } catch (err) {
-      console.warn("[PDF] Parse error: " + err.message);
+      console.warn("[PDF] Parse error for " + rp.facultyName + ": " + err.message);
     }
+  }
+  } catch (appendErr) {
+    console.warn("[PDF] Appending Drive PDFs failed — returning table PDF only:", appendErr.message);
   }
   } // end if (!isPreview)
 
