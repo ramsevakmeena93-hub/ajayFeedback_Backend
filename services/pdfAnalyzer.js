@@ -457,14 +457,22 @@ async function extractMetaFromBuffer(buffer) {
       const codeItems = dataRowItems.filter(i => i.x >= 140 && i.x < 240).map(i => i.str).join('');
       const subjectCode = codeItems ? codeItems.replace(/\s+/g, '-').replace(/-+/g, '-') : '';
 
-      // Extract Course Name (Programme): items between X 240 and 310, check dataY and any immediately adjacent upper row (e.g. dataY + 8)
+      // Extract Course Name (Programme): items between X 240 and 320
+      // Also check multiple adjacent rows above the data row (course names can wrap)
       const courseNameParts = [];
-      const aboveY = yKeys.find(k => k > dataY && k < headerY);
-      if (aboveY && rowMap[aboveY]) {
-        rowMap[aboveY].filter(i => i.x >= 240 && i.x < 310).forEach(i => courseNameParts.push(i.str));
+      const yKeysSorted = yKeys.filter(k => k > dataY && k < headerY).sort((a, b) => a - b);
+      // Collect from up to 3 rows above the data row
+      for (const aboveY of yKeysSorted.slice(-3)) {
+        if (rowMap[aboveY]) {
+          rowMap[aboveY].filter(i => i.x >= 240 && i.x < 320).forEach(i => {
+            if (i.str.trim()) courseNameParts.unshift(i.str.trim());
+          });
+        }
       }
-      dataRowItems.filter(i => i.x >= 240 && i.x < 310).forEach(i => courseNameParts.push(i.str));
-      const programme = courseNameParts.join(' ').trim();
+      dataRowItems.filter(i => i.x >= 240 && i.x < 320).forEach(i => {
+        if (i.str.trim()) courseNameParts.push(i.str.trim());
+      });
+      const programme = courseNameParts.join(' ').replace(/\s+/g, ' ').trim();
 
       if (facultyName || subjectCode || ffiScore !== null) {
         // If responsePercent missing but responseCount and linkSent/registeredStudents exist, calculate
@@ -494,7 +502,7 @@ async function extractMetaFromBuffer(buffer) {
 
   // 2. Second attempt: Format 2 & Format 1 Regex
   if (!bestMeta || !bestMeta.facultyName || bestMeta.ffiScore === null) {
-    const fmt2Regex = /Faculty\s+Name\s+Course\s+Code\s+Course\s+Name\s+Semester\s+Registered\s+Students\s+Link\s+Send\s+to\s+Students\s+Response\s+%\s*Resp\.?\s+FFI\s+([A-Za-z\s.]+?)\s+(\d{5,}(?:\s*-\s*Batch\s*-\s*[A-Z0-9]+|\s*-\s*[A-Za-z0-9]+|\s+Batch\s*-\s*[A-Z0-9]+)?)\s+(.+?)\s+(\d{1,2})\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)/i;
+    const fmt2Regex = /Faculty\s+Name\s+Course\s+Code\s+Course\s+Name\s+Semester\s+Registered\s+Students\s+Link\s+Send\s+to\s+Students\s+Response\s+%\s*Resp\.?\s+FFI\s+([A-Za-z\s.]+?)\s+(\d{5,}(?:\s*-\s*Batch\s*-\s*[A-Z0-9]+|\s*-\s*[A-Za-z0-9]+|\s+Batch\s*-\s*[A-Z0-9]+)?)\s+([\w\s&,.\/-]+?)\s+(\d{1,2})\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)/i;
     const fmt1Regex = /Faculty\s+Name\s+Code\s*\/\s*Batch\s+Programme\s+Sem(?:ester)?\s+FFI\s+Resp\.?\s+Needs\s+Attention\s+Appreciation\s+Action\s+Taken\s+Faculty\s+Signature\s+(\d+)\s+([A-Za-z\s.]+?)\s+(\d{5,}(?:\s*Batch\s*-\s*[A-Z0-9]+|\s*-\s*[A-Za-z0-9]+)?)\s+(.+?)\s+(\d{1,2})\s+(\d+(?:\.\d+)?)\s+([\d\-]+)/i;
 
     for (let p = 1; p <= doc.numPages; p++) {
@@ -552,8 +560,9 @@ async function extractMetaFromBuffer(buffer) {
         if (m) subjectCode = m[1].replace(/\s+/g, '-').replace(/-+/g, '-');
       }
       if (!programme) {
-        const m = fullText.match(/(?:course\s*name|programme|branch)\s*[:\-]?\s*([A-Za-z\s&]+?)(?=\s+(?:semester|sem|\d{1,2}|$))/i);
-        if (m && m[1].trim().length > 2) programme = m[1].trim();
+        // Capture everything after "course name/programme/branch" until semester/sem/digit or end
+        const m = fullText.match(/(?:course\s*name|programme|branch)\s*[:\-]?\s*((?:[A-Za-z0-9&,./\-]+\s*)+?)(?=\s*(?:semester|sem\b|\d{1,2}\s*(?:semester|sem|\b)|ffi|resp|response|$))/i);
+        if (m && m[1].trim().length > 2) programme = m[1].trim().replace(/\s+/g, ' ');
       }
       if (!semester) {
         const m = fullText.match(/(?:semester|sem)\s*[:\-]?\s*(\d{1,2})\b/i);
