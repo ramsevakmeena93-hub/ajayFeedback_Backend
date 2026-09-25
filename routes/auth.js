@@ -125,8 +125,8 @@ router.post('/register', async (req, res) => {
     let safeRole = 'faculty';
     let safeDepartment = department || '';
     if (cleanEmail === '25tc1aj7@mitsgwl.ac.in') {
-      safeRole = 'hod';
-      safeDepartment = safeDepartment || 'Computer Science and Engineering';
+      safeRole = 'admin';
+      safeDepartment = '';
     }
     if (cleanEmail === '25mc1sh132@mitsgwl.ac.in') {
       safeRole = 'hod';
@@ -202,14 +202,11 @@ router.post('/login', async (req, res) => {
     });
 
     // Re-apply hardcoded role overrides for designated accounts
-    if (cleanEmail === '25tc1aj7@mitsgwl.ac.in' && (user.role !== 'hod' || user.department !== 'Computer Science and Engineering')) {
-      await User.findByIdAndUpdate(user._id, { role: 'hod', roles: ['hod', 'faculty'], activeWorkspace: 'hod', department: 'Computer Science and Engineering' });
+    if (cleanEmail === '25tc1aj7@mitsgwl.ac.in' && user.role !== 'admin') {
+      await User.findByIdAndUpdate(user._id, { role: 'admin', roles: ['admin'], activeWorkspace: 'admin', department: '' });
       await UserRole.deleteMany({ userId: user._id });
-      await UserRole.create([
-        { userId: user._id, role: 'hod',     departmentScope: 'Computer Science and Engineering', active: true },
-        { userId: user._id, role: 'faculty', departmentScope: 'Computer Science and Engineering', active: true },
-      ]);
-      user.role = 'hod'; user.activeWorkspace = 'hod'; user.department = 'Computer Science and Engineering';
+      await UserRole.create({ userId: user._id, role: 'admin', departmentScope: '', active: true });
+      user.role = 'admin'; user.activeWorkspace = 'admin'; user.department = '';
     }
     if (cleanEmail === '25mc1sh132@mitsgwl.ac.in' && user.role !== 'hod') {
       await User.findByIdAndUpdate(user._id, { role: 'hod', roles: ['hod','faculty'], activeWorkspace: 'hod', department: 'Literature, Politics and Economics' });
@@ -438,7 +435,7 @@ router.post('/google', async (req, res) => {
       let assignedRole = 'faculty';
       let assignedDepartment = '';
       if (email.toLowerCase().includes('admin')) assignedRole = 'admin';
-      if (cleanEmail === '25tc1aj7@mitsgwl.ac.in') { assignedRole = 'hod'; assignedDepartment = 'Computer Science and Engineering'; }
+      if (cleanEmail === '25tc1aj7@mitsgwl.ac.in') { assignedRole = 'admin'; assignedDepartment = ''; }
       if (cleanEmail === '25mc1sh132@mitsgwl.ac.in') {
         assignedRole = 'hod';
         assignedDepartment = 'Literature, Politics and Economics';
@@ -476,7 +473,7 @@ router.post('/google', async (req, res) => {
       // externally (e.g. by a seed script that didn't know about this account).
       let correctedRole = null;
       let correctedDept = null;
-      if (cleanEmail === '25tc1aj7@mitsgwl.ac.in') { correctedRole = 'hod'; correctedDept = 'Computer Science and Engineering'; }
+      if (cleanEmail === '25tc1aj7@mitsgwl.ac.in') { correctedRole = 'admin'; correctedDept = ''; }
       if (cleanEmail === '25mc1sh132@mitsgwl.ac.in') {
         correctedRole = 'hod';
         correctedDept = 'Literature, Politics and Economics';
