@@ -778,7 +778,7 @@ router.get('/submission/:submissionId', authMiddleware, requireRole('vc'), async
       .populate({
         path:   'reports',
         model:  'FacultyReport',
-        select: 'facultyName subjectCode programme semester branch section ffiScore appreciationCount attentionCount status commentsNeedingAttention appreciation commentPercentages actionTaken hodRemarks driveLink academicYear',
+        select: 'facultyName subjectCode programme semester branch section ffiScore appreciationCount attentionCount status commentsNeedingAttention appreciation commentPercentages actionTaken hodRemarks driveLink academicYear responsePercent responseCount totalResponses',
       });
     if (!submission) return res.status(404).json({ error: 'Submission not found' });
 
