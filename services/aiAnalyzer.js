@@ -210,7 +210,7 @@ const NEGATIVE_PATTERNS = [
 // ─────────────────────────────────────────────────────────────────────────────
 const SKIP_PATTERNS = [
   /^-+$/, /^\.*$/, /^_+$/, /^\s*$/, /^x+$/i, /^\.{1,3}$/,
-  /^[0-9]+$/, /^[^a-zA-Z]+$/,
+  /^[0-9]+$/, /^[^a-zA-Z]+$/, /^[\d\s.,%-]+$/,
   /^no$/i, /^nil$/i, /^na$/i, /^n\/a$/i, /^none$/i, /^nothing$/i,
   /^no comments?$/i, /^no suggestions?$/i, /^all good$/i,
   /^ok$/i, /^okay$/i, /^please$/i, /^kuch nahi$/i, /^nothing to say$/i,
@@ -407,8 +407,18 @@ async function analyzeCommentsWithAI(rawComments) {
 
   console.log(`[AI] Classified ${rawComments.length} comments → ${result.appreciation.length} positive, ${result.commentsNeedingAttention.length} attention needed`);
 
-  // Filter out generic/short comments — keep only meaningful unique ones
-  result.appreciation = deduplicateComments(result.appreciation.filter(c => !isGenericComment(c)));
+  // Filter appreciation: remove numbers, generics, short comments — store only meaningful ones
+  result.appreciation = deduplicateComments(
+    result.appreciation
+      .filter(c => {
+        const t = c.trim();
+        // Remove purely numeric entries like "3 0 1 4 8 10 4.17"
+        if (/^[\d\s.,%-]+$/.test(t)) return false;
+        // Remove generic/short
+        if (isGenericComment(t)) return false;
+        return true;
+      })
+  );
   result.commentsNeedingAttention = deduplicateComments(result.commentsNeedingAttention);
 
   return result;
