@@ -558,7 +558,11 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
 
   const seenLinks = new Set();
   if (!isPreview) {
+  // Wrap entire Drive download + append in a 25s timeout so Render never kills the response
+  const appendTimeout = new Promise(resolve => setTimeout(resolve, 25000));
   try {
+  await Promise.race([
+    (async () => {
   // Download PDFs in parallel with concurrency limit to avoid timeout
   const downloadQueue = [];
   for (let ri = 0; ri < uniqueReports.length; ri++) {
@@ -648,6 +652,9 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
       console.warn("[PDF] Parse error for " + rp.facultyName + ": " + err.message);
     }
   }
+    })(),
+    appendTimeout
+  ]);
   } catch (appendErr) {
     console.warn("[PDF] Appending Drive PDFs failed — returning table PDF only:", appendErr.message);
   }
