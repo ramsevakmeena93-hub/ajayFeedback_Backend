@@ -754,8 +754,10 @@ const handleHODExportPDF = async (req, res) => {
     });
 
     res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Length', Buffer.isBuffer(pdfBuffer) ? pdfBuffer.length : Buffer.from(pdfBuffer).length);
     res.setHeader('Content-Disposition', 'attachment; filename="hod-feedback-report.pdf"');
-    res.send(pdfBuffer);
+    res.setHeader('Cache-Control', 'no-cache');
+    res.end(Buffer.isBuffer(pdfBuffer) ? pdfBuffer : Buffer.from(pdfBuffer));
   } catch (err) {
     console.error('[HOD Export PDF Error]:', err);
     res.status(500).json({ error: err.message });

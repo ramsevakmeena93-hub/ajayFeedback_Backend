@@ -493,9 +493,12 @@ router.get('/:id/download-pdf', authMiddleware, async (req, res) => {
     });
 
     const semSuffix = semFilter ? `-sem${semFilter}` : '';
+    const buf = Buffer.isBuffer(pdfBuffer) ? pdfBuffer : Buffer.from(pdfBuffer);
     res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Length', buf.length);
     res.setHeader('Content-Disposition', `attachment; filename="feedback-report-${submission._id}${semSuffix}.pdf"`);
-    res.send(pdfBuffer);
+    res.setHeader('Cache-Control', 'no-cache');
+    res.end(buf);
   } catch (err) {
     console.error('[PDF Gen]', err.message, err.stack);
     res.status(500).json({ error: err.message });
