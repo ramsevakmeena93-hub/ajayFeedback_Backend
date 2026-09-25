@@ -244,8 +244,44 @@ const NEUTRAL_SKIP_PATTERNS = [
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Rule-based classifier
+// Generic/filler comments that should be counted in % but NOT shown as
+// meaningful appreciation/attention comments
 // ─────────────────────────────────────────────────────────────────────────────
+const GENERIC_APPRECIATION_PATTERNS = [
+  /^(excellent|very good|good|great|outstanding|superb|brilliant|best|nice|satisfactory|wonderful|awesome|perfect|fantastic|amazing|exceptional|magnificent|splendid|marvelous)\.?$/i,
+  /^(good|great|excellent|best|nice|wonderful|amazing|awesome|superb|brilliant) (teacher|mam|sir|madam|faculty|lecture|class|sir\.?|mam\.?)\.?$/i,
+  /^(good|great|excellent|best|nice) (teaching|explanation|lectures?|classes?)\.?$/i,
+  /^(very |quite |really )?(good|nice|great|excellent|helpful|clear|effective)\.?$/i,
+  /^(thank you|thanks|keep it up|well done|hats off|best wishes|keep going|good luck)\.?$/i,
+  /^(bahut accha|bahut acha|acha hai|accha hai|best hai|zabardast|mast hai|sahi hai)\.?$/i,
+  /^(all good|overall good|overall great|overall excellent|overall nice|nothing to improve|no complaints|fully satisfied|completely satisfied|very satisfied)\.?$/i,
+  /^(punctual|interactive|approachable|supportive|cooperative|polite|friendly|engaging|informative|interesting)\.?$/i,
+  /^(good|nice|excellent|great|best)\.?$/i,
+  /^(not bad|not bad at all|no issues|no problems?|no concern)\.?$/i,
+];
+
+function isGenericComment(text) {
+  if (!text) return true;
+  const t = text.trim();
+  // Less than 4 words → generic
+  if (t.split(/\s+/).length < 4) return true;
+  // Matches a generic pattern
+  if (GENERIC_APPRECIATION_PATTERNS.some(p => p.test(t))) return true;
+  return false;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Deduplicate comments — case-insensitive, keep first occurrence
+// ─────────────────────────────────────────────────────────────────────────────
+function deduplicateComments(comments) {
+  const seen = new Set();
+  return comments.filter(c => {
+    const key = c.toLowerCase().trim().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ');
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
 function ruleBasedClassify(comment) {
   const text = comment.trim();
   if (!text || text.length < 2) return 'skip';
@@ -370,6 +406,11 @@ async function analyzeCommentsWithAI(rawComments) {
   }
 
   console.log(`[AI] Classified ${rawComments.length} comments → ${result.appreciation.length} positive, ${result.commentsNeedingAttention.length} attention needed`);
+
+  // Filter out generic/short comments — keep only meaningful unique ones
+  result.appreciation = deduplicateComments(result.appreciation.filter(c => !isGenericComment(c)));
+  result.commentsNeedingAttention = deduplicateComments(result.commentsNeedingAttention);
+
   return result;
 }
 
