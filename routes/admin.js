@@ -612,8 +612,10 @@ router.get('/stats', ...adminOnly, async (req, res) => {
       { $match: { department: { $ne: '' } } },
       { $group: { _id: '$department', count: { $sum: 1 } } },
     ]);
-    const recentUsers = await User.find({}, 'name email role roles department createdAt status')
-      .sort({ createdAt: -1 }).limit(5);
+    const recentUsers = await User.find(
+      { role: { $nin: ['admin'] } },
+      'name email role roles department createdAt status'
+    ).sort({ createdAt: -1 }).limit(5);
 
     res.json({
       totalUsers, reports, submissions,
