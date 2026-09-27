@@ -217,12 +217,20 @@ function isValidComment(text) {
     // Reject table header keywords
     const tableKeywords = [
         'faculty name', 'course code', 'course name', 'semester', 'registered students',
-        'link send', 'response %', 'submitted answers', 'label question',
+        'link send', 'response %', 'submitted answers', 'label question', 'submitted answer',
         'signature', 'hod', 'pro - vc', 'ffi & suggestion', 'student feedback comments',
-        'below average', 'course outcomes', 'qv 1', 'qv 2', 'needs attention', 'appreciation'
+        'below average', 'course outcomes', 'qv 1', 'qv 2', 'needs attention', 'appreciation',
+        'question', 'answer', 'response count', 'total responses', 'feedback form'
     ];
     const lower = clean.toLowerCase();
     if (tableKeywords.some(kw => lower.includes(kw))) return false;
+    
+    // Reject if it looks like a course/subject name followed by an answer
+    // e.g. "Software Engineering 45" or "Data Structures Yes"
+    if (/^[A-Z][A-Za-z\s&]+\s+(?:\d+|yes|no|n\.?a\.?)$/i.test(clean)) return false;
+    
+    // Reject if it contains multiple tab-separated or pipe-separated values (table data)
+    if (clean.split(/\t|\|/).length > 3) return false;
 
     // Reject pure numbers or punctuation
     if (/^[\d\s.,\-–/\\%]+$/.test(clean)) return false;
