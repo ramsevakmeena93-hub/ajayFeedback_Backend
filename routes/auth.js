@@ -12,11 +12,12 @@ const TOKEN_EXPIRY = '7d';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Domain whitelist
-// Only institute Google accounts are allowed.
+// Both MITS email domains are allowed.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const ALLOWED_DOMAINS = [
-  '@mitsgwl.ac.in'
+  '@mitsgwl.ac.in',
+  '@mitsgwalior.in'
 ];
 
 function isAllowedDomain(email) {
