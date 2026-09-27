@@ -546,6 +546,65 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
   }
 
   async function downloadWithRetry(url, retries = 3) {
+    // Check if it's a Google Drive link
+    const fileIdMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)|[?&]id=([a-zA-Z0-9_-]+)/);
+    
+    if (fileIdMatch) {
+      // Google Drive link - try service account first
+      const fileId = fileIdMatch[1] || fileIdMatch[2];
+      
+      try {
+        const { google } = require('googleapis');
+        
+        // Check if service account credentials are available
+        const clientEmail = process.env.GOOGLE_DRIVE_CLIENT_EMAIL;
+        const privateKey = process.env.GOOGLE_DRIVE_PRIVATE_KEY;
+        
+        if (clientEmail && privateKey) {
+          console.log('[PDF] Using service account to download Drive file:', fileId);
+          
+          // Create authentication
+          const auth = new google.auth.GoogleAuth({
+            credentials: {
+              client_email: clientEmail,
+              private_key: privateKey.replace(/\\n/g, '\n'),
+            },
+            scopes: ['https://www.googleapis.com/auth/drive.readonly'],
+          });
+          
+          const drive = google.drive({ version: 'v3', auth });
+          
+          // Download file using Drive API
+          const response = await drive.files.get({
+            fileId: fileId,
+            alt: 'media',
+          }, {
+            responseType: 'arraybuffer'
+          });
+          
+          const buf = Buffer.from(response.data);
+          
+          // Validate PDF header
+          const header = buf.subarray(0, 5).toString("latin1");
+          if (header !== "%PDF-") {
+            throw new Error("Downloaded response is not a PDF. Header: " + JSON.stringify(header));
+          }
+          if (buf.length < 1000) {
+            throw new Error("Downloaded PDF is too small");
+          }
+          
+          console.log(`[PDF] Valid PDF downloaded via service account: ${buf.length} bytes`);
+          return buf;
+        } else {
+          console.warn('[PDF] Service account credentials not found, falling back to public download');
+        }
+      } catch (error) {
+        console.error('[PDF] Service account download failed:', error.message);
+        console.log('[PDF] Falling back to public download method');
+      }
+    }
+    
+    // Fallback: Use public download (works if file is publicly accessible)
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
         const res = await axios.get(url, {

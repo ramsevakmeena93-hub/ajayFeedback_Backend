@@ -421,6 +421,54 @@ function convertDriveLink(url) {
 }
 
 async function fetchPDFBuffer(url) {
+  // Check if it's a Google Drive link
+  const fileIdMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)|[?&]id=([a-zA-Z0-9_-]+)/);
+  
+  if (fileIdMatch) {
+    // Google Drive link - use service account authentication
+    const fileId = fileIdMatch[1] || fileIdMatch[2];
+    
+    try {
+      const { google } = require('googleapis');
+      
+      // Check if service account credentials are available
+      const clientEmail = process.env.GOOGLE_DRIVE_CLIENT_EMAIL;
+      const privateKey = process.env.GOOGLE_DRIVE_PRIVATE_KEY;
+      
+      if (clientEmail && privateKey) {
+        console.log('[PDF] Using service account to download Drive file:', fileId);
+        
+        // Create authentication
+        const auth = new google.auth.GoogleAuth({
+          credentials: {
+            client_email: clientEmail,
+            private_key: privateKey.replace(/\\n/g, '\n'),
+          },
+          scopes: ['https://www.googleapis.com/auth/drive.readonly'],
+        });
+        
+        const drive = google.drive({ version: 'v3', auth });
+        
+        // Download file using Drive API
+        const response = await drive.files.get({
+          fileId: fileId,
+          alt: 'media',
+        }, {
+          responseType: 'arraybuffer'
+        });
+        
+        console.log('[PDF] Successfully downloaded via service account');
+        return Buffer.from(response.data);
+      } else {
+        console.warn('[PDF] Service account credentials not found, falling back to public download');
+      }
+    } catch (error) {
+      console.error('[PDF] Service account download failed:', error.message);
+      console.log('[PDF] Falling back to public download method');
+    }
+  }
+  
+  // Fallback: Use public download (works if file is publicly accessible)
   const res = await axios.get(convertDriveLink(url), {
     responseType: 'arraybuffer', timeout: 30000,
     headers: { 'User-Agent': 'Mozilla/5.0' }, maxRedirects: 5
