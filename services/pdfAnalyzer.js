@@ -576,18 +576,36 @@ async function extractMetaFromBuffer(buffer) {
             if (regItem) registeredStudents = parseInt(regItem.str, 10);
 
             // Extract Semester (X ~ 300-340, but be more flexible)
+            // Look in the semester column area
             let semester = '';
+            
+            // First try: exact position
             const semItem = dataRowItems.find(i =>
-                i.x >= 290 && i.x < 350 && /^\d{1,2}$/.test(i.str)
+                i.x >= 290 && i.x < 360 && /^\d{1,2}$/.test(i.str)
             );
             if (semItem) {
                 semester = semItem.str;
             } else {
-                // Fallback: look for any 1-2 digit number that could be semester
+                // Second try: any single digit 1-8 in wider range
                 const fallbackSem = dataRowItems.find(i => 
                     i.x >= 250 && i.x < 400 && /^[1-8]$/.test(i.str)
                 );
-                if (fallbackSem) semester = fallbackSem.str;
+                if (fallbackSem) {
+                    semester = fallbackSem.str;
+                } else {
+                    // Third try: look near the course name for semester info
+                    const nearbyItems = items.filter(i => 
+                        Math.abs(i.y - dataY) < 10 && 
+                        i.x >= 250 && i.x < 450
+                    );
+                    for (const item of nearbyItems) {
+                        const match = item.str.match(/^\d{1,2}$/);
+                        if (match && parseInt(match[0]) >= 1 && parseInt(match[0]) <= 8) {
+                            semester = match[0];
+                            break;
+                        }
+                    }
+                }
             }
 
             // Extract Faculty Name (X < 140)
@@ -607,34 +625,30 @@ async function extractMetaFromBuffer(buffer) {
                 : '';
 
             // Extract Programme/Course Name (X 240-320)
-            // Check multiple rows above data row for wrapped course names
+            // Collect ALL text in the course name column area, including multi-line wrapped text
             const courseNameParts = [];
-            const yKeysSorted = yKeys.filter(k => k > dataY && k < headerY).sort((a, b) => a - b);
-
-            for (const aboveY of yKeysSorted.slice(-3)) {
-                if (rowMap[aboveY]) {
-                    rowMap[aboveY]
-                        .filter(i => i.x >= 230 && i.x < 330) // Wider range
-                        .forEach(i => {
-                            const text = i.str.trim();
-                            // Skip table headers and numbers
-                            if (text && text.length > 2 && 
-                                !text.match(/^(semester|sem|ffi|resp|programme|code|faculty|name|students|link|send|response|\d+)$/i)) {
-                                courseNameParts.unshift(text);
-                            }
-                        });
+            
+            // Strategy: Collect all text items in the X range 230-330 that appear
+            // between the data row and header row (or within reasonable Y distance)
+            const minY = Math.min(dataY - 50, headerY); // Look up to 50 units above
+            const maxY = dataY + 20; // And 20 units below
+            
+            // Group all text items by Y position in the course name X range
+            const courseTexts = items
+                .filter(i => i.x >= 230 && i.x < 330 && i.y >= minY && i.y <= maxY)
+                .sort((a, b) => b.y - a.y); // Sort by Y descending (top to bottom)
+            
+            // Collect unique text, filtering out headers and numbers
+            const seenTexts = new Set();
+            for (const item of courseTexts) {
+                const text = item.str.trim();
+                if (text && text.length > 1 && 
+                    !seenTexts.has(text.toLowerCase()) &&
+                    !text.match(/^(semester|sem|ffi|resp|programme|code|faculty|name|students|link|send|response|course|registered|\d+)$/i)) {
+                    courseNameParts.push(text);
+                    seenTexts.add(text.toLowerCase());
                 }
             }
-
-            dataRowItems
-                .filter(i => i.x >= 230 && i.x < 330)
-                .forEach(i => {
-                    const text = i.str.trim();
-                    if (text && text.length > 2 && 
-                        !text.match(/^(semester|sem|ffi|resp|programme|code|faculty|name|students|link|send|response|\d+)$/i)) {
-                        courseNameParts.push(text);
-                    }
-                });
 
             const programme = courseNameParts.join(' ').replace(/\s+/g, ' ').trim();
 
