@@ -40,8 +40,11 @@ router.post('/upload-csv', authMiddleware, csvUpload.any(), async (req, res) => 
     const file = req.files && req.files.length > 0 ? req.files[0] : req.file;
     if (!file) return res.status(400).json({ error: 'No CSV or Excel file uploaded' });
 
+    console.log(`[upload-csv] Received file: ${file.originalname}, size: ${file.size} bytes, mimetype: ${file.mimetype}`);
+    
     const entries = parseCSV(file.buffer);
-    console.log(`[upload-csv] Parsed ${entries.length} entries from file: ${file.originalname}, size: ${file.size}`);
+    console.log(`[upload-csv] Parsed ${entries.length} entries from file: ${file.originalname}`);
+    
     if (entries.length === 0) {
       // Log first few rows to help debug
       try {
@@ -54,6 +57,8 @@ router.post('/upload-csv', authMiddleware, csvUpload.any(), async (req, res) => 
       return res.status(400).json({ error: 'No valid PDF links found in the uploaded file. Make sure your Excel contains a column with PDF/HTTP URLs.' });
     }
 
+    console.log(`[upload-csv] Sample entries:`, entries.slice(0, 3));
+
     // Return just the links — don't create DB records yet
     res.json({
       message: `Found ${entries.length} PDF links`,
@@ -62,7 +67,8 @@ router.post('/upload-csv', authMiddleware, csvUpload.any(), async (req, res) => 
     });
   } catch (err) {
     console.error('[upload-csv] Error parsing file:', err);
-    res.status(500).json({ error: err.message });
+    console.error('[upload-csv] Stack trace:', err.stack);
+    res.status(500).json({ error: err.message, details: 'Check server logs for more information' });
   }
 });
 
@@ -84,28 +90,48 @@ router.post('/process-one', authMiddleware, async (req, res) => {
       let response;
       for (let attempt = 1; attempt <= 4; attempt++) {
         try {
+          console.log(`[process-one] Attempt ${attempt}: Downloading ${pdfLink.substring(0, 60)}...`);
           response = await axios.get(convertDriveLink(pdfLink), {
             responseType: 'arraybuffer', timeout: 30000,
             headers: { 'User-Agent': 'Mozilla/5.0' }, maxRedirects: 5
           });
+          console.log(`[process-one] Download successful, size: ${response.data.byteLength} bytes`);
           break; // success
         } catch (err) {
           const status = err.response?.status;
+          console.error(`[process-one] Download attempt ${attempt} failed:`, err.message, `Status: ${status || 'N/A'}`);
+          
           if (attempt < 4 && (status === 429 || status === 503)) {
             // Exponential backoff with jitter: 5s, 10s, 20s
             const delay = (5000 * attempt) + Math.random() * 2000;
+            console.log(`[process-one] Waiting ${Math.round(delay/1000)}s before retry...`);
             await new Promise(r => setTimeout(r, delay));
             continue;
           }
           if (status === 429) {
             throw new Error('Google Drive rate limit reached. Please wait a minute and try again.');
           }
+          if (status === 403) {
+            throw new Error('Access denied. Make sure the PDF is shared with "Anyone at MITS" or add service account to folder permissions.');
+          }
+          if (status === 404) {
+            throw new Error('PDF not found. The link may be invalid or the file was deleted.');
+          }
           throw err;
         }
       }
+      
+      if (!response) {
+        throw new Error('Failed to download PDF after 4 attempts');
+      }
+      
       const buffer = Buffer.from(response.data);
+      console.log(`[process-one] Analyzing PDF...`);
       result = await analyzePDFBuffer(buffer);
+      console.log(`[process-one] Analysis complete. Comments: ${result.appreciation?.length || 0} appreciation, ${result.commentsNeedingAttention?.length || 0} attention`);
       setCache(cacheKey, result);
+    } else {
+      console.log(`[process-one] Using cached result for ${pdfLink.substring(0, 60)}`);
     }
 
     const meta = result.meta || {};
