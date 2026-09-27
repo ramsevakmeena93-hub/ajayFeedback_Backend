@@ -13,6 +13,48 @@
 let pipeline = null;
 let pipelineLoading = false;
 
+// Sentiment patterns
+const POSITIVE_PATTERNS = [
+  /\b(excellent|outstanding|amazing|wonderful|fantastic|great|good|nice|best|helpful|clear|friendly|supportive)\b/i,
+  /\b(achha|accha|badhiya|best|good|nice|helpful)\b/i
+];
+
+const NEGATIVE_PATTERNS = [
+  /\b(improve|need|should|must|better|more|less|slow|fast|poor|bad|difficult)\b/i,
+  /\b(nahi|nahin|bahut kam|thoda|improve karo)\b/i
+];
+
+const SKIP_PATTERNS = [
+  /^(no|none|na|nahi|nil|\.{3,}|-{3,}|_{3,})$/i,
+  /^.{1,3}$/
+];
+
+const NEUTRAL_SKIP_PATTERNS = [
+  /^(ok|okay|fine|average|normal|moderate)$/i
+];
+
+const CATEGORY_PATTERNS = {
+  Teaching: /\b(teach|explain|lecture|class|concept)\b/i,
+  Communication: /\b(communicate|talk|speak|language)\b/i,
+  Availability: /\b(available|accessible|office|hours)\b/i,
+  Materials: /\b(notes|slides|material|book|resource)\b/i,
+  Assessment: /\b(exam|test|quiz|grade|mark|assignment)\b/i,
+  General: /.*/
+};
+
+function deduplicateComments(comments) {
+  const seen = new Set();
+  const unique = [];
+  for (const comment of comments) {
+    const key = String(comment || '').toLowerCase().trim();
+    if (key && !seen.has(key)) {
+      seen.add(key);
+      unique.push(comment);
+    }
+  }
+  return unique;
+}
+
 async function getSentimentPipeline() {
   if (pipeline) return pipeline;
   if (pipelineLoading) {
@@ -34,25 +76,29 @@ async function getSentimentPipeline() {
   }
   return pipeline;
 }
-    // Complete audit trail
+
+// Patterns and classification logic
+async function classifyComments(rawComments) {
+  const result = {
+    appreciation: [],
+    commentsNeedingAttention: [],
+    commentCategories: {
+      Teaching: [],
+      Communication: [],
+      Availability: [],
+      Materials: [],
+      Assessment: [],
+      General: []
+    },
     classifiedComments: [],
-
     statistics: {
-
       totalReceived: 0,
-
       appreciation: 0,
-
       attention: 0,
-
       neutral: 0,
-
       skipped: 0,
-
       aiClassified: 0
-
     }
-
   };
 
 
@@ -236,39 +282,8 @@ async function getSentimentPipeline() {
   // GENERIC NEGATIVE / ACTIONABLE CHECK
   // ==========================================================
 
-  function hasGenericNegative(
-    text
-  ) {
-
-    return /\b(
-      not|
-      never|
-      hardly|
-      rarely|
-      barely|
-      don't|
-      doesn't|
-      didn't|
-      can't|
-      cannot|
-      won't|
-      shouldn't|
-      couldn't|
-      less|
-      poor|
-      improve|
-      issue|
-      problem|
-      slow|
-      fast|
-      rude|
-      absent|
-      late|
-      lack|
-      difficult|
-      insufficient
-    )\b/ix.test(text);
-
+  function hasGenericNegative(text) {
+    return /\b(not|never|hardly|rarely|barely|don't|doesn't|didn't|can't|cannot|won't|shouldn't|couldn't|less|poor|improve|issue|problem|slow|fast|rude|absent|late|lack|difficult|insufficient)\b/i.test(text);
   }
 
 
@@ -819,3 +834,17 @@ async function getSentimentPipeline() {
 
   return result;
 }
+
+
+// Export the main function
+module.exports = {
+  classifyComments,
+  testGeminiConnection: async () => {
+    try {
+      await getSentimentPipeline();
+      return { ok: true, engine: 'HuggingFace Transformers' };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  }
+};
