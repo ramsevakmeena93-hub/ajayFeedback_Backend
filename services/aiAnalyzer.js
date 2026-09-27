@@ -15,22 +15,26 @@ let pipelineLoading = false;
 
 // Sentiment patterns
 const POSITIVE_PATTERNS = [
-  /\b(excellent|outstanding|amazing|wonderful|fantastic|great|good|nice|best|helpful|clear|friendly|supportive)\b/i,
-  /\b(achha|accha|badhiya|best|good|nice|helpful)\b/i
+  /\b(excellent|outstanding|amazing|wonderful|fantastic|great|good|nice|best|helpful|clear|friendly|supportive|awesome|brilliant|superb|perfect|love|enjoyed|appreciate)\b/i,
+  /\b(achha|accha|badhiya|bahut accha|best|good|nice|helpful|mast|zabardast)\b/i,
+  /\b(well\s+(?:explained|taught|organized|structured))\b/i,
+  /\b(very\s+(?:good|helpful|clear|patient|knowledgeable))\b/i
 ];
 
 const NEGATIVE_PATTERNS = [
-  /\b(improve|need|should|must|better|more|less|slow|fast|poor|bad|difficult)\b/i,
-  /\b(nahi|nahin|bahut kam|thoda|improve karo)\b/i
+  /\b(improve|need|should|must|better|more\s+(?:time|examples|practice|attention|explanation)|less|slow|fast|poor|bad|difficult|hard|confusing|unclear|boring|waste)\b/i,
+  /\b(not\s+(?:clear|enough|good|helpful|available|punctual)|doesn'?t\s+(?:explain|teach|provide|help)|didn'?t\s+(?:understand|cover|give))\b/i,
+  /\b(nahi|nahin|bahut\s+kam|thoda|improve\s+karo|samajh\s+nahi\s+aaya)\b/i,
+  /\b(rude|arrogant|biased|unfair|absent|late|irregular|unavailable)\b/i
 ];
 
 const SKIP_PATTERNS = [
-  /^(no|none|na|nahi|nil|\.{3,}|-{3,}|_{3,})$/i,
+  /^(no|none|na|nahi|nil|n\.?a\.?|\.{3,}|-{3,}|_{3,})$/i,
   /^.{1,3}$/
 ];
 
 const NEUTRAL_SKIP_PATTERNS = [
-  /^(ok|okay|fine|average|normal|moderate)$/i
+  /^(ok|okay|fine|average|normal|moderate|alright|decent)$/i
 ];
 
 const CATEGORY_PATTERNS = {
@@ -283,7 +287,17 @@ async function classifyComments(rawComments) {
   // ==========================================================
 
   function hasGenericNegative(text) {
-    return /\b(not|never|hardly|rarely|barely|don't|doesn't|didn't|can't|cannot|won't|shouldn't|couldn't|less|poor|improve|issue|problem|slow|fast|rude|absent|late|lack|difficult|insufficient)\b/i.test(text);
+    const negativeIndicators = [
+      /\bnot\s+(good|clear|helpful|enough|available|punctual|organized)\b/i,
+      /\bdoesn'?t\s+(explain|teach|provide|help|come|attend)\b/i,
+      /\bdidn'?t\s+(understand|cover|explain|teach|give|provide)\b/i,
+      /\bcan'?t\s+(understand|follow|hear|see)\b/i,
+      /\bwon'?t\s+(help|explain|answer|respond)\b/i,
+      /\b(never|hardly|rarely|barely|seldom)\s+(available|present|comes|helps|explains)\b/i,
+      /\b(too\s+fast|too\s+slow|too\s+difficult|too\s+easy|too\s+much|too\s+less)\b/i,
+      /\b(less|poor|lack|insufficient|inadequate|absent|late|rude|biased|unfair|boring|waste)\b/i
+    ];
+    return negativeIndicators.some(pattern => pattern.test(text));
   }
 
 
@@ -433,6 +447,8 @@ async function classifyComments(rawComments) {
         pattern =>
           pattern.test(lower)
       );
+    
+    const hasGenericNeg = hasGenericNegative(text);
 
 
     // ========================================================
@@ -448,10 +464,13 @@ async function classifyComments(rawComments) {
     // Positive = YES
     // Negative = YES
     // Final = NEED ATTENTION
+    // 
+    // BUT: If comment is purely positive (multiple positive words,
+    // no strong negative), don't mis-classify
     // ========================================================
 
     if (
-      hasNegative
+      hasNegative || hasGenericNeg
     ) {
 
       addAttention(text);
@@ -487,53 +506,7 @@ async function classifyComments(rawComments) {
 
 
     // ========================================================
-    // RULE #2
-    //
-    // GENERIC NEGATION
-    //
-    // Examples:
-    //
-    // "Teacher is not available."
-    // "Faculty does not explain clearly."
-    // "Notes are not provided."
-    // ========================================================
-
-    if (
-      hasGenericNegative(text)
-    ) {
-
-      addAttention(text);
-
-
-      result.statistics.attention++;
-
-
-      result.classifiedComments.push({
-
-        text,
-
-        classification:
-          'attention',
-
-        needsAttention:
-          true,
-
-        mixedSentiment:
-          hasPositive,
-
-        reason:
-          'negative-language'
-
-      });
-
-
-      continue;
-
-    }
-
-
-    // ========================================================
-    // RULE #3
+    // RULE #2 (formerly RULE #3)
     //
     // POSITIVE
     // ========================================================
@@ -573,7 +546,7 @@ async function classifyComments(rawComments) {
 
 
     // ========================================================
-    // RULE #4
+    // RULE #3
     //
     // LONG UNKNOWN COMMENT
     //
@@ -705,7 +678,7 @@ async function classifyComments(rawComments) {
 
 
     // ========================================================
-    // RULE #5
+    // RULE #4
     //
     // UNKNOWN COMMENT
     //

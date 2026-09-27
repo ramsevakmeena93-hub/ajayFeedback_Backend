@@ -110,30 +110,60 @@ router.post('/process-one', authMiddleware, async (req, res) => {
 
     const meta = result.meta || {};
 
-    // Save to DB
-    const report = await FacultyReport.create({
+    // Check if this report already exists for this HOD
+    const existingReport = await FacultyReport.findOne({
       hodId: req.user.id,
-      facultyName: meta.facultyName || '',
-      subjectCode: meta.subjectCode || '',
-      programme: meta.programme || '',
-      semester: meta.semester || '',
-      pdfLink,
       driveLink: pdfLink,
-      appreciation: result.appreciation,
-      commentsNeedingAttention: result.commentsNeedingAttention,
-      appreciationCount: result.appreciationCount,
-      attentionCount: result.attentionCount,
-      ffiScore: result.ffiScore ?? meta.ffiScore ?? null,
-      responseCount: req.body.responseCount ?? result.responseCount ?? meta.responseCount ?? null,
-      responsePercent: req.body.responsePercent ?? result.responsePercent ?? meta.responsePercent ?? null,
-      registeredStudents: meta.registeredStudents ?? null,
-      linkSent: meta.linkSent ?? null,
-      rawStudentComments: result.rawStudentComments || [],
-      commentCategories: result.commentCategories || {},
-      commentPercentages: result.commentPercentages || {},
-      status: 'processed',
-      analyzedAt: result.analyzedAt
+      facultyName: meta.facultyName || '',
+      subjectCode: meta.subjectCode || ''
     });
+
+    let report;
+    if (existingReport) {
+      // Update existing report instead of creating duplicate
+      console.log(`[process-one] Updating existing report for ${meta.facultyName} - ${meta.subjectCode}`);
+      report = await FacultyReport.findByIdAndUpdate(existingReport._id, {
+        appreciation: result.appreciation,
+        commentsNeedingAttention: result.commentsNeedingAttention,
+        appreciationCount: result.appreciationCount,
+        attentionCount: result.attentionCount,
+        ffiScore: result.ffiScore ?? meta.ffiScore ?? existingReport.ffiScore,
+        responseCount: req.body.responseCount ?? result.responseCount ?? meta.responseCount ?? existingReport.responseCount,
+        responsePercent: req.body.responsePercent ?? result.responsePercent ?? meta.responsePercent ?? existingReport.responsePercent,
+        registeredStudents: meta.registeredStudents ?? existingReport.registeredStudents,
+        linkSent: meta.linkSent ?? existingReport.linkSent,
+        rawStudentComments: result.rawStudentComments || [],
+        commentCategories: result.commentCategories || {},
+        commentPercentages: result.commentPercentages || {},
+        status: 'processed',
+        analyzedAt: result.analyzedAt
+      }, { new: true });
+    } else {
+      // Save to DB as new report
+      report = await FacultyReport.create({
+        hodId: req.user.id,
+        facultyName: meta.facultyName || '',
+        subjectCode: meta.subjectCode || '',
+        programme: meta.programme || '',
+        semester: meta.semester || '',
+        pdfLink,
+        driveLink: pdfLink,
+        appreciation: result.appreciation,
+        commentsNeedingAttention: result.commentsNeedingAttention,
+        appreciationCount: result.appreciationCount,
+        attentionCount: result.attentionCount,
+        ffiScore: result.ffiScore ?? meta.ffiScore ?? null,
+        responseCount: req.body.responseCount ?? result.responseCount ?? meta.responseCount ?? null,
+        responsePercent: req.body.responsePercent ?? result.responsePercent ?? meta.responsePercent ?? null,
+        registeredStudents: meta.registeredStudents ?? null,
+        linkSent: meta.linkSent ?? null,
+        rawStudentComments: result.rawStudentComments || [],
+        commentCategories: result.commentCategories || {},
+        commentPercentages: result.commentPercentages || {},
+        status: 'processed',
+        analyzedAt: result.analyzedAt
+      });
+    }
 
     res.json({ report, sno });
   } catch (err) {
