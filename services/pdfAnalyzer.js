@@ -575,12 +575,20 @@ async function extractMetaFromBuffer(buffer) {
             );
             if (regItem) registeredStudents = parseInt(regItem.str, 10);
 
-            // Extract Semester (X ~ 300-340)
+            // Extract Semester (X ~ 300-340, but be more flexible)
             let semester = '';
             const semItem = dataRowItems.find(i =>
-                i.x >= 300 && i.x < 340 && /^\d{1,2}$/.test(i.str)
+                i.x >= 290 && i.x < 350 && /^\d{1,2}$/.test(i.str)
             );
-            if (semItem) semester = semItem.str;
+            if (semItem) {
+                semester = semItem.str;
+            } else {
+                // Fallback: look for any 1-2 digit number that could be semester
+                const fallbackSem = dataRowItems.find(i => 
+                    i.x >= 250 && i.x < 400 && /^[1-8]$/.test(i.str)
+                );
+                if (fallbackSem) semester = fallbackSem.str;
+            }
 
             // Extract Faculty Name (X < 140)
             const facultyName = dataRowItems
@@ -606,17 +614,26 @@ async function extractMetaFromBuffer(buffer) {
             for (const aboveY of yKeysSorted.slice(-3)) {
                 if (rowMap[aboveY]) {
                     rowMap[aboveY]
-                        .filter(i => i.x >= 240 && i.x < 320)
+                        .filter(i => i.x >= 230 && i.x < 330) // Wider range
                         .forEach(i => {
-                            if (i.str.trim()) courseNameParts.unshift(i.str.trim());
+                            const text = i.str.trim();
+                            // Skip table headers and numbers
+                            if (text && text.length > 2 && 
+                                !text.match(/^(semester|sem|ffi|resp|programme|code|faculty|name|students|link|send|response|\d+)$/i)) {
+                                courseNameParts.unshift(text);
+                            }
                         });
                 }
             }
 
             dataRowItems
-                .filter(i => i.x >= 240 && i.x < 320)
+                .filter(i => i.x >= 230 && i.x < 330)
                 .forEach(i => {
-                    if (i.str.trim()) courseNameParts.push(i.str.trim());
+                    const text = i.str.trim();
+                    if (text && text.length > 2 && 
+                        !text.match(/^(semester|sem|ffi|resp|programme|code|faculty|name|students|link|send|response|\d+)$/i)) {
+                        courseNameParts.push(text);
+                    }
                 });
 
             const programme = courseNameParts.join(' ').replace(/\s+/g, ' ').trim();
@@ -714,15 +731,40 @@ async function extractMetaFromBuffer(buffer) {
             }
 
             if (!programme) {
-                const m = fullText.match(/(?:course\s*name|programme|branch)\s*[:\-]?\s*((?:[A-Za-z0-9&,./\-]+\s*)+?)(?=\s*(?:semester|sem\b|\d{1,2}\s*(?:semester|sem|\b)|ffi|resp|response|$))/i);
-                if (m && m[1].trim().length > 2) {
-                    programme = m[1].trim().replace(/\s+/g, ' ');
+                // More flexible pattern for course name
+                const patterns = [
+                    /(?:course\s*name|programme|branch)\s*[:\-]?\s*((?:[A-Za-z0-9&,./\-\(\)]+\s*)+?)(?=\s*(?:semester|sem\b|\d{1,2}\s*(?:semester|sem|\b)|ffi|resp|response|registered|$))/i,
+                    /(?:^|\n)((?:[A-Z][A-Za-z0-9&,./\-\(\)\s]+))(?=\s*(?:semester|sem\b|I{1,3}V?|V?I{1,3}\b))/im, // Matches course names before semester numbers
+                    /programme\s*[:\-]?\s*([A-Z][A-Za-z0-9&,./\-\(\)\s]+?)(?=\s*semester)/i
+                ];
+                
+                for (const pattern of patterns) {
+                    const m = fullText.match(pattern);
+                    if (m && m[1] && m[1].trim().length > 3) {
+                        programme = m[1].trim().replace(/\s+/g, ' ');
+                        break;
+                    }
                 }
             }
 
             if (!semester) {
-                const m = fullText.match(/(?:semester|sem)\s*[:\-]?\s*(\d{1,2})\b/i);
-                if (m) semester = m[1];
+                // Multiple patterns for semester
+                const patterns = [
+                    /(?:semester|sem)\s*[:\-]?\s*(\d{1,2})\b/i,
+                    /\bsem\s*[:\-]?\s*([1-8])\b/i,
+                    /\b(I{1,3}V?|V?I{1,3})\s*(?:semester|sem)\b/i, // Roman numerals
+                    /(?:semester|sem)\s*[:\-]?\s*(I{1,3}V?|V?I{1,3})\b/i
+                ];
+                
+                for (const pattern of patterns) {
+                    const m = fullText.match(pattern);
+                    if (m && m[1]) {
+                        // Convert Roman to number if needed
+                        const romanToNum = { 'I': '1', 'II': '2', 'III': '3', 'IV': '4', 'V': '5', 'VI': '6', 'VII': '7', 'VIII': '8' };
+                        semester = romanToNum[m[1].toUpperCase()] || m[1];
+                        break;
+                    }
+                }
             }
 
             if (ffiScore === null) {
