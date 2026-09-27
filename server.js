@@ -5,6 +5,19 @@ const cors = require('cors');
 const mongoose = require('mongoose');
 const path = require('path');
 
+// ── Check critical dependencies on startup ──
+console.log('[Startup] Checking dependencies...');
+try {
+  require('jsonwebtoken');
+  require('bcryptjs');
+  require('axios');
+  require('multer');
+  console.log('[Startup] ✅ Core dependencies loaded');
+} catch (err) {
+  console.error('[Startup] ❌ Critical dependency missing:', err.message);
+  process.exit(1);
+}
+
 // ── MUST be first — intercepts all console.log/error/warn ──
 const logstream = require('./routes/logstream');
 
@@ -104,9 +117,16 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 5000;
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/faculty_feedback';
 
+console.log('[Startup] Starting server...');
+console.log('[Startup] PORT:', PORT);
+console.log('[Startup] MONGO_URI:', MONGO_URI ? 'Set (length: ' + MONGO_URI.length + ')' : 'NOT SET');
+console.log('[Startup] NODE_ENV:', process.env.NODE_ENV || 'development');
+console.log('[Startup] JWT_SECRET:', process.env.JWT_SECRET ? 'Set' : 'Using default');
+console.log('[Startup] FRONTEND_URL:', process.env.FRONTEND_URL || 'Not set');
+
 mongoose.connect(MONGO_URI)
   .then(async () => {
-    console.log('MongoDB connected');
+    console.log('[Startup] ✅ MongoDB connected successfully');
 
     // ── Cleanup stale local PDF files on startup (disk space) ──
     try {
@@ -223,9 +243,14 @@ mongoose.connect(MONGO_URI)
       }).catch(() => {});
     } catch {}
 
-    httpServer.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+    httpServer.listen(PORT, () => {
+      console.log('[Startup] ✅ Server running on port', PORT);
+      console.log('[Startup] ✅ All systems operational');
+    });
   })
   .catch(err => {
-    console.error('MongoDB connection error:', err);
+    console.error('[Startup] ❌ MongoDB connection error:', err.message);
+    console.error('[Startup] ❌ Full error:', err);
+    console.error('[Startup] ❌ MONGO_URI preview:', MONGO_URI ? MONGO_URI.substring(0, 30) + '...' : 'undefined');
     process.exit(1);
   });
