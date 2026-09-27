@@ -19,7 +19,15 @@ try {
 }
 
 // ── MUST be first — intercepts all console.log/error/warn ──
-const logstream = require('./routes/logstream');
+let logstream;
+try {
+  logstream = require('./routes/logstream');
+  console.log('[Startup] ✅ Logstream loaded');
+} catch (err) {
+  console.error('[Startup] ⚠️ Logstream failed to load:', err.message);
+  console.error('[Startup] Continuing without logstream...');
+  logstream = null;
+}
 
 const app = express();
 const httpServer = http.createServer(app);
@@ -72,21 +80,30 @@ app.use((req, res, next) => {
 });
 
 // Routes
-app.use('/api/auth',          require('./routes/auth'));
-app.use('/api/reports',       require('./routes/reports'));
-app.use('/api/submissions',   require('./routes/submissions'));
-app.use('/api/process',       require('./routes/process'));
-app.use('/api/logs',          require('./routes/logs'));
-app.use('/api/notifications', require('./routes/notifications'));
-app.use('/api/admin',         require('./routes/admin'));
-app.use('/api/logstream',     require('./routes/logstream'));
-app.use('/api/codeeditor',    require('./routes/codeeditor'));
+console.log('[Startup] Loading routes...');
+try {
+  app.use('/api/auth',          require('./routes/auth'));
+  app.use('/api/reports',       require('./routes/reports'));
+  app.use('/api/submissions',   require('./routes/submissions'));
+  app.use('/api/process',       require('./routes/process'));
+  app.use('/api/logs',          require('./routes/logs'));
+  app.use('/api/notifications', require('./routes/notifications'));
+  app.use('/api/admin',         require('./routes/admin'));
+  if (logstream) app.use('/api/logstream', logstream);
+  app.use('/api/codeeditor',    require('./routes/codeeditor'));
 
-// ── Multi-role RBAC routes ────────────────────────────────────────────────
-app.use('/api/workspace',   require('./routes/workspace'));   // workspace switch + /me
-app.use('/api/roles',       require('./routes/roles'));       // role assignment + approval policy
-app.use('/api/assignments', require('./routes/assignments')); // teaching assignments
-app.use('/api/audit',       require('./routes/audit'));       // audit log (admin + /my)
+  // ── Multi-role RBAC routes ────────────────────────────────────────────────
+  app.use('/api/workspace',   require('./routes/workspace'));   // workspace switch + /me
+  app.use('/api/roles',       require('./routes/roles'));       // role assignment + approval policy
+  app.use('/api/assignments', require('./routes/assignments')); // teaching assignments
+  app.use('/api/audit',       require('./routes/audit'));       // audit log (admin + /my)
+  
+  console.log('[Startup] ✅ All routes loaded');
+} catch (err) {
+  console.error('[Startup] ❌ Route loading error:', err.message);
+  console.error('[Startup] ❌ Stack:', err.stack);
+  process.exit(1);
+}
 
 // Health check + version
 app.get('/api/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime(), version: '2.3.0' }));
