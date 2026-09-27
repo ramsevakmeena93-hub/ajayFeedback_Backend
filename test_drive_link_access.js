@@ -11,16 +11,17 @@ async function testDriveLinkAccess() {
   console.log('🔍 Testing Google Drive Link Access...\n');
 
   // Example Drive link (replace with your actual PDF link)
-  const testLink = 'https://drive.google.com/file/d/1ABC123_YOUR_FILE_ID/view';
+  const testLink = 'https://drive.google.com/open?id=1txsD9qcwbRakuwDtNi3RrdYyYPcYXLwY&usp=drive_copy';
   
   // Extract file ID from link
-  const fileIdMatch = testLink.match(/\/d\/([^\/]+)/);
+  const fileIdMatch = testLink.match(/\/d\/([a-zA-Z0-9_-]+)|[?&]id=([a-zA-Z0-9_-]+)/);
   if (!fileIdMatch) {
     console.error('❌ Invalid Drive link format');
+    console.error('   Link:', testLink);
     return;
   }
   
-  const fileId = fileIdMatch[1];
+  const fileId = fileIdMatch[1] || fileIdMatch[2];
   console.log(`📄 File ID: ${fileId}\n`);
 
   // Check environment variables
