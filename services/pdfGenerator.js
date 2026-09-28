@@ -278,23 +278,23 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
   // Line 1: Action Taken Report
   const atrText = "Action Taken Report";
   txt(coverPage, atrText,
-      PW / 2 - timesBoldFont.widthOfTextAtSize(atrText, 14) / 2,
-      y, 14, timesBoldFont, black);
+      PW / 2 - timesBoldFont.widthOfTextAtSize(atrText, 16) / 2,
+      y, 16, timesBoldFont, black);
   y -= 18;
 
   // Line 2: Faculty Feedback – I (or form number)
   const formNo  = submission.feedbackFormNo || "I";
   const ffTitle = "Faculty Feedback \u2013 " + formNo;
   txt(coverPage, ffTitle,
-      PW / 2 - timesBoldFont.widthOfTextAtSize(ffTitle, 16) / 2,
-      y, 16, timesBoldFont, darkBlue);
+      PW / 2 - timesBoldFont.widthOfTextAtSize(ffTitle, 18) / 2,
+      y, 18, timesBoldFont, darkBlue);
   y -= 18;
 
   // Line 3: Department
   const dT = (hodUser && hodUser.department) || "Centre for Computer Science and Technology";
   txt(coverPage, dT,
-      PW / 2 - timesFont.widthOfTextAtSize(dT, 12) / 2,
-      y, 12, timesFont, black);
+      PW / 2 - timesFont.widthOfTextAtSize(dT, 14) / 2,
+      y, 14, timesFont, black);
   y -= 16;
 
   // Line 4: Academic Year (left) | Session (right)
