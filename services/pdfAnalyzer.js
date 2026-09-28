@@ -184,8 +184,8 @@ function isValidComment(text) {
     if (!text || typeof text !== 'string') return false;
     const clean = text.trim();
 
-    // Minimum length to be considered a real comment
-    if (clean.length < 8) return false;
+    // Minimum length to be considered a real comment (increased to filter more garbage)
+    if (clean.length < 10) return false;
 
     // Reject page numbers like "1 / 3", "2/3", "about:blank 1 / 2"
     if (/^\d+\s*\/\s*\d+$/.test(clean)) return false;
@@ -214,20 +214,24 @@ function isValidComment(text) {
 
     if (headerPatterns.some(p => p.test(clean))) return false;
 
-    // Reject table header keywords
+    // Reject table header keywords and metadata
     const tableKeywords = [
         'faculty name', 'course code', 'course name', 'semester', 'registered students',
         'link send', 'response %', 'submitted answers', 'label question', 'submitted answer',
         'signature', 'hod', 'pro - vc', 'ffi & suggestion', 'student feedback comments',
         'below average', 'course outcomes', 'qv 1', 'qv 2', 'needs attention', 'appreciation',
-        'question', 'answer', 'response count', 'total responses', 'feedback form'
+        'question', 'answer', 'response count', 'total responses', 'feedback form',
+        'submit', 'label', 'requirement', 'operating system', 'real world', 'purchased'
     ];
     const lower = clean.toLowerCase();
     if (tableKeywords.some(kw => lower.includes(kw))) return false;
     
     // Reject if it looks like a course/subject name followed by an answer
-    // e.g. "Software Engineering 45" or "Data Structures Yes"
-    if (/^[A-Z][A-Za-z\s&]+\s+(?:\d+|yes|no|n\.?a\.?)$/i.test(clean)) return false;
+    // e.g. "Software Engineering 45" or "Data Structures Yes" or "operating system purchased"
+    if (/^[A-Z][A-Za-z\s&]+\s+(?:\d+|yes|no|n\.?a\.?|purchased|required)$/i.test(clean)) return false;
+    
+    // Reject lines that look like questions or prompts
+    if (/\brequirement\b|\boperating system\b|\breal world\b|\bpurchased\b|\bproblem\b.*\bsoftware\b/i.test(clean)) return false;
     
     // Reject if it contains multiple tab-separated or pipe-separated values (table data)
     if (clean.split(/\t|\|/).length > 3) return false;
