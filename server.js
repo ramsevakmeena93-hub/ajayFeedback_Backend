@@ -89,6 +89,7 @@ try {
   app.use('/api/logs',          require('./routes/logs'));
   app.use('/api/notifications', require('./routes/notifications'));
   app.use('/api/admin',         require('./routes/admin'));
+  app.use('/api/util',          require('./routes/updateVCName')); // Temporary utility route
   if (logstream) app.use('/api/logstream', logstream);
   app.use('/api/codeeditor',    require('./routes/codeeditor'));
 
