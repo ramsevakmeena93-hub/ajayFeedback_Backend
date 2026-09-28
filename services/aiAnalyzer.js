@@ -15,17 +15,58 @@ let pipelineLoading = false;
 
 // Sentiment patterns
 const POSITIVE_PATTERNS = [
-  /\b(excellent|outstanding|amazing|wonderful|fantastic|great|good|nice|best|helpful|clear|friendly|supportive|awesome|brilliant|superb|perfect|love|enjoyed|appreciate)\b/i,
-  /\b(achha|accha|badhiya|bahut accha|best|good|nice|helpful|mast|zabardast)\b/i,
-  /\b(well\s+(?:explained|taught|organized|structured))\b/i,
-  /\b(very\s+(?:good|helpful|clear|patient|knowledgeable))\b/i
+  // Very strong positive only
+  /\b(excellent|outstanding|amazing|wonderful|fantastic|superb|brilliant|perfect|exceptional|extraordinary)\b/i,
+  
+  // Strong appreciation
+  /\b(love|loved|enjoyed|appreciate|grateful|thank|thanks|thankful)\b/i,
+  
+  // Specific positive teaching qualities
+  /\b(very\s+(?:good|helpful|clear|patient|knowledgeable|experienced|dedicated))\b/i,
+  /\b(extremely\s+(?:good|helpful|supportive|knowledgeable))\b/i,
+  /\b(best\s+(?:teacher|faculty|professor|explanation|teaching))\b/i,
+  
+  // Strong Hindi positive
+  /\b(bahut\s+(?:accha|achha|badhiya)|zabardast|kamaal|behtareen)\b/i,
+  
+  // Well + strong verb
+  /\b(very\s+well\s+(?:explained|taught|organized|structured))\b/i,
+  /\b(extremely\s+well\s+(?:explained|taught))\b/i
 ];
 
 const NEGATIVE_PATTERNS = [
-  /\b(improve|need|should|must|better|more\s+(?:time|examples|practice|attention|explanation)|less|slow|fast|poor|bad|difficult|hard|confusing|unclear|boring|waste)\b/i,
-  /\b(not\s+(?:clear|enough|good|helpful|available|punctual)|doesn'?t\s+(?:explain|teach|provide|help)|didn'?t\s+(?:understand|cover|give))\b/i,
-  /\b(nahi|nahin|bahut\s+kam|thoda|improve\s+karo|samajh\s+nahi\s+aaya)\b/i,
-  /\b(rude|arrogant|biased|unfair|absent|late|irregular|unavailable)\b/i
+  // Direct criticism
+  /\b(improve|need|should|must|better|lack|lacking|insufficient|inadequate)\b/i,
+  
+  // Quality issues
+  /\b(poor|bad|worst|terrible|horrible|useless|waste|boring|dull|monotonous)\b/i,
+  
+  // Speed/pace issues
+  /\b(too\s+(?:fast|slow|quick|rushed)|very\s+(?:fast|slow)|so\s+(?:fast|slow))\b/i,
+  
+  // Understanding issues
+  /\b(difficult|hard|confusing|unclear|complicated|not\s+clear|doesn'?t\s+explain|can'?t\s+understand)\b/i,
+  
+  // Quantity issues
+  /\b(more\s+(?:time|examples|practice|attention|explanation|details|classes)|less\s+(?:time|attention)|not\s+enough)\b/i,
+  
+  // Negative comparisons
+  /\b(not\s+(?:good|helpful|available|punctual|organized|satisfied|happy))\b/i,
+  /\b(doesn'?t\s+(?:explain|teach|provide|help|come|attend|give))\b/i,
+  /\b(didn'?t\s+(?:understand|cover|explain|teach|give|provide))\b/i,
+  
+  // Behavioral issues
+  /\b(rude|arrogant|biased|unfair|partial|angry|harsh|strict|mean)\b/i,
+  /\b(absent|late|irregular|unavailable|never\s+available|rarely\s+available)\b/i,
+  
+  // Hindi negative patterns
+  /\b(nahi|nahin|bahut\s+kam|thoda|improve\s+karo|samajh\s+nahi\s+aaya|accha\s+nahi)\b/i,
+  
+  // Suggestions (even polite ones = need attention)
+  /\b(could\s+(?:improve|do|give|provide)|would\s+be\s+better|might\s+want\s+to|try\s+to)\b/i,
+  
+  // Mixed sentiment markers (good BUT...)
+  /\b(but|however|although|though)\b/i
 ];
 
 const SKIP_PATTERNS = [
@@ -494,8 +535,8 @@ async function classifyComments(rawComments) {
 
         reason:
           hasPositive
-            ? 'positive-praise-with-actionable-feedback'
-            : 'actionable-negative-feedback'
+            ? 'mixed-with-criticism'
+            : 'needs-improvement'
 
       });
 
@@ -506,9 +547,9 @@ async function classifyComments(rawComments) {
 
 
     // ========================================================
-    // RULE #2 (formerly RULE #3)
+    // RULE #2: PURE POSITIVE ONLY
     //
-    // POSITIVE
+    // Only appreciation if NO negative words detected
     // ========================================================
 
     if (
@@ -535,7 +576,7 @@ async function classifyComments(rawComments) {
           false,
 
         reason:
-          'positive-feedback'
+          'purely-positive'
 
       });
 
