@@ -807,15 +807,15 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
     }
   }
 
-  // ── Page numbers ──────────────────────────────────────────────────────────
-  const total = pdfDoc.getPageCount();
-  for (let pi = 0; pi < total; pi++) {
-    try {
-      pdfDoc.getPage(pi).drawText(String(pi + 1) + " / " + String(total), {
-        x: PW - 50, y: 8, size: 9, font, color: gray
-      });
-    } catch (e) {}
-  }
+  // ── Page numbers (REMOVED) ────────────────────────────────────────────────
+  // const total = pdfDoc.getPageCount();
+  // for (let pi = 0; pi < total; pi++) {
+  //   try {
+  //     pdfDoc.getPage(pi).drawText(String(pi + 1) + " / " + String(total), {
+  //       x: PW - 50, y: 8, size: 9, font, color: gray
+  //     });
+  //   } catch (e) {}
+  // }
 
   // ── Final PDF generation with validation ──────────────────────────────────
   const finalPdfBytes = await pdfDoc.save({ useObjectStreams: false });
@@ -1056,13 +1056,13 @@ async function generateIndividualFacultyPDF(report) {
   page.drawText("Head of Department (HOD):", { x: PW - MR - 160, y: footerY + 30, size: 8, font: boldFont, color: gray });
   page.drawText("Verified & Submitted", { x: PW - MR - 160, y: footerY + 16, size: 8.5, font: boldFont, color: navy });
 
-  // Page Numbers
-  const totalPages = pdfDoc.getPageCount();
-  for (let pi = 0; pi < totalPages; pi++) {
-    pdfDoc.getPage(pi).drawText(`Page ${pi + 1} of ${totalPages} · Confidential MITS Feedback System`, {
-      x: PW / 2 - 100, y: 15, size: 7.5, font, color: gray
-    });
-  }
+  // Page Numbers (REMOVED)
+  // const totalPages = pdfDoc.getPageCount();
+  // for (let pi = 0; pi < totalPages; pi++) {
+  //   pdfDoc.getPage(pi).drawText(`Page ${pi + 1} of ${totalPages} · Confidential MITS Feedback System`, {
+  //     x: PW / 2 - 100, y: 15, size: 7.5, font, color: gray
+  //   });
+  // }
 
   return Buffer.from(await pdfDoc.save());
 }
