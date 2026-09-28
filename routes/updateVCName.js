@@ -2,7 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
-const Report = require('../models/Report');
+const FacultyReport = require('../models/FacultyReport');
 const { authMiddleware, requireRole, requireAnyRole } = require('./middleware');
 
 // ============================================================================
@@ -45,7 +45,7 @@ router.post('/clean-course-names', authMiddleware, requireAnyRole(['admin', 'hod
     console.log('[Clean] Starting course name cleanup...');
     
     // Find all reports with "Submitted answers" in programme or courseName fields
-    const reportsToUpdate = await Report.find({
+    const reportsToUpdate = await FacultyReport.find({
       $or: [
         { programme: /Submitted\s*answers?:?-?\s*/i },
         { courseName: /Submitted\s*answers?:?-?\s*/i }
@@ -82,7 +82,7 @@ router.post('/clean-course-names', authMiddleware, requireAnyRole(['admin', 'hod
 
       // Update if there are changes
       if (Object.keys(updateFields).length > 0) {
-        await Report.updateOne(
+        await FacultyReport.updateOne(
           { _id: report._id },
           { $set: updateFields }
         );
@@ -119,7 +119,7 @@ router.post('/clean-course-names', authMiddleware, requireAnyRole(['admin', 'hod
 // Preview what would be cleaned (dry run)
 router.get('/preview-clean-course-names', authMiddleware, requireAnyRole(['admin', 'hod', 'vc']), async (req, res) => {
   try {
-    const reportsToUpdate = await Report.find({
+    const reportsToUpdate = await FacultyReport.find({
       $or: [
         { programme: /Submitted\s*answers?:?-?\s*/i },
         { courseName: /Submitted\s*answers?:?-?\s*/i }
