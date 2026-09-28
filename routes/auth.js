@@ -1,4 +1,4 @@
-const express = require('express');
+﻿const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
@@ -823,7 +823,7 @@ router.get(
       res.json(
         vc || {
           name:
-            'Pro Vice-Chancellor',
+            'Dr. Manjuree Pandit',
           signatureImage: null
         }
       );

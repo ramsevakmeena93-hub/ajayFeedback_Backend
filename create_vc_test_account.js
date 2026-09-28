@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Create VC test account and submit HOD reports to VC
  * 
  * Usage: node create_vc_test_account.js
@@ -16,7 +16,7 @@ const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/mits-feedb
 
 // VC test account details
 const VC_EMAIL = 'vc.test@mitsgwl.ac.in';
-const VC_NAME = 'Dr. Pro Vice-Chancellor';
+const VC_NAME = 'Dr. Dr. Manjuree Pandit';
 const VC_PASSWORD = 'vc123456';
 
 // HOD account to find
