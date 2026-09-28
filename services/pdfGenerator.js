@@ -520,8 +520,8 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
     line(coverPage, c2X + 4, bY - sBH + 18, c2X + c2W - 8, bY - sBH + 18, 0.5, gray);
   }
 
-  // VC name + signature
-  txt(coverPage, (vcUser && vcUser.name) || "Dr. Manjuree Pandit",
+  // VC name + signature (forced to Dr. Manjuree Pandit)
+  txt(coverPage, "Dr. Manjuree Pandit",
       c3X + 4, bY - 12, 9, boldFont, black);
   if (vcSig && !withoutSignatures) {
     const sc = Math.min((c3W - 10) / vcSig.width, (sBH - 22) / vcSig.height, 1);
