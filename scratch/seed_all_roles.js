@@ -27,7 +27,7 @@ const USERS = [
     department: 'Computer Science & Engineering'
   },
   {
-    name: 'Prof. R. K. Pandit (VC)',
+    name: 'Dr. Manjuree Pandit',
     email: 'vc@mits.ac.in',
     password: 'vc123',
     role: 'vc',
