@@ -511,4 +511,18 @@ router.post('/upload-batch', authMiddleware, batchUpload.any(), async (req, res)
   }
 });
 
+// ─── DELETE ALL REPORTS (for testing/cleanup) ─────────────────────────────
+router.delete('/clear-all', authMiddleware, async (req, res) => {
+  try {
+    const result = await FacultyReport.deleteMany({ hodId: req.user.id });
+    console.log(`[clear-all] Deleted ${result.deletedCount} reports for HOD ${req.user.id}`);
+    res.json({ 
+      message: `Deleted ${result.deletedCount} reports`, 
+      deletedCount: result.deletedCount 
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
