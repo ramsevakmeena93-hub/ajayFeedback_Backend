@@ -454,7 +454,8 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
       // Safer maxChars with more horizontal padding (10px)
       const maxChars = Math.max(1, Math.floor((col.w - 10) / (FS * 0.62)));
       // Split by newlines, filter out empty lines, then wrap each segment
-      const allLines = val.v.split("\n").filter(seg => seg.trim()).flatMap(seg => wrap(seg, maxChars));
+      const textValue = val.v || "";
+      const allLines = textValue.split("\n").filter(seg => seg.trim()).flatMap(seg => wrap(seg, maxChars));
       const visLines = allLines.slice(0, Math.floor((ROW_H - 12) / LH));
       visLines.forEach((l, li) => {
         const fontToUse = val.bold ? boldFont : timesFont;
