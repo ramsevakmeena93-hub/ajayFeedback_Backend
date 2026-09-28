@@ -221,10 +221,18 @@ function parseCSV(buffer) {
       if (colMap.subjectCode !== -1 && row[colMap.subjectCode]) subjectCode = row[colMap.subjectCode].val.trim();
 
       let courseName = '';
-      if (colMap.courseName !== -1 && row[colMap.courseName]) courseName = row[colMap.courseName].val.trim();
+      if (colMap.courseName !== -1 && row[colMap.courseName]) {
+        courseName = row[colMap.courseName].val.trim()
+          .replace(/\s*Submitted\s*answers?:?-?\s*/gi, '') // Remove "Submitted answers:-"
+          .trim();
+      }
 
       let programme = '';
-      if (colMap.programme !== -1 && row[colMap.programme]) programme = row[colMap.programme].val.trim();
+      if (colMap.programme !== -1 && row[colMap.programme]) {
+        programme = row[colMap.programme].val.trim()
+          .replace(/\s*Submitted\s*answers?:?-?\s*/gi, '') // Remove "Submitted answers:-"
+          .trim();
+      }
 
       let semester = '';
       if (colMap.semester !== -1 && row[colMap.semester]) semester = row[colMap.semester].val.trim();
