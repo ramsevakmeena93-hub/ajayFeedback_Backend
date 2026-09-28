@@ -13,12 +13,12 @@ async function main() {
   try {
     console.log('[Find] Connecting to MongoDB...');
     await mongoose.connect(MONGO_URI);
-    console.log('[Find] ✅ Connected\n');
+    console.log('[Find] Γ£à Connected\n');
 
     // Find all HODs
-    console.log('═══════════════════════════════════════════════════════');
+    console.log('ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ');
     console.log('ALL HOD ACCOUNTS:');
-    console.log('═══════════════════════════════════════════════════════\n');
+    console.log('ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ\n');
 
     const hods = await User.find({ 
       $or: [
@@ -28,12 +28,12 @@ async function main() {
     }).select('name email department role roles');
 
     if (hods.length === 0) {
-      console.log('❌ No HOD accounts found!\n');
+      console.log('Γ¥î No HOD accounts found!\n');
     } else {
       for (const hod of hods) {
         const reportCount = await FacultyReport.countDocuments({ hodId: hod._id });
         
-        console.log(`📌 ${hod.name}`);
+        console.log(`≡ƒôî ${hod.name}`);
         console.log(`   Email: ${hod.email}`);
         console.log(`   ID: ${hod._id}`);
         console.log(`   Department: ${hod.department || '(none)'}`);
@@ -57,16 +57,16 @@ async function main() {
     }
 
     // Find all reports without HOD
-    console.log('═══════════════════════════════════════════════════════');
+    console.log('ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ');
     console.log('REPORTS WITHOUT HOD:');
-    console.log('═══════════════════════════════════════════════════════\n');
+    console.log('ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ\n');
 
     const orphanReports = await FacultyReport.find({ hodId: null })
       .select('facultyName subjectCode status')
       .limit(10);
 
     if (orphanReports.length === 0) {
-      console.log('✅ No orphan reports\n');
+      console.log('Γ£à No orphan reports\n');
     } else {
       console.log(`Found ${orphanReports.length} reports without HOD:\n`);
       orphanReports.forEach((r, i) => {
@@ -76,9 +76,9 @@ async function main() {
     }
 
     // Total stats
-    console.log('═══════════════════════════════════════════════════════');
+    console.log('ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ');
     console.log('STATISTICS:');
-    console.log('═══════════════════════════════════════════════════════\n');
+    console.log('ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ\n');
 
     const totalReports = await FacultyReport.countDocuments();
     const totalUsers = await User.countDocuments();

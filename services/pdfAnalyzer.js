@@ -38,29 +38,8 @@ function parseBoundsFromConstructPath(args) {
 }
 
 function pushUnique(arr, value) {
-    if (!Array.isArray(arr)) return;
-    if (typeof value !== 'string') return;
-
-    const cleaned = value
-        .replace(/\s+/g, ' ')
-        .trim();
-
-    if (!cleaned) return;
-
-    // Do not add extremely short/non-comment strings
-    if (cleaned.length < 8) return;
-
-    // Normalize and check duplicates (case-insensitive, handles punctuation)
-    const normalized = cleaned.toLowerCase().replace(/[.,!?;:]+$/, '');
-
-    const isDuplicate = arr.some(existing => {
-        const existingNorm = existing.toLowerCase().replace(/[.,!?;:]+$/, '');
-        return existingNorm === normalized;
-    });
-
-    if (!isDuplicate) {
-        arr.push(cleaned);
-    }
+  const clean = (value || '').trim().replace(/\s+/g, ' ');
+  if (clean.length > 2 && !arr.includes(clean)) arr.push(clean);
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -181,80 +160,47 @@ async function extractHighlightedText(buffer) {
 // Accepts: single-word feedback ("GOOD", "Excellent", "best", "nice")
 // ─────────────────────────────────────────────────────────────────
 function isValidComment(text) {
-    if (!text || typeof text !== 'string') return false;
-    const clean = text.trim();
+  if (!text || typeof text !== 'string') return false;
+  const clean = text.trim();
+  if (clean.length < 2) return false;
 
-    // Minimum length to be considered a real comment (increased to filter more garbage)
-    if (clean.length < 10) return false;
+  // Reject page numbers like "1 / 3", "2/3", "about:blank 1 / 2"
+  if (/^\d+\s*\/\s*\d+$/.test(clean)) return false;
+  if (/about:blank/i.test(clean)) return false;
+  if (/\d+\/\d+\/\d+/.test(clean) && clean.length < 35) return false; // dates e.g. "04/07/2026 17:03:01 PM"
 
-    // Reject page numbers like "1 / 3", "2/3", "about:blank 1 / 2"
-    if (/^\d+\s*\/\s*\d+$/.test(clean)) return false;
-    if (/about:blank/i.test(clean)) return false;
+  // Reject URLs
+  if (/http|www\./i.test(clean)) return false;
 
-    // Reject dates (e.g. "04/07/2026 17:03:01 PM")
-    if (/\d{1,2}\/\d{1,2}\/\d{2,4}/.test(clean) && clean.length < 40) return false;
+  // Reject institution & report headers
+  if (/madhav\s+institute|department\s+name|print\s+out/i.test(clean)) return false;
+  if (/faculty\s+feedback|action\s+taken\s+report/i.test(clean)) return false;
+  if (/academic\s+year|session:\s*july/i.test(clean)) return false;
+  if (/average\s+ffi|average\s+response/i.test(clean)) return false;
+  if (/feedback\s+submitted|report\s+generated/i.test(clean)) return false;
 
-    // Reject URLs
-    if (/http|www\./i.test(clean)) return false;
+  // Reject table header keywords
+  const tableKeywords = [
+    'faculty name', 'course code', 'course name', 'semester', 'registered students',
+    'link send', 'response %', 'submitted answers', 'label question',
+    'signature', 'hod', 'pro - vc', 'ffi & suggestion', 'student feedback comments',
+    'below average', 'course outcomes', 'qv 1', 'qv 2'
+  ];
+  const lower = clean.toLowerCase();
+  if (tableKeywords.some(kw => lower.includes(kw))) return false;
 
-    // Reject institution & report headers
-    const headerPatterns = [
-        /madhav\s+institute/i,
-        /department\s+name/i,
-        /print\s+out/i,
-        /faculty\s+feedback/i,
-        /action\s+taken\s+report/i,
-        /academic\s+year/i,
-        /session:\s*july/i,
-        /average\s+ffi/i,
-        /average\s+response/i,
-        /feedback\s+submitted/i,
-        /report\s+generated/i
-    ];
+  // Reject pure numbers or punctuation
+  if (/^[\d\s.,\-–/\\%]+$/.test(clean)) return false;
 
-    if (headerPatterns.some(p => p.test(clean))) return false;
+  // Reject survey questions with numerical rating tables (e.g. "1 Classes are useful ... 0 7 14 11 16 3.75")
+  if (/^\d+\s+[A-Za-z]/.test(clean) && /\b\d+\s+\d+\s+\d+\b/.test(clean)) return false;
+  if (/^\d+\s+Total\b/i.test(clean)) return false;
+  if (/\b(Below Average|Very good|Average)\b/i.test(clean) && /\d+/.test(clean)) return false;
 
-    // Reject table header keywords and metadata
-    const tableKeywords = [
-        'faculty name', 'course code', 'course name', 'semester', 'registered students',
-        'link send', 'response %', 'submitted answers', 'label question', 'submitted answer',
-        'signature', 'hod', 'pro - vc', 'ffi & suggestion', 'student feedback comments',
-        'below average', 'course outcomes', 'qv 1', 'qv 2', 'needs attention', 'appreciation',
-        'question', 'answer', 'response count', 'total responses', 'feedback form',
-        'submit', 'label', 'requirement', 'operating system', 'real world', 'purchased'
-    ];
-    const lower = clean.toLowerCase();
-    if (tableKeywords.some(kw => lower.includes(kw))) return false;
-    
-    // Reject if it looks like a course/subject name followed by an answer
-    // e.g. "Software Engineering 45" or "Data Structures Yes" or "operating system purchased"
-    if (/^[A-Z][A-Za-z\s&]+\s+(?:\d+|yes|no|n\.?a\.?|purchased|required)$/i.test(clean)) return false;
-    
-    // Reject lines that look like questions or prompts
-    if (/\brequirement\b|\boperating system\b|\breal world\b|\bpurchased\b|\bproblem\b.*\bsoftware\b/i.test(clean)) return false;
-    
-    // Reject if it contains multiple tab-separated or pipe-separated values (table data)
-    if (clean.split(/\t|\|/).length > 3) return false;
+  // Must have at least 1 letter
+  if (!/[a-zA-Z]/.test(clean)) return false;
 
-    // Reject pure numbers or punctuation
-    if (/^[\d\s.,\-–/\\%]+$/.test(clean)) return false;
-
-    // Reject survey questions with numerical rating tables
-    if (/^\d+\s+[A-Za-z]/.test(clean) && /\b\d+\s+\d+\s+\d+\b/.test(clean)) return false;
-    if (/^\d+\s+Total\b/i.test(clean)) return false;
-    if (/\b(Below Average|Very good|Average)\b/i.test(clean) && /\d+/.test(clean)) return false;
-
-    // Must have at least 1 letter
-    if (!/[a-zA-Z]/.test(clean)) return false;
-
-    // Reject if it's ONLY a rating word with no additional content
-    const ratingOnlyPatterns = [
-        /^(good|nice|excellent|poor|best|worst|average|ok|okay)\.?$/i,
-        /^(very\s+good|very\s+nice|very\s+bad)\.?$/i
-    ];
-    if (ratingOnlyPatterns.some(p => p.test(clean))) return false;
-
-    return true;
+  return true;
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -264,158 +210,137 @@ function isValidComment(text) {
 // 2. Action Taken Report summary tables (Page 1-2) with bullet points
 // ─────────────────────────────────────────────────────────────────
 async function extractAllStudentComments(buffer, targetCourseCode) {
-    const uint8 = new Uint8Array(buffer);
-    const doc = await pdfjsLib.getDocument({ data: uint8, verbosity: 0 }).promise;
-    let comments = [];
-    const rawCommentPages = [];
+  const uint8 = new Uint8Array(buffer);
+  const doc = await pdfjsLib.getDocument({ data: uint8, verbosity: 0 }).promise;
+  let comments = [];
+  const rawCommentPages = [];
 
-    // Pass 1: Identify pages that have raw student comments
+  // Pass 1: Identify pages that have raw student comments
+  for (let p = 1; p <= doc.numPages; p++) {
+    const page = await doc.getPage(p);
+    const tc = await page.getTextContent();
+    const fullText = tc.items.map(i => i.str).join(' ').toLowerCase();
+
+    const hasSubmitted = fullText.includes('submitted') && (fullText.includes('answer') || fullText.includes('response'));
+    const hasStudentFeedbackHeader = fullText.includes('feedback') && (fullText.includes('comment') || fullText.includes('student'));
+    const hasQuestionsTable = fullText.includes('label') && fullText.includes('question') && fullText.includes('qv');
+
+    // Prefer pages dedicated to comments, but keep all potential pages
+    if (hasSubmitted || hasStudentFeedbackHeader || !hasQuestionsTable) {
+      rawCommentPages.push({ pageNum: p, page, tc, fullText, hasQuestionsTable });
+    }
+  }
+
+  const extractRowsFromPages = (pages, filterCode) => {
+    const res = [];
+    for (const { pageNum, tc, fullText } of pages) {
+      if (filterCode) {
+        const cleanTarget = filterCode.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+        const pageCodeMatch = fullText.match(/\d{5,}\s*-?\s*batch\s*-?\s*[a-z0-9]+/i);
+        if (pageCodeMatch) {
+          const pageCode = pageCodeMatch[0].replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+          if (pageCode !== cleanTarget) {
+            continue; // belongs to another course in multi-course PDF
+          }
+        }
+      }
+
+      const items = tc.items.filter(i => i.str && i.str.trim());
+
+      // Group text items by row Y (tolerance 3pt)
+      const rowMap = {};
+      items.forEach(i => {
+        const yKey = Math.round(i.transform[5] / 3) * 3;
+        if (!rowMap[yKey]) rowMap[yKey] = [];
+        rowMap[yKey].push(i);
+      });
+
+      const yKeys = Object.keys(rowMap).map(Number).sort((a, b) => b - a);
+
+      // Find the header line after which comments start
+      let commentStartY = 750;
+      for (const y of yKeys) {
+        const line = rowMap[y].sort((a, b) => a.transform[4] - b.transform[4]).map(i => i.str).join(' ').toLowerCase();
+        if ((line.includes('submitted') && (line.includes('answer') || line.includes('response'))) || (line.includes('student') && line.includes('feedback'))) {
+          commentStartY = y;
+          break;
+        }
+      }
+
+      // Filter rows below header line and above bottom page footer (y > 30)
+      const commentRows = yKeys.filter(y => y < commentStartY - 10 && y > 30).map(y => {
+        const text = rowMap[y].sort((a, b) => a.transform[4] - b.transform[4]).map(i => i.str).join(' ').trim();
+        return { y, text };
+      });
+
+      let i = 0;
+      while (i < commentRows.length) {
+        let curr = commentRows[i].text;
+        while (i + 1 < commentRows.length && (commentRows[i].y - commentRows[i + 1].y) <= 16) {
+          curr += ' ' + commentRows[i + 1].text;
+          i++;
+        }
+        if (isValidComment(curr)) {
+          res.push(curr.trim().replace(/\s+/g, ' '));
+        }
+        i++;
+      }
+    }
+    return res;
+  };
+
+  // Pass 2: Extract rows from identified pages
+  if (rawCommentPages.length > 0) {
+    comments = extractRowsFromPages(rawCommentPages, targetCourseCode);
+    if (comments.length === 0 && targetCourseCode) {
+      comments = extractRowsFromPages(rawCommentPages, null);
+    }
+  }
+
+  // Pass 3: Action Taken Report summary tables (Page 1-2) with bullet points
+  if (comments.length === 0) {
     for (let p = 1; p <= doc.numPages; p++) {
-        const page = await doc.getPage(p);
-        const tc = await page.getTextContent();
-        const fullText = tc.items.map(i => i.str).join(' ').toLowerCase();
+      const page = await doc.getPage(p);
+      const tc = await page.getTextContent();
+      const items = tc.items.filter(i => i.str && i.str.trim());
+      const fullText = items.map(i => i.str).join(' ').toLowerCase();
 
-        const hasSubmitted = fullText.includes('submitted') && (fullText.includes('answer') || fullText.includes('response'));
-        const hasStudentFeedbackHeader = fullText.includes('feedback') && (fullText.includes('comment') || fullText.includes('student'));
-        const hasQuestionsTable = fullText.includes('label') && fullText.includes('question') && fullText.includes('qv');
-
-        // Prefer pages dedicated to comments, but keep all potential pages
-        if (hasSubmitted || hasStudentFeedbackHeader || !hasQuestionsTable) {
-            rawCommentPages.push({ pageNum: p, page, tc, fullText, hasQuestionsTable });
-        }
+      if (fullText.includes('action taken report') || (fullText.includes('needs attention') && fullText.includes('appreciation'))) {
+        const tableComments = items
+          .filter(i => i.transform[4] >= 340 && i.transform[4] < 680 && i.transform[5] > 30 && i.transform[5] < 750)
+          .map(i => i.str)
+          .join(' ');
+        
+        const bullets = tableComments.split(/•/).map(s => s.trim()).filter(Boolean);
+        bullets.forEach(b => {
+          if (!/^(good|very good|excellent|below average):\s*\d+%/i.test(b) && isValidComment(b)) {
+            comments.push(b.trim().replace(/\s+/g, ' '));
+          }
+        });
+      }
     }
+  }
 
-    const extractRowsFromPages = (pages, filterCode) => {
-        const res = [];
-        for (const { pageNum, tc, fullText } of pages) {
-            if (filterCode) {
-                const cleanTarget = filterCode.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-                const pageCodeMatch = fullText.match(/\d{5,}\s*-?\s*batch\s*-?\s*[a-z0-9]+/i);
-                if (pageCodeMatch) {
-                    const pageCode = pageCodeMatch[0].replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-                    if (pageCode !== cleanTarget) {
-                        continue; // belongs to another course in multi-course PDF
-                    }
-                }
-            }
-
-            const items = tc.items.filter(i => i.str && i.str.trim());
-
-            // Group text items by row Y (tolerance 3pt)
-            const rowMap = {};
-            items.forEach(i => {
-                const yKey = Math.round(i.transform[5] / 3) * 3;
-                if (!rowMap[yKey]) rowMap[yKey] = [];
-                rowMap[yKey].push(i);
-            });
-
-            const yKeys = Object.keys(rowMap).map(Number).sort((a, b) => b - a);
-
-            // Find the header line after which comments start
-            let commentStartY = 750;
-            for (const y of yKeys) {
-                const line = rowMap[y].sort((a, b) => a.transform[4] - b.transform[4]).map(i => i.str).join(' ').toLowerCase();
-                if ((line.includes('submitted') && (line.includes('answer') || line.includes('response'))) || (line.includes('student') && line.includes('feedback'))) {
-                    commentStartY = y;
-                    break;
-                }
-            }
-
-            // Filter rows below header line and above bottom page footer (y > 30)
-            const commentRows = yKeys.filter(y => y < commentStartY - 10 && y > 30).map(y => {
-                const text = rowMap[y].sort((a, b) => a.transform[4] - b.transform[4]).map(i => i.str).join(' ').trim();
-                return { y, text };
-            });
-
-            // CRITICAL: Accumulate complete multi-line comments WITHOUT splitting on sentiment keywords
-            let i = 0;
-            while (i < commentRows.length) {
-                let curr = commentRows[i].text;
-
-                // Merge continuation rows (line breaks within same comment)
-                while (i + 1 < commentRows.length && (commentRows[i].y - commentRows[i + 1].y) <= 16) {
-                    curr += ' ' + commentRows[i + 1].text;
-                    i++;
-                }
-
-                // Clean and normalize whitespace
-                curr = curr.trim().replace(/\s+/g, ' ');
-
-                // Add complete comment as-is (NO splitting)
-                if (isValidComment(curr)) {
-                    res.push(curr);
-                }
-                i++;
-            }
+  // Pass 4: Fallback scan for valid feedback comments anywhere in doc
+  if (comments.length === 0) {
+    for (let p = 1; p <= doc.numPages; p++) {
+      const page = await doc.getPage(p);
+      const tc = await page.getTextContent();
+      const items = tc.items.filter(i => i.str && i.str.trim());
+      for (const item of items) {
+        const str = item.str.trim();
+        if (str.length > 3 && isValidComment(str)) {
+          if (/good|nice|excellent|poor|best|worst|speed|voice|doubt|explain|notes|exam|quiz|teach|clear|improve|slow|fast|audible|helpful/i.test(str)) {
+            comments.push(str.replace(/\s+/g, ' '));
+          }
         }
-        return res;
-    };
-
-    // Pass 2: Extract rows from identified pages
-    if (rawCommentPages.length > 0) {
-        comments = extractRowsFromPages(rawCommentPages, targetCourseCode);
-        if (comments.length === 0 && targetCourseCode) {
-            comments = extractRowsFromPages(rawCommentPages, null);
-        }
+      }
     }
+  }
 
-    // Pass 3: Action Taken Report summary tables (Page 1-2) with bullet points
-    if (comments.length === 0) {
-        for (let p = 1; p <= doc.numPages; p++) {
-            const page = await doc.getPage(p);
-            const tc = await page.getTextContent();
-            const items = tc.items.filter(i => i.str && i.str.trim());
-            const fullText = items.map(i => i.str).join(' ').toLowerCase();
-
-            if (fullText.includes('action taken report') || (fullText.includes('needs attention') && fullText.includes('appreciation'))) {
-                const tableComments = items
-                    .filter(i => i.transform[4] >= 340 && i.transform[4] < 680 && i.transform[5] > 30 && i.transform[5] < 750)
-                    .map(i => i.str)
-                    .join(' ');
-
-                const bullets = tableComments.split(/•/).map(s => s.trim()).filter(Boolean);
-                bullets.forEach(b => {
-                    // Clean and validate
-                    const cleaned = b.trim().replace(/\s+/g, ' ');
-                    if (!/^(good|very good|excellent|below average):\s*\d+%/i.test(cleaned) && isValidComment(cleaned)) {
-                        comments.push(cleaned);
-                    }
-                });
-            }
-        }
-    }
-
-    // Pass 4: Fallback scan for valid feedback comments anywhere in doc
-    if (comments.length === 0) {
-        for (let p = 1; p <= doc.numPages; p++) {
-            const page = await doc.getPage(p);
-            const tc = await page.getTextContent();
-            const items = tc.items.filter(i => i.str && i.str.trim());
-            for (const item of items) {
-                const str = item.str.trim().replace(/\s+/g, ' ');
-                if (str.length >= 8 && isValidComment(str)) {
-                    // Look for feedback keywords
-                    if (/good|nice|excellent|poor|best|worst|speed|voice|doubt|explain|notes|exam|quiz|teach|clear|improve|slow|fast|audible|helpful|teaching|class|lecture|understand/i.test(str)) {
-                        comments.push(str);
-                    }
-                }
-            }
-        }
-    }
-
-    // Deduplicate using case-insensitive normalization
-    const seen = new Set();
-    const unique = [];
-    for (const comment of comments) {
-        const normalized = comment.toLowerCase().replace(/[.,!?;:]+$/, '');
-        if (!seen.has(normalized)) {
-            seen.add(normalized);
-            unique.push(comment);
-        }
-    }
-
-    console.log(`[PDF] Extracted ${unique.length} complete student comments (no splitting on sentiment keywords)`);
-    return unique;
+  const unique = [...new Set(comments)];
+  console.log(`[PDF] Extracted ${unique.length} student comments for AI analysis`);
+  return unique;
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -433,54 +358,6 @@ function convertDriveLink(url) {
 }
 
 async function fetchPDFBuffer(url) {
-  // Check if it's a Google Drive link
-  const fileIdMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)|[?&]id=([a-zA-Z0-9_-]+)/);
-  
-  if (fileIdMatch) {
-    // Google Drive link - use service account authentication
-    const fileId = fileIdMatch[1] || fileIdMatch[2];
-    
-    try {
-      const { google } = require('googleapis');
-      
-      // Check if service account credentials are available
-      const clientEmail = process.env.GOOGLE_DRIVE_CLIENT_EMAIL;
-      const privateKey = process.env.GOOGLE_DRIVE_PRIVATE_KEY;
-      
-      if (clientEmail && privateKey) {
-        console.log('[PDF] Using service account to download Drive file:', fileId);
-        
-        // Create authentication
-        const auth = new google.auth.GoogleAuth({
-          credentials: {
-            client_email: clientEmail,
-            private_key: privateKey.replace(/\\n/g, '\n'),
-          },
-          scopes: ['https://www.googleapis.com/auth/drive.readonly'],
-        });
-        
-        const drive = google.drive({ version: 'v3', auth });
-        
-        // Download file using Drive API
-        const response = await drive.files.get({
-          fileId: fileId,
-          alt: 'media',
-        }, {
-          responseType: 'arraybuffer'
-        });
-        
-        console.log('[PDF] Successfully downloaded via service account');
-        return Buffer.from(response.data);
-      } else {
-        console.warn('[PDF] Service account credentials not found, falling back to public download');
-      }
-    } catch (error) {
-      console.error('[PDF] Service account download failed:', error.message);
-      console.log('[PDF] Falling back to public download method');
-    }
-  }
-  
-  // Fallback: Use public download (works if file is publicly accessible)
   const res = await axios.get(convertDriveLink(url), {
     responseType: 'arraybuffer', timeout: 30000,
     headers: { 'User-Agent': 'Mozilla/5.0' }, maxRedirects: 5
@@ -496,356 +373,277 @@ async function fetchPDFBuffer(url) {
 // Fallback: Robust field-level regular expressions
 // ─────────────────────────────────────────────────────────────────
 async function extractMetaFromBuffer(buffer) {
-    const uint8 = new Uint8Array(buffer);
-    const doc = await pdfjsLib.getDocument({ data: uint8, verbosity: 0 }).promise;
+  const uint8 = new Uint8Array(buffer);
+  const doc = await pdfjsLib.getDocument({ data: uint8, verbosity: 0 }).promise;
 
-    let bestMeta = null;
+  let bestMeta = null;
 
-    // 1. COORDINATE-BASED EXTRACTION (most reliable for standard MITS PDFs)
-    try {
-        const page = await doc.getPage(1);
-        const tc = await page.getTextContent();
-        const items = tc.items
-            .filter(i => i.str && i.str.trim())
-            .map(i => ({
-                str: i.str.trim(),
-                x: Math.round(i.transform[4]),
-                y: Math.round(i.transform[5])
-            }));
+  // 1. First attempt: Coordinate-based extraction on Page 1 (robust against line breaks and multi-row headers)
+  try {
+    const page = await doc.getPage(1);
+    const tc = await page.getTextContent();
+    const items = tc.items
+      .filter(i => i.str && i.str.trim())
+      .map(i => ({ str: i.str.trim(), x: Math.round(i.transform[4]), y: Math.round(i.transform[5]) }));
 
-        // Group by Y coordinate (4px tolerance for multi-line headers)
-        const rowMap = {};
-        items.forEach(item => {
-            const yKey = Math.round(item.y / 4) * 4;
-            if (!rowMap[yKey]) rowMap[yKey] = [];
-            rowMap[yKey].push(item);
-        });
+    // Group items by Y coordinate with 4px tolerance
+    const rowMap = {};
+    items.forEach(item => {
+      const yKey = Math.round(item.y / 4) * 4;
+      if (!rowMap[yKey]) rowMap[yKey] = [];
+      rowMap[yKey].push(item);
+    });
 
-        const yKeys = Object.keys(rowMap).map(Number).sort((a, b) => b - a);
-        let headerY = null;
-        let dataY = null;
+    const yKeys = Object.keys(rowMap).map(Number).sort((a, b) => b - a);
+    let headerY = null;
+    let dataY = null;
+    let isFormatA = false;
 
-        // Find table header row
-        for (const y of yKeys) {
-            const rowText = rowMap[y].map(i => i.str.toLowerCase()).join(' ');
-            if (rowText.includes('faculty') &&
-                (rowText.includes('code') || rowText.includes('name')) &&
-                (rowText.includes('semester') || rowText.includes('sem') || rowText.includes('ffi'))) {
-                headerY = y;
-
-                // Find first substantial data row below header
-                const lowerRows = yKeys.filter(k => k < y).sort((a, b) => b - a);
-                for (const ky of lowerRows) {
-                    if (rowMap[ky].length >= 5) {
-                        dataY = ky;
-                        break;
-                    }
-                }
-                break;
-            }
-        }
-
-        if (headerY && dataY) {
-            const dataRowItems = rowMap[dataY].sort((a, b) => a.x - b.x);
-
-            // Extract FFI Score (rightmost decimal value at ~X 540-560)
-            const ffiItem = dataRowItems
-                .filter(i => /^\d+\.\d+$/.test(i.str))
-                .sort((a, b) => b.x - a.x)[0];
-            const ffiScore = ffiItem ? parseFloat(ffiItem.str) : null;
-            const ffiX = ffiItem ? ffiItem.x : 547;
-
-            // Extract Response Percent (decimal/integer left of FFI, X range: ffiX-60 to ffiX-10)
-            let responsePercent = null;
-            const pctItem = dataRowItems.find(i =>
-                i.x < ffiX - 10 &&
-                i.x >= ffiX - 60 &&
-                /^\d+(?:\.\d+)?$/.test(i.str)
-            );
-            if (pctItem) responsePercent = parseFloat(pctItem.str);
-
-            // Extract Response Count (integer left of percent, X range: ffiX-110 to ffiX-60)
-            let responseCount = null;
-            const respItem = dataRowItems.find(i =>
-                i.x < ffiX - 60 &&
-                i.x >= ffiX - 110 &&
-                /^\d+$/.test(i.str)
-            );
-            if (respItem) responseCount = parseInt(respItem.str, 10);
-
-            // Extract Link Sent (X ~ 400-450)
-            let linkSent = null;
-            const linkItem = dataRowItems.find(i =>
-                i.x >= 400 && i.x < 450 && /^\d+$/.test(i.str)
-            );
-            if (linkItem) linkSent = parseInt(linkItem.str, 10);
-
-            // Extract Registered Students (X ~ 340-390)
-            let registeredStudents = null;
-            const regItem = dataRowItems.find(i =>
-                i.x >= 340 && i.x < 390 && /^\d+$/.test(i.str)
-            );
-            if (regItem) registeredStudents = parseInt(regItem.str, 10);
-
-            // Extract Semester (X ~ 300-340, but be more flexible)
-            // Look in the semester column area
-            let semester = '';
-            
-            // Strategy 1: Look in expected semester column position
-            const semItem = dataRowItems.find(i =>
-                i.x >= 280 && i.x < 370 && /^\d{1,2}$/.test(i.str)
-            );
-            if (semItem) {
-                semester = semItem.str;
-            } 
-            
-            if (!semester) {
-                // Strategy 2: Look for ANY single digit 1-8 in wider area
-                const fallbackSem = dataRowItems.find(i => 
-                    i.x >= 230 && i.x < 450 && /^[1-8]$/.test(i.str)
-                );
-                if (fallbackSem) {
-                    semester = fallbackSem.str;
-                }
-            }
-            
-            if (!semester) {
-                // Strategy 3: Scan all nearby rows (above and below data row)
-                const nearbyItems = items.filter(i => 
-                    Math.abs(i.y - dataY) < 15 && 
-                    i.x >= 230 && i.x < 450
-                );
-                for (const item of nearbyItems) {
-                    if (/^[1-8]$/.test(item.str)) {
-                        semester = item.str;
-                        break;
-                    }
-                }
-            }
-            
-            if (!semester) {
-                // Strategy 4: Look in all items for semester near faculty/course info
-                const allNearby = items.filter(i => 
-                    Math.abs(i.y - dataY) < 25
-                );
-                for (const item of allNearby) {
-                    const match = item.str.match(/^(sem|semester|sem\.|s)\s*[:\-]?\s*([1-8])$/i);
-                    if (match) {
-                        semester = match[2];
-                        break;
-                    }
-                    // Also check for Roman numerals
-                    const romanMatch = item.str.match(/^(I{1,3}V?|V?I{1,3})$/);
-                    if (romanMatch) {
-                        const romanToNum = { 'I': '1', 'II': '2', 'III': '3', 'IV': '4', 'V': '5', 'VI': '6', 'VII': '7', 'VIII': '8' };
-                        semester = romanToNum[romanMatch[1].toUpperCase()] || romanMatch[1];
-                        break;
-                    }
-                }
-            }
-
-            // Extract Faculty Name (X < 140)
-            const facultyName = dataRowItems
-                .filter(i => i.x < 140)
-                .map(i => i.str)
-                .join(' ')
-                .trim();
-
-            // Extract Course Code (X 140-240)
-            const codeItems = dataRowItems
-                .filter(i => i.x >= 140 && i.x < 240)
-                .map(i => i.str)
-                .join('');
-            const subjectCode = codeItems
-                ? codeItems.replace(/\s+/g, '-').replace(/-+/g, '-')
-                : '';
-
-            // Extract Programme/Course Name (X 240-320)
-            // Collect ALL text in the course name column area, including multi-line wrapped text
-            const courseNameParts = [];
-            
-            // Strategy: Collect all text items in the X range 230-330 that appear
-            // between the data row and header row (or within reasonable Y distance)
-            const minY = Math.min(dataY - 50, headerY); // Look up to 50 units above
-            const maxY = dataY + 20; // And 20 units below
-            
-            // Group all text items by Y position in the course name X range
-            const courseTexts = items
-                .filter(i => i.x >= 230 && i.x < 330 && i.y >= minY && i.y <= maxY)
-                .sort((a, b) => b.y - a.y); // Sort by Y descending (top to bottom)
-            
-            // Collect unique text, filtering out headers and numbers
-            const seenTexts = new Set();
-            for (const item of courseTexts) {
-                const text = item.str.trim();
-                if (text && text.length > 1 && 
-                    !seenTexts.has(text.toLowerCase()) &&
-                    !text.match(/^(semester|sem|ffi|resp|programme|code|faculty|name|students|link|send|response|course|registered|\d+)$/i)) {
-                    courseNameParts.push(text);
-                    seenTexts.add(text.toLowerCase());
-                }
-            }
-
-            const programme = courseNameParts.join('\n').trim(); // Preserve line breaks
-
-            // Calculate missing response percent if possible
-            if (facultyName || subjectCode || ffiScore !== null) {
-                if (responsePercent === null && responseCount !== null) {
-                    const base = linkSent || registeredStudents;
-                    if (base && base > 0) {
-                        responsePercent = Math.round((responseCount / base) * 10000) / 100;
-                    }
-                }
-
-                bestMeta = {
-                    facultyName,
-                    subjectCode,
-                    programme,
-                    semester,
-                    registeredStudents,
-                    linkSent,
-                    responseCount,
-                    responsePercent,
-                    ffiScore
-                };
-            }
-        }
-    } catch (err) {
-        console.warn('[extractMetaFromBuffer] Coordinate extraction failed:', err.message);
+    // Check page width
+    const viewport = page.getViewport({ scale: 1 });
+    if (viewport.width > 700) {
+      isFormatA = true;
     }
 
-    // 2. REGEX-BASED EXTRACTION (fallback for non-standard layouts)
-    if (!bestMeta || !bestMeta.facultyName || bestMeta.ffiScore === null) {
-        // Format 2: Standard MITS Faculty Feedback Form
-        const fmt2Regex = /Faculty\s+Name\s+Course\s+Code\s+Course\s+Name\s+Semester\s+Registered\s+Students\s+Link\s+Send\s+to\s+Students\s+Response\s+%\s*Resp\.?\s+FFI\s+([A-Za-z\s.]+?)\s+(\d{5,}(?:\s*-\s*Batch\s*-\s*[A-Z0-9]+|\s*-\s*[A-Za-z0-9]+|\s+Batch\s*-\s*[A-Z0-9]+)?)\s+([\w\s&,.\/-]+?)\s+(\d{1,2})\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)/i;
-
-        // Format 1: Action Taken Report Summary Table
-        const fmt1Regex = /Faculty\s+Name\s+Code\s*\/\s*Batch\s+Programme\s+Sem(?:ester)?\s+FFI\s+Resp\.?\s+Needs\s+Attention\s+Appreciation\s+Action\s+Taken\s+Faculty\s+Signature\s+(\d+)\s+([A-Za-z\s.]+?)\s+(\d{5,}(?:\s*Batch\s*-\s*[A-Z0-9]+|\s*-\s*[A-Za-z0-9]+)?)\s+(.+?)\s+(\d{1,2})\s+(\d+(?:\.\d+)?)\s+([\d\-]+)/i;
-
-        for (let p = 1; p <= doc.numPages; p++) {
-            const page = await doc.getPage(p);
-            const tc = await page.getTextContent();
-            const text = tc.items.map(i => i.str.trim()).filter(Boolean).join(' ');
-
-            const m2 = text.match(fmt2Regex);
-            if (m2) {
-                bestMeta = {
-                    facultyName: m2[1].trim(),
-                    subjectCode: m2[2].replace(/\s+/g, '-').replace(/-+/g, '-'),
-                    programme: m2[3].trim(),
-                    semester: m2[4].trim(),
-                    registeredStudents: parseInt(m2[5], 10),
-                    linkSent: parseInt(m2[6], 10),
-                    responseCount: parseInt(m2[7], 10),
-                    responsePercent: parseFloat(m2[8]),
-                    ffiScore: parseFloat(m2[9])
-                };
-                break;
-            }
-
-            if (!bestMeta) {
-                const m1 = text.match(fmt1Regex);
-                if (m1) {
-                    bestMeta = {
-                        facultyName: m1[2].trim(),
-                        subjectCode: m1[3].replace(/\s+/g, '-').replace(/-+/g, '-'),
-                        programme: m1[4].trim(),
-                        semester: m1[5].trim(),
-                        ffiScore: parseFloat(m1[6]),
-                        responseCount: /^\d+$/.test(m1[7]) ? parseInt(m1[7], 10) : null,
-                        responsePercent: null
-                    };
-                }
-            }
+    for (const y of yKeys) {
+      const rowText = rowMap[y].map(i => i.str.toLowerCase()).join(' ');
+      if (rowText.includes('faculty') && (rowText.includes('code') || rowText.includes('name') || rowText.includes('programme'))) {
+        headerY = y;
+        if (rowText.includes('programme') || rowText.includes('code/batch') || rowText.includes('needs attention') || rowText.includes('appreciation')) {
+          isFormatA = true;
         }
+        break;
+      }
     }
 
-    // 3. FIELD-BY-FIELD REGEX FALLBACK (last resort)
-    if (!bestMeta) {
-        let facultyName = '', subjectCode = '', programme = '', semester = '';
-        let ffiScore = null, responseCount = null, responsePercent = null;
+    if (isFormatA && headerY) {
+      // Landscape Action Taken Report (ATR) table format
+      const snoItems = items.filter(i => i.x >= 15 && i.x <= 45 && i.y < headerY - 15 && /^\d+$/.test(i.str));
+      if (snoItems.length > 0) {
+        dataY = snoItems[0].y;
+        const nextSnoY = snoItems.length > 1 ? snoItems[1].y : (dataY - 40);
+        const minY = Math.max(dataY - 35, nextSnoY + 5);
 
-        for (let p = 1; p <= doc.numPages; p++) {
-            const page = await doc.getPage(p);
-            const tc = await page.getTextContent();
-            const fullText = tc.items.map(i => i.str.trim()).filter(Boolean).join(' ');
+        const recordItems = items.filter(i => i.y <= dataY + 3 && i.y >= minY);
 
-            if (!facultyName) {
-                const m = fullText.match(/(?:faculty\s*name|name\s*of\s*faculty)\s*[:\-]?\s*([A-Za-z\s.]+?)(?=\s+(?:course|code|programme|semester|$))/i);
-                if (m && m[1].trim().length > 2) facultyName = m[1].trim();
-            }
+        const facultyParts = recordItems.filter(i => i.x >= 45 && i.x < 135).sort((a,b) => b.y - a.y).map(i => i.str);
+        const codeParts    = recordItems.filter(i => i.x >= 135 && i.x < 200).sort((a,b) => b.y - a.y).map(i => i.str);
+        const progParts    = recordItems.filter(i => i.x >= 200 && i.x < 270).sort((a,b) => b.y - a.y).map(i => i.str);
+        const semParts     = recordItems.filter(i => i.x >= 270 && i.x < 298).map(i => i.str);
+        const ffiParts     = recordItems.filter(i => i.x >= 295 && i.x < 330).map(i => i.str);
+        const respParts    = recordItems.filter(i => i.x >= 330 && i.x < 370).map(i => i.str);
 
-            if (!subjectCode) {
-                const m = fullText.match(/(?:course\s*code|code\s*\/\s*batch|code)\s*[:\-]?\s*(\d{5,}(?:\s*-\s*Batch\s*-\s*[A-Z0-9]+|\s*-\s*[A-Za-z0-9]+)?)/i);
-                if (m) subjectCode = m[1].replace(/\s+/g, '-').replace(/-+/g, '-');
-            }
-
-            if (!programme) {
-                // More flexible pattern for course name
-                const patterns = [
-                    /(?:course\s*name|programme|branch)\s*[:\-]?\s*((?:[A-Za-z0-9&,./\-\(\)]+\s*)+?)(?=\s*(?:semester|sem\b|\d{1,2}\s*(?:semester|sem|\b)|ffi|resp|response|registered|$))/i,
-                    /(?:^|\n)((?:[A-Z][A-Za-z0-9&,./\-\(\)\s]+))(?=\s*(?:semester|sem\b|I{1,3}V?|V?I{1,3}\b))/im, // Matches course names before semester numbers
-                    /programme\s*[:\-]?\s*([A-Z][A-Za-z0-9&,./\-\(\)\s]+?)(?=\s*semester)/i
-                ];
-                
-                for (const pattern of patterns) {
-                    const m = fullText.match(pattern);
-                    if (m && m[1] && m[1].trim().length > 3) {
-                        programme = m[1].trim().replace(/\s+/g, ' ');
-                        break;
-                    }
-                }
-            }
-
-            if (!semester) {
-                // Multiple patterns for semester
-                const patterns = [
-                    /(?:semester|sem)\s*[:\-]?\s*(\d{1,2})\b/i,
-                    /\bsem\s*[:\-]?\s*([1-8])\b/i,
-                    /\b(I{1,3}V?|V?I{1,3})\s*(?:semester|sem)\b/i, // Roman numerals
-                    /(?:semester|sem)\s*[:\-]?\s*(I{1,3}V?|V?I{1,3})\b/i
-                ];
-                
-                for (const pattern of patterns) {
-                    const m = fullText.match(pattern);
-                    if (m && m[1]) {
-                        // Convert Roman to number if needed
-                        const romanToNum = { 'I': '1', 'II': '2', 'III': '3', 'IV': '4', 'V': '5', 'VI': '6', 'VII': '7', 'VIII': '8' };
-                        semester = romanToNum[m[1].toUpperCase()] || m[1];
-                        break;
-                    }
-                }
-            }
-
-            if (ffiScore === null) {
-                const m = fullText.match(/(?:ffi\s*score|ffi|average\s*ffi)\s*[:\-–]?\s*(\d+\.\d+)/i);
-                if (m) ffiScore = parseFloat(m[1]);
-            }
-
-            if (responseCount === null) {
-                const m = fullText.match(/(?:submitted\s*answers|responses?)\s*[:\-–]?\s*(\d+)/i);
-                if (m) responseCount = parseInt(m[1], 10);
-            }
-
-            if (responsePercent === null) {
-                const m = fullText.match(/(?:%\s*resp\.?|response\s*%|resp\s*%)\s*[:\-–]?\s*(\d+(?:\.\d+)?)/i);
-                if (m) responsePercent = parseFloat(m[1]);
-            }
+        const facultyName = facultyParts.join(' ').replace(/\s+/g, ' ').trim();
+        let subjectCode = codeParts.join(' - ').replace(/\s*-\s*/g, ' - ').trim();
+        if (!subjectCode.includes(' - ') && codeParts.length >= 2) {
+          subjectCode = codeParts.join(' - ');
         }
+        let programme = progParts.join(' ')
+          .replace(/Engineer…/i, 'Engineering')
+          .replace(/\s+/g, ' ')
+          .trim();
 
-        bestMeta = {
+        let semester = semParts.find(s => /^[1-8]$/.test(s)) || semParts.join('').replace(/[^\d]/g, '');
+        let ffiScore = parseFloat(ffiParts.find(s => /^\d+\.\d+$/.test(s)) || '0') || null;
+        let respStr = respParts.join('').replace(/[^\d.%]/g, '');
+        let responsePercent = respStr.includes('%') ? parseFloat(respStr.replace('%', '')) : (parseFloat(respStr) || null);
+
+        if (facultyName || subjectCode || ffiScore !== null) {
+          bestMeta = {
             facultyName,
             subjectCode,
             programme,
             semester,
-            ffiScore,
-            responseCount,
-            responsePercent
-        };
+            registeredStudents: null,
+            linkSent: null,
+            responseCount: null,
+            responsePercent,
+            ffiScore
+          };
+        }
+      }
     }
 
-    console.log('[PDF] Metadata extraction complete:', bestMeta ? 'Success' : 'Partial');
-    return bestMeta;
+    if (!bestMeta && headerY) {
+      // Format B: Portrait summary table
+      const lowerRows = yKeys.filter(k => k < headerY).sort((a, b) => b - a);
+      for (const ky of lowerRows) {
+        if (rowMap[ky].length >= 5) {
+          dataY = ky;
+          break;
+        }
+      }
+
+      if (dataY) {
+        const dataRowItems = rowMap[dataY].sort((a, b) => a.x - b.x);
+
+        // Extract FFI Score (float with decimal point, usually rightmost at ~X 540-560)
+        const ffiItem = dataRowItems.filter(i => /^\d+\.\d+$/.test(i.str)).sort((a, b) => b.x - a.x)[0];
+        const ffiScore = ffiItem ? parseFloat(ffiItem.str) : null;
+        const ffiX = ffiItem ? ffiItem.x : 547;
+
+        // Extract % Resp. (Response Percent): float or number just to the left of FFI (X between ffiX - 55 and ffiX - 10)
+        let responsePercent = null;
+        const pctItem = dataRowItems.find(i => i.x < ffiX - 10 && i.x >= ffiX - 60 && /^\d+(?:\.\d+)?$/.test(i.str));
+        if (pctItem) {
+          responsePercent = parseFloat(pctItem.str);
+        }
+
+        // Extract Response Count: integer to the left of % Resp. (X between ffiX - 110 and ffiX - 60)
+        let responseCount = null;
+        const respItem = dataRowItems.find(i => i.x < ffiX - 60 && i.x >= ffiX - 110 && /^\d+$/.test(i.str));
+        if (respItem) {
+          responseCount = parseInt(respItem.str, 10);
+        }
+
+        // Extract Link Sent: integer at X ~ 410-440
+        let linkSent = null;
+        const linkItem = dataRowItems.find(i => i.x >= 400 && i.x < 450 && /^\d+$/.test(i.str));
+        if (linkItem) linkSent = parseInt(linkItem.str, 10);
+
+        // Extract Registered Students: integer at X ~ 350-380
+        let registeredStudents = null;
+        const regItem = dataRowItems.find(i => i.x >= 340 && i.x < 390 && /^\d+$/.test(i.str));
+        if (regItem) registeredStudents = parseInt(regItem.str, 10);
+
+        // Extract Semester: 1 or 2 digits at X ~ 300-340
+        let semester = '';
+        const semItem = dataRowItems.find(i => i.x >= 300 && i.x < 340 && /^\d{1,2}$/.test(i.str));
+        if (semItem) semester = semItem.str;
+
+        // Extract Faculty Name: items at X < 140
+        const facultyName = dataRowItems.filter(i => i.x < 140).map(i => i.str).join(' ').trim();
+
+        // Extract Course Code: items between X 140 and 240
+        const codeItems = dataRowItems.filter(i => i.x >= 140 && i.x < 240).map(i => i.str).join('');
+        const subjectCode = codeItems ? codeItems.replace(/\s+/g, '-').replace(/-+/g, '-') : '';
+
+        // Extract Course Name (Programme): items between X 240 and 320
+        const courseNameParts = [];
+        const yKeysSorted = yKeys.filter(k => k > dataY && k < headerY).sort((a, b) => a - b);
+        for (const aboveY of yKeysSorted.slice(-3)) {
+          if (rowMap[aboveY]) {
+            rowMap[aboveY].filter(i => i.x >= 240 && i.x < 320).forEach(i => {
+              if (i.str.trim()) courseNameParts.unshift(i.str.trim());
+            });
+          }
+        }
+        dataRowItems.filter(i => i.x >= 240 && i.x < 320).forEach(i => {
+          if (i.str.trim()) courseNameParts.push(i.str.trim());
+        });
+        const programme = courseNameParts.join(' ').replace(/\s+/g, ' ').trim();
+
+        if (facultyName || subjectCode || ffiScore !== null) {
+          if (responsePercent === null && responseCount !== null) {
+            const base = linkSent || registeredStudents;
+            if (base && base > 0) {
+              responsePercent = Math.round((responseCount / base) * 10000) / 100;
+            }
+          }
+
+          bestMeta = {
+            facultyName,
+            subjectCode,
+            programme,
+            semester,
+            registeredStudents,
+            linkSent,
+            responseCount,
+            responsePercent,
+            ffiScore
+          };
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[extractMeta] Coordinate extraction warning:', err.message);
+  }
+
+  // 2. Second attempt: Format 2 & Format 1 Regex
+  if (!bestMeta || !bestMeta.facultyName || bestMeta.ffiScore === null) {
+    const fmt2Regex = /Faculty\s+Name\s+Course\s+Code\s+Course\s+Name\s+Semester\s+Registered\s+Students\s+Link\s+Send\s+to\s+Students\s+Response\s+%\s*Resp\.?\s+FFI\s+([A-Za-z\s.]+?)\s+(\d{5,}(?:\s*-\s*Batch\s*-\s*[A-Z0-9]+|\s*-\s*[A-Za-z0-9]+|\s+Batch\s*-\s*[A-Z0-9]+)?)\s+([\w\s&,.\/-]+?)\s+(\d{1,2})\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)/i;
+    const fmt1Regex = /Faculty\s+Name\s+Code\s*\/\s*Batch\s+Programme\s+Sem(?:ester)?\s+FFI\s+Resp\.?\s+Needs\s+Attention\s+Appreciation\s+Action\s+Taken\s+Faculty\s+Signature\s+(\d+)\s+([A-Za-z\s.]+?)\s+(\d{5,}(?:\s*Batch\s*-\s*[A-Z0-9]+|\s*-\s*[A-Za-z0-9]+)?)\s+(.+?)\s+(\d{1,2})\s+(\d+(?:\.\d+)?)\s+([\d\-]+)/i;
+
+    for (let p = 1; p <= doc.numPages; p++) {
+      const page = await doc.getPage(p);
+      const tc = await page.getTextContent();
+      const text = tc.items.map(i => i.str.trim()).filter(Boolean).join(' ');
+
+      const m2 = text.match(fmt2Regex);
+      if (m2) {
+        bestMeta = {
+          facultyName: m2[1].trim(),
+          subjectCode: m2[2].replace(/\s+/g, '-').replace(/-+/g, '-'),
+          programme: m2[3].trim(),
+          semester: m2[4].trim(),
+          registeredStudents: parseInt(m2[5], 10),
+          linkSent: parseInt(m2[6], 10),
+          responseCount: parseInt(m2[7], 10),
+          responsePercent: parseFloat(m2[8]),
+          ffiScore: parseFloat(m2[9])
+        };
+        break;
+      }
+
+      if (!bestMeta) {
+        const m1 = text.match(fmt1Regex);
+        if (m1) {
+          bestMeta = {
+            facultyName: m1[2].trim(),
+            subjectCode: m1[3].replace(/\s+/g, '-').replace(/-+/g, '-'),
+            programme: m1[4].trim(),
+            semester: m1[5].trim(),
+            ffiScore: parseFloat(m1[6]),
+            responseCount: /^\d+$/.test(m1[7]) ? parseInt(m1[7], 10) : null,
+            responsePercent: null
+          };
+        }
+      }
+    }
+  }
+
+  // 3. Fallback: individual field regex search
+  if (!bestMeta) {
+    let facultyName = '', subjectCode = '', programme = '', semester = '', ffiScore = null, responseCount = null, responsePercent = null;
+    for (let p = 1; p <= doc.numPages; p++) {
+      const page = await doc.getPage(p);
+      const tc = await page.getTextContent();
+      const fullText = tc.items.map(i => i.str.trim()).filter(Boolean).join(' ');
+
+      if (!facultyName) {
+        const m = fullText.match(/(?:faculty\s*name|name\s*of\s*faculty)\s*[:\-]?\s*([A-Za-z\s.]+?)(?=\s+(?:course|code|programme|semester|$))/i);
+        if (m && m[1].trim().length > 2) facultyName = m[1].trim();
+      }
+      if (!subjectCode) {
+        const m = fullText.match(/(?:course\s*code|code\s*\/\s*batch|code)\s*[:\-]?\s*(\d{5,}(?:\s*-\s*Batch\s*-\s*[A-Z0-9]+|\s*-\s*[A-Za-z0-9]+)?)/i);
+        if (m) subjectCode = m[1].replace(/\s+/g, '-').replace(/-+/g, '-');
+      }
+      if (!programme) {
+        // Capture everything after "course name/programme/branch" until semester/sem/digit or end
+        const m = fullText.match(/(?:course\s*name|programme|branch)\s*[:\-]?\s*((?:[A-Za-z0-9&,./\-]+\s*)+?)(?=\s*(?:semester|sem\b|\d{1,2}\s*(?:semester|sem|\b)|ffi|resp|response|$))/i);
+        if (m && m[1].trim().length > 2) programme = m[1].trim().replace(/\s+/g, ' ');
+      }
+      if (!semester) {
+        const m = fullText.match(/(?:semester|sem)\s*[:\-]?\s*(\d{1,2})\b/i);
+        if (m) semester = m[1];
+      }
+      if (ffiScore === null) {
+        const m = fullText.match(/(?:ffi\s*score|ffi|average\s*ffi)\s*[:\-–]?\s*(\d+\.\d+)/i);
+        if (m) ffiScore = parseFloat(m[1]);
+      }
+      if (responseCount === null) {
+        const m = fullText.match(/(?:submitted\s*answers|responses?)\s*[:\-–]?\s*(\d+)/i);
+        if (m) responseCount = parseInt(m[1], 10);
+      }
+      if (responsePercent === null) {
+        const m = fullText.match(/(?:%\s*resp\.?|response\s*%|resp\s*%)\s*[:\-–]?\s*(\d+(?:\.\d+)?)/i);
+        if (m) responsePercent = parseFloat(m[1]);
+      }
+    }
+    bestMeta = { facultyName, subjectCode, programme, semester, ffiScore, responseCount, responsePercent };
+  }
+
+  return bestMeta;
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -862,202 +660,132 @@ async function analyzePDF(pdfLink) {
  * Returns: { "Excellent": 10, "Very Good": 25, "Good": 65 } (percentages)
  */
 function calculateCommentPercentages(allComments, responseCount) {
-    if (!allComments || allComments.length === 0) return {};
+  if (!allComments || allComments.length === 0) return {};
 
-    // Priority-based keyword matching (check in order: Excellent > Very Good > Good)
-    const KEYWORDS = {
-        'Excellent': [
-            'excellent', 'outstanding', 'superb', 'brilliant',
-            'best', 'besttttt', 'bestt',
-            'excellent teacher', 'excellent mam', 'excellent sir', 'excellent ma\'am'
-        ],
-        'Very Good': [
-            'very good', 'very well', 'very nice',
-            'very helpful', 'very great', 'very clear'
-        ],
-        'Good': [
-            'good', 'great', 'nice', 'well done', 'satisfactory',
-            'good teacher', 'good mam', 'good sir', 'good ma\'am',
-            'overall good', 'nicely', 'fine', 'decent'
-        ]
-    };
+  const KEYWORDS = {
+    'Excellent': ['excellent', 'outstanding', 'superb', 'brilliant', 'best', 'besttttt', 'bestt', 'excellent teacher', 'excellent mam', 'excellent sir'],
+    'Very Good': ['very good', 'very well', 'very nice', 'very helpful', 'very great'],
+    'Good':      ['good', 'great', 'nice', 'well done', 'satisfactory', 'good teacher', 'good mam', 'good sir', 'overall good', 'nicely'],
+  };
 
-    const counts = { 'Excellent': 0, 'Very Good': 0, 'Good': 0 };
+  const counts = { 'Excellent': 0, 'Very Good': 0, 'Good': 0 };
 
-    allComments.forEach(comment => {
-        const lower = comment.toLowerCase().trim();
-
-        // Match in priority order (first match wins)
-        for (const [category, keywords] of Object.entries(KEYWORDS)) {
-            const matched = keywords.some(kw => {
-                // Exact match
-                if (lower === kw || lower === kw + '.') return true;
-
-                // Word boundary matches
-                if (lower.startsWith(kw + ' ') || lower.endsWith(' ' + kw)) return true;
-                if (lower.includes(' ' + kw + ' ') || lower.includes(' ' + kw + '.')) return true;
-
-                // Clean alphanumeric match (handles punctuation)
-                const cleanLower = lower.replace(/[^a-z\s]/g, '').trim();
-                return cleanLower === kw || cleanLower === kw.replace(/'/g, '');
-            });
-
-            if (matched) {
-                counts[category]++;
-                break; // Stop after first category match
-            }
-        }
-    });
-
-    // Calculate percentages using responseCount as denominator (if available)
-    const total = (responseCount && responseCount > 0) ? responseCount : allComments.length;
-    const result = {};
-
-    for (const [label, count] of Object.entries(counts)) {
-        if (count > 0) {
-            result[label] = Math.round((count / total) * 100);
-        }
+  allComments.forEach(comment => {
+    const lower = comment.toLowerCase().trim();
+    // Check in priority order: Excellent > Very Good > Good
+    for (const [category, keywords] of Object.entries(KEYWORDS)) {
+      if (keywords.some(kw => {
+        // Match: exact, starts with, ends with, or contains as whole word
+        return lower === kw
+          || lower === kw + '.'
+          || lower.startsWith(kw + ' ')
+          || lower.endsWith(' ' + kw)
+          || lower.includes(' ' + kw + ' ')
+          || lower.includes(' ' + kw + '.')
+          // Also match if comment IS just this keyword (case insensitive)
+          || lower.replace(/[^a-z\s]/g, '').trim() === kw;
+      })) {
+        counts[category]++;
+        break;
+      }
     }
+  });
 
-    console.log(`[PDF] Comment percentages calculated:`, result);
-    return result;
+  const total = responseCount && responseCount > 0 ? responseCount : allComments.length;
+  const result = {};
+  for (const [label, count] of Object.entries(counts)) {
+    if (count > 0) {
+      result[label] = Math.round((count / total) * 100);
+    }
+  }
+  return result;
 }
 
 async function analyzePDFBuffer(buffer) {
-    const { analyzeCommentsWithAI } = require('./aiAnalyzer');
+  const { analyzeCommentsWithAI } = require('./aiAnalyzer');
 
-    console.log('[PDF] Starting PDF analysis...');
+  // Extract meta, highlights, and text comments
+  const meta = await extractMetaFromBuffer(buffer);
+  const highlights = await extractHighlightedText(buffer).catch(e => {
+    console.warn('[PDF Analyzer] Highlight extraction error:', e.message);
+    return { appreciation: [], commentsNeedingAttention: [] };
+  });
+  const allComments = await extractAllStudentComments(buffer, meta?.subjectCode);
 
-    // STEP 1: Extract metadata
-    const meta = await extractMetaFromBuffer(buffer);
-    console.log('[PDF] Metadata extracted:', meta ? 'Success' : 'Partial');
+  // Include any highlighted comments in allComments
+  (highlights?.appreciation || []).forEach(c => {
+    if (!allComments.some(x => x.toLowerCase() === c.toLowerCase())) allComments.push(c);
+  });
+  (highlights?.commentsNeedingAttention || []).forEach(c => {
+    if (!allComments.some(x => x.toLowerCase() === c.toLowerCase())) allComments.push(c);
+  });
 
-    // STEP 2: Extract highlighted text (yellow/red backgrounds)
-    const highlights = await extractHighlightedText(buffer).catch(e => {
-        console.warn('[PDF Analyzer] Highlight extraction error:', e.message);
-        return { appreciation: [], commentsNeedingAttention: [] };
-    });
+  let appreciation = [];
+  let commentsNeedingAttention = [];
+  let commentCategories = {};
 
-    // STEP 3: Extract ALL student comments (complete, no splitting)
-    const allComments = await extractAllStudentComments(buffer, meta?.subjectCode);
-
-    // STEP 4: Merge highlighted comments into allComments (deduplicate)
-    (highlights?.appreciation || []).forEach(c => {
-        const normalized = c.toLowerCase().replace(/[.,!?;:]+$/, '');
-        const exists = allComments.some(x => x.toLowerCase().replace(/[.,!?;:]+$/, '') === normalized);
-        if (!exists) allComments.push(c);
-    });
-
-    (highlights?.commentsNeedingAttention || []).forEach(c => {
-        const normalized = c.toLowerCase().replace(/[.,!?;:]+$/, '');
-        const exists = allComments.some(x => x.toLowerCase().replace(/[.,!?;:]+$/, '') === normalized);
-        if (!exists) allComments.push(c);
-    });
-
-    // STEP 5: Classify comments using AI
-    let appreciation = [];
-    let commentsNeedingAttention = [];
-    let commentCategories = {};
-
-    if (allComments.length > 0) {
-        try {
-            console.log(`[PDF] Sending ${allComments.length} comments to AI classifier...`);
-            const aiResult = await analyzeCommentsWithAI(allComments);
-            appreciation = aiResult.appreciation || [];
-            commentsNeedingAttention = aiResult.commentsNeedingAttention || [];
-            commentCategories = aiResult.commentCategories || {};
-
-            console.log(`[PDF] AI classification complete: ${appreciation.length} appreciation, ${commentsNeedingAttention.length} need attention`);
-        } catch (aiErr) {
-            console.error('[PDF] AI analysis failed:', aiErr.message);
-            console.log('[PDF] Falling back to rule-based classification...');
-
-            // Fallback: simple keyword-based sorting
-            allComments.forEach(comment => {
-                const lower = comment.toLowerCase();
-                if (/excellent|outstanding|superb|brilliant|best|very good|great|nice|helpful|clear|understand|perfect/i.test(lower)) {
-                    pushUnique(appreciation, comment);
-                } else if (/poor|bad|worst|slow|fast|audible|voice|doubt|problem|issue|improve|confus|unclear/i.test(lower)) {
-                    pushUnique(commentsNeedingAttention, comment);
-                } else {
-                    // Neutral comments go to appreciation by default (general feedback)
-                    pushUnique(appreciation, comment);
-                }
-            });
-        }
+  if (allComments.length > 0) {
+    try {
+      const aiResult = await analyzeCommentsWithAI(allComments);
+      appreciation = aiResult.appreciation || [];
+      commentsNeedingAttention = aiResult.commentsNeedingAttention || [];
+      commentCategories = aiResult.commentCategories || {};
+    } catch (aiErr) {
+      console.warn('[PDF] AI analysis failed, falling back to rule-based sorting:', aiErr.message);
     }
+  }
 
-    // STEP 6: Guarantee highlighted comments are in final classification
-    // (Priority: Highlighted > AI classification)
-    (highlights?.appreciation || []).forEach(c => {
-        pushUnique(appreciation, c);
-    });
+  // Guarantee that detected highlighted text is included in final lists
+  (highlights?.appreciation || []).forEach(c => {
+    pushUnique(appreciation, c);
+  });
+  (highlights?.commentsNeedingAttention || []).forEach(c => {
+    pushUnique(commentsNeedingAttention, c);
+    // Categorize attention comment if categories exist
+    if (commentCategories) {
+      const lower = c.toLowerCase();
+      if (/speed|fast|slow|rush|pace/i.test(lower)) {
+        commentCategories.Speed = commentCategories.Speed || [];
+        if (!commentCategories.Speed.includes(c)) commentCategories.Speed.push(c);
+      } else if (/voice|audible|volume|sound|mic|hear|loud/i.test(lower)) {
+        commentCategories.Clarity = commentCategories.Clarity || [];
+        if (!commentCategories.Clarity.includes(c)) commentCategories.Clarity.push(c);
+      } else if (/note|material|pdf|ppt|slide|book|bank|question/i.test(lower)) {
+        commentCategories.Materials = commentCategories.Materials || [];
+        if (!commentCategories.Materials.includes(c)) commentCategories.Materials.push(c);
+      } else if (/doubt|interactive|discuss|ask|talk/i.test(lower)) {
+        commentCategories.Interaction = commentCategories.Interaction || [];
+        if (!commentCategories.Interaction.includes(c)) commentCategories.Interaction.push(c);
+      } else {
+        commentCategories.General = commentCategories.General || [];
+        if (!commentCategories.General.includes(c)) commentCategories.General.push(c);
+      }
+    }
+  });
 
-    (highlights?.commentsNeedingAttention || []).forEach(c => {
-        pushUnique(commentsNeedingAttention, c);
+  const commentPercentages = calculateCommentPercentages(allComments, meta?.responseCount);
 
-        // Auto-categorize "Need Attention" comments
-        if (commentCategories) {
-            const lower = c.toLowerCase();
-            if (/speed|fast|slow|rush|pace/i.test(lower)) {
-                commentCategories.Speed = commentCategories.Speed || [];
-                if (!commentCategories.Speed.includes(c)) commentCategories.Speed.push(c);
-            } else if (/voice|audible|volume|sound|mic|hear|loud|speak/i.test(lower)) {
-                commentCategories.Clarity = commentCategories.Clarity || [];
-                if (!commentCategories.Clarity.includes(c)) commentCategories.Clarity.push(c);
-            } else if (/note|material|pdf|ppt|slide|book|bank|question|handout/i.test(lower)) {
-                commentCategories.Materials = commentCategories.Materials || [];
-                if (!commentCategories.Materials.includes(c)) commentCategories.Materials.push(c);
-            } else if (/doubt|interactive|discuss|ask|talk|question|session/i.test(lower)) {
-                commentCategories.Interaction = commentCategories.Interaction || [];
-                if (!commentCategories.Interaction.includes(c)) commentCategories.Interaction.push(c);
-            } else {
-                commentCategories.General = commentCategories.General || [];
-                if (!commentCategories.General.includes(c)) commentCategories.General.push(c);
-            }
-        }
-    });
-
-    // STEP 7: Calculate comment percentages (Excellent, Very Good, Good)
-    const commentPercentages = calculateCommentPercentages(allComments, meta?.responseCount);
-
-    console.log(`[PDF] Analysis complete: ${allComments.length} total comments extracted`);
-
-    return {
-        appreciation,
-        commentsNeedingAttention,
-        appreciationCount: appreciation.length,
-        attentionCount: commentsNeedingAttention.length,
-        commentPercentages,
-        commentCategories,
-        rawStudentComments: allComments, // Complete comments, never split
-        meta,
-        ffiScore: meta?.ffiScore ?? null,
-        responseCount: meta?.responseCount ?? null,
-        responsePercent: meta?.responsePercent ?? null,
-        registeredStudents: meta?.registeredStudents ?? null,
-        linkSent: meta?.linkSent ?? null,
-        analyzedAt: new Date()
-    };
+  return {
+    appreciation,
+    commentsNeedingAttention,
+    appreciationCount: appreciation.length,
+    attentionCount: commentsNeedingAttention.length,
+    commentPercentages,
+    commentCategories,
+    rawStudentComments: allComments,
+    meta, // Include full meta object
+    ffiScore: meta?.ffiScore ?? null,
+    responseCount: meta?.responseCount ?? null,
+    responsePercent: meta?.responsePercent ?? null,
+    registeredStudents: meta?.registeredStudents ?? null,
+    linkSent: meta?.linkSent ?? null,
+    analyzedAt: new Date()
+  };
 }
 
 async function extractMetaFromPDF(buffer) {
-    try {
-        return await extractMetaFromBuffer(buffer);
-    } catch (error) {
-        console.error('[extractMetaFromPDF] Error:', error.message);
-        return {
-            facultyName: '',
-            subjectCode: '',
-            programme: '',
-            semester: '',
-            ffiScore: null,
-            responseCount: null,
-            responsePercent: null,
-            registeredStudents: null,
-            linkSent: null
-        };
-    }
+  try { return await extractMetaFromBuffer(buffer); }
+  catch { return { facultyName: '', subjectCode: '', programme: '', semester: '', ffiScore: null, responseCount: null, responsePercent: null }; }
 }
 
 module.exports = { analyzePDF, analyzePDFBuffer, extractMetaFromPDF, extractHighlightedText, convertDriveLink };

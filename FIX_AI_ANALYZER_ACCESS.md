@@ -1,9 +1,9 @@
-# 🔧 Fix: AI Analyzer Cannot Read Links with MITS Domain Restriction
+# ≡ƒöº Fix: AI Analyzer Cannot Read Links with MITS Domain Restriction
 
 ## Problem
 When you set Google Drive folder to "Anyone at MITS can access", the service account (AI analyzer) loses access because it's not an @mitsgwl.ac.in or @mitsgwalior.in email.
 
-## ✅ Solution: Dual Access Setup
+## Γ£à Solution: Dual Access Setup
 
 You need **BOTH** types of access:
 1. **Domain-wide sharing** for MITS faculty (upload/edit access)
@@ -11,7 +11,7 @@ You need **BOTH** types of access:
 
 ---
 
-## 📋 Step-by-Step Fix
+## ≡ƒôï Step-by-Step Fix
 
 ### **Step 1: Find Your Service Account Email**
 
@@ -26,7 +26,7 @@ You need **BOTH** types of access:
 
 1. Go to Google Drive
 2. Find your **feedback reports folder** (the one where PDFs are uploaded)
-3. **Right-click** on the folder → **Share**
+3. **Right-click** on the folder ΓåÆ **Share**
 4. In the "Add people" field, **paste the service account email**
 5. Set permission to **Viewer**
 6. **Uncheck** "Notify people" (service accounts don't need emails)
@@ -37,23 +37,23 @@ You need **BOTH** types of access:
 Your folder should now show:
 
 ```
-🌐 General Access:
-   └─ Anyone at Madhav Institute of Technology & Science
-      └─ Can edit
+≡ƒîÉ General Access:
+   ΓööΓöÇ Anyone at Madhav Institute of Technology & Science
+      ΓööΓöÇ Can edit
 
-👥 Shared with:
-   └─ feedback-drive-access@project-123456.iam.gserviceaccount.com
-      └─ Viewer
+≡ƒæÑ Shared with:
+   ΓööΓöÇ feedback-drive-access@project-123456.iam.gserviceaccount.com
+      ΓööΓöÇ Viewer
 ```
 
 This setup allows:
-- ✅ **MITS faculty** (@mitsgwl.ac.in, @mitsgwalior.in) can upload/edit
-- ✅ **Service account** (AI analyzer) can read files
-- ❌ **External users** are blocked
+- Γ£à **MITS faculty** (@mitsgwl.ac.in, @mitsgwalior.in) can upload/edit
+- Γ£à **Service account** (AI analyzer) can read files
+- Γ¥î **External users** are blocked
 
 ---
 
-## 🧪 Test the Fix
+## ≡ƒº¬ Test the Fix
 
 ### **Option 1: Quick Test (Command Line)**
 
@@ -70,9 +70,9 @@ node test_drive_link_access.js
 
 **Expected output:**
 ```
-✅ File metadata access successful!
-✅ File download successful!
-🎉 All tests passed!
+Γ£à File metadata access successful!
+Γ£à File download successful!
+≡ƒÄë All tests passed!
 ```
 
 ### **Option 2: Test via Application**
@@ -85,7 +85,7 @@ node test_drive_link_access.js
 
 ---
 
-## 🚨 Troubleshooting
+## ≡ƒÜ¿ Troubleshooting
 
 ### **Error: "Permission denied (403)"**
 
@@ -118,7 +118,7 @@ node test_drive_link_access.js
 
 ---
 
-## 📝 Important Notes
+## ≡ƒô¥ Important Notes
 
 1. **Share the FOLDER, not individual files**
    - Sharing the parent folder gives access to all files inside
@@ -138,7 +138,7 @@ node test_drive_link_access.js
 
 ---
 
-## ✅ Verification Checklist
+## Γ£à Verification Checklist
 
 - [ ] Service account email copied from JSON key file
 - [ ] Folder shared with service account (Viewer permission)
@@ -150,13 +150,13 @@ node test_drive_link_access.js
 
 ---
 
-## 🎯 Final Result
+## ≡ƒÄ» Final Result
 
 Your system should now support:
 
-1. ✅ **MITS faculty** upload feedback via Drive links
-2. ✅ **Domain restriction** blocks external access
-3. ✅ **AI analyzer** reads PDFs automatically
-4. ✅ **Pro-VC** gets AI summaries for approval
+1. Γ£à **MITS faculty** upload feedback via Drive links
+2. Γ£à **Domain restriction** blocks external access
+3. Γ£à **AI analyzer** reads PDFs automatically
+4. Γ£à **Pro-VC** gets AI summaries for approval
 
-**Security maintained + Functionality restored!** 🎉
+**Security maintained + Functionality restored!** ≡ƒÄë

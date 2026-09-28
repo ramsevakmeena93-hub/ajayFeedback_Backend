@@ -32,18 +32,18 @@ app.get('/', (req, res) => {
 console.log('Attempting MongoDB connection...');
 mongoose.connect(MONGO_URI)
   .then(() => {
-    console.log('✅ MongoDB connected successfully');
+    console.log('Γ£à MongoDB connected successfully');
     
     app.listen(PORT, () => {
-      console.log('✅ Server is listening on port', PORT);
-      console.log('✅ Health check: http://localhost:' + PORT + '/api/health');
+      console.log('Γ£à Server is listening on port', PORT);
+      console.log('Γ£à Health check: http://localhost:' + PORT + '/api/health');
       console.log('='.repeat(60));
       console.log('SERVER READY');
       console.log('='.repeat(60));
     });
   })
   .catch(err => {
-    console.error('❌ MongoDB connection failed:');
+    console.error('Γ¥î MongoDB connection failed:');
     console.error('Error name:', err.name);
     console.error('Error message:', err.message);
     if (err.reason) {
@@ -57,14 +57,14 @@ mongoose.connect(MONGO_URI)
 
 // Catch uncaught errors
 process.on('uncaughtException', (err) => {
-  console.error('❌ UNCAUGHT EXCEPTION:');
+  console.error('Γ¥î UNCAUGHT EXCEPTION:');
   console.error('Error:', err.message);
   console.error('Stack:', err.stack);
   process.exit(1);
 });
 
 process.on('unhandledRejection', (err) => {
-  console.error('❌ UNHANDLED REJECTION:');
+  console.error('Γ¥î UNHANDLED REJECTION:');
   console.error('Error:', err);
   process.exit(1);
 });

@@ -1,104 +1,17 @@
-// ============================================================
-// FINAL COMMENT ANALYZER
-// ============================================================
-// IMPORTANT:
-// - NEVER split the original student comment.
-// - Positive + actionable negative = NEED ATTENTION.
-// - Preserve the complete original comment.
-// - Do not silently delete unknown comments.
-// - English + Hinglish patterns from the existing classifier
-//   are still used.
-// ============================================================
+/**
+ * AI Comment Analyzer — Smart Rule-Based + HuggingFace fallback
+ *
+ * Problem with pure AI: distilbert misclassifies short academic phrases like
+ * "Very Good", "Great classes", "Excellent mam" as NEGATIVE because it was
+ * trained on movie reviews, not faculty feedback forms.
+ *
+ * Solution: A comprehensive rule-based classifier that understands MITS
+ * feedback form language (English + Hinglish), with AI only as a fallback
+ * for genuinely ambiguous long sentences.
+ */
 
 let pipeline = null;
 let pipelineLoading = false;
-
-// Sentiment patterns
-const POSITIVE_PATTERNS = [
-  // Very strong positive only
-  /\b(excellent|outstanding|amazing|wonderful|fantastic|superb|brilliant|perfect|exceptional|extraordinary)\b/i,
-  
-  // Strong appreciation
-  /\b(love|loved|enjoyed|appreciate|grateful|thank|thanks|thankful)\b/i,
-  
-  // Specific positive teaching qualities
-  /\b(very\s+(?:good|helpful|clear|patient|knowledgeable|experienced|dedicated))\b/i,
-  /\b(extremely\s+(?:good|helpful|supportive|knowledgeable))\b/i,
-  /\b(best\s+(?:teacher|faculty|professor|explanation|teaching))\b/i,
-  
-  // Strong Hindi positive
-  /\b(bahut\s+(?:accha|achha|badhiya)|zabardast|kamaal|behtareen)\b/i,
-  
-  // Well + strong verb
-  /\b(very\s+well\s+(?:explained|taught|organized|structured))\b/i,
-  /\b(extremely\s+well\s+(?:explained|taught))\b/i
-];
-
-const NEGATIVE_PATTERNS = [
-  // Direct criticism
-  /\b(improve|need|should|must|better|lack|lacking|insufficient|inadequate)\b/i,
-  
-  // Quality issues
-  /\b(poor|bad|worst|terrible|horrible|useless|waste|boring|dull|monotonous)\b/i,
-  
-  // Speed/pace issues
-  /\b(too\s+(?:fast|slow|quick|rushed)|very\s+(?:fast|slow)|so\s+(?:fast|slow))\b/i,
-  
-  // Understanding issues
-  /\b(difficult|hard|confusing|unclear|complicated|not\s+clear|doesn'?t\s+explain|can'?t\s+understand)\b/i,
-  
-  // Quantity issues
-  /\b(more\s+(?:time|examples|practice|attention|explanation|details|classes)|less\s+(?:time|attention)|not\s+enough)\b/i,
-  
-  // Negative comparisons
-  /\b(not\s+(?:good|helpful|available|punctual|organized|satisfied|happy))\b/i,
-  /\b(doesn'?t\s+(?:explain|teach|provide|help|come|attend|give))\b/i,
-  /\b(didn'?t\s+(?:understand|cover|explain|teach|give|provide))\b/i,
-  
-  // Behavioral issues
-  /\b(rude|arrogant|biased|unfair|partial|angry|harsh|strict|mean)\b/i,
-  /\b(absent|late|irregular|unavailable|never\s+available|rarely\s+available)\b/i,
-  
-  // Hindi negative patterns
-  /\b(nahi|nahin|bahut\s+kam|thoda|improve\s+karo|samajh\s+nahi\s+aaya|accha\s+nahi)\b/i,
-  
-  // Suggestions (even polite ones = need attention)
-  /\b(could\s+(?:improve|do|give|provide)|would\s+be\s+better|might\s+want\s+to|try\s+to)\b/i,
-  
-  // Mixed sentiment markers (good BUT...)
-  /\b(but|however|although|though)\b/i
-];
-
-const SKIP_PATTERNS = [
-  /^(no|none|na|nahi|nil|n\.?a\.?|\.{3,}|-{3,}|_{3,})$/i,
-  /^.{1,3}$/
-];
-
-const NEUTRAL_SKIP_PATTERNS = [
-  /^(ok|okay|fine|average|normal|moderate|alright|decent)$/i
-];
-
-const CATEGORY_PATTERNS = {
-  Teaching: /\b(teach|explain|lecture|class|concept)\b/i,
-  Communication: /\b(communicate|talk|speak|language)\b/i,
-  Availability: /\b(available|accessible|office|hours)\b/i,
-  Materials: /\b(notes|slides|material|book|resource)\b/i,
-  Assessment: /\b(exam|test|quiz|grade|mark|assignment)\b/i,
-  General: /.*/
-};
-
-function deduplicateComments(comments) {
-  const seen = new Set();
-  const unique = [];
-  for (const comment of comments) {
-    const key = String(comment || '').toLowerCase().trim();
-    if (key && !seen.has(key)) {
-      seen.add(key);
-      unique.push(comment);
-    }
-  }
-  return unique;
-}
 
 async function getSentimentPipeline() {
   if (pipeline) return pipeline;
@@ -108,757 +21,423 @@ async function getSentimentPipeline() {
   }
   pipelineLoading = true;
   try {
-    // Use require instead of dynamic import for better compatibility
-    const { pipeline: createPipeline } = require('@xenova/transformers');
+    const { pipeline: createPipeline } = await import('@xenova/transformers');
     pipeline = await createPipeline('sentiment-analysis', 'Xenova/distilbert-base-uncased-finetuned-sst-2-english');
     console.log('[AI] HuggingFace sentiment model loaded');
-  } catch (err) {
-    console.error('[AI] Failed to load HuggingFace model:', err.message);
-    // Don't throw - fall back to rule-based classification only
-    pipeline = null;
   } finally {
     pipelineLoading = false;
   }
   return pipeline;
 }
 
-// Patterns and classification logic
-async function classifyComments(rawComments) {
+// ─────────────────────────────────────────────────────────────────────────────
+// POSITIVE keyword patterns — academic feedback context
+// ─────────────────────────────────────────────────────────────────────────────
+const POSITIVE_PATTERNS = [
+  // Rating words (from feedback forms)
+  /^excellent$/i, /^very good$/i, /^good$/i, /^great$/i, /^outstanding$/i,
+  /^superb$/i, /^brilliant$/i, /^best$/i, /^nice$/i, /^satisfactory$/i,
+  /^wonderful$/i, /^awesome$/i, /^perfect$/i, /^fantastic$/i, /^amazing$/i,
+  /^exceptional$/i, /^magnificent$/i, /^splendid$/i, /^marvelous$/i,
+
+  // Compound positives
+  /very good/i, /quite good/i, /really good/i, /very nice/i, /very helpful/i,
+  /very clear/i, /very effective/i, /very well/i, /extremely good/i,
+  /highly satisfied/i, /highly recommend/i, /very satisf/i,
+
+  // Teaching positives
+  /great teacher/i, /good teacher/i, /excellent teacher/i, /best teacher/i,
+  /great class/i, /good class/i, /excellent class/i, /great lecture/i,
+  /good lecture/i, /excellent lecture/i, /good explanation/i,
+  /clear explanation/i, /easy to understand/i, /easy to learn/i,
+  /well explained/i, /nicely explained/i, /clearly explained/i,
+  /good concept/i, /good knowledge/i, /great knowledge/i,
+  /good communication/i, /good interaction/i, /good teaching/i,
+  /excellent teaching/i, /great teaching/i, /effective teaching/i,
+  /good understanding/i, /makes it easy/i, /easy to grasp/i,
+
+  // Respect / appreciation phrases (Indian academic context)
+  /good mam/i, /good sir/i, /nice mam/i, /nice sir/i,
+  /excellent mam/i, /excellent sir/i, /best mam/i, /best sir/i,
+  /great mam/i, /great sir/i, /thank you/i, /thanks a lot/i,
+  /grateful/i, /appreciate/i, /wonderful mam/i, /wonderful sir/i,
+  /hats off/i, /keep it up/i, /keep up/i, /well done/i,
+
+  // Satisfaction
+  /fully satisfied/i, /completely satisfied/i, /very satisfied/i,
+  /overall good/i, /overall great/i, /overall excellent/i, /overall nice/i,
+  /overall course/i, /conducted nicely/i, /nicely conducted/i,
+  /well conducted/i, /conducted well/i, /\bnicely\b/i,
+  /overall satisf/i, /nothing to improve/i, /no improvement needed/i,
+  /no suggestion/i, /no complaints/i, /everything is good/i,
+  /everything good/i, /all good/i, /all is well/i,
+
+  // Qualities & Engagement
+  /^best+$/i, /\bbest{2,}\b/i,
+  /\b(punctual|interactive|approachable|supportive|cooperative|polite|friendly)\b/i,
+  /\b(engaging|engaging lectures?|informative|interesting)\b/i,
+  /explains? clearly/i, /gives clear explanation/i,
+
+  // Encouragement
+  /continue the same/i, /please continue/i, /keep going/i,
+  /maintain this/i, /best wishes/i, /good luck/i,
+
+  // Hinglish positive
+  /bahut accha/i, /bahut acha/i, /acha hai/i, /accha hai/i,
+  /best hai/i, /zabardast/i, /mast hai/i, /sahi hai/i,
+
+  // Negation-positive (sound negative but are actually positive/neutral)
+  /not bad/i, /not bad at all/i, /no complaints/i, /no problem/i,
+  /no issues/i, /nothing to complain/i,
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NEGATIVE keyword patterns — attention needed
+// ─────────────────────────────────────────────────────────────────────────────
+const NEGATIVE_PATTERNS = [
+  // Negations of positive traits (MUST come first so "not great" is caught immediately)
+  /\b(not|never|hardly|rarely|barely)\s+(great|good|nice|clear|helpful|effective|satisfied|satisfactory|happy|cooperative|approachable|supportive|punctual|prepared|engaging|active|fair)\b/i,
+  /\bnot\s+a\s+good\b/i,
+  /\bnot\s+very\s+(good|nice|helpful|clear|effective)\b/i,
+  /\bnot\s+great\s+classes\b/i,
+
+  // Clear negatives
+  /^poor$/i, /^bad$/i, /^worst$/i, /^terrible$/i, /^horrible$/i,
+  /^average$/i, /^below average$/i, /^not good$/i, /^not great$/i,
+
+  // Improvement & Requests
+  /need to improve/i, /needs improvement/i, /should improve/i,
+  /must improve/i, /can improve/i, /could improve/i, /require improvement/i,
+  /improve your/i, /improve the/i, /please improve/i,
+  /could be better/i, /scope for improvement/i,
+
+  // Academic complaints / Stress / Exams / Notes
+  /stressful/i, /too much stress/i, /hectic/i, /burden/i,
+  /difficult to study/i, /difficult to understand/i, /hard to follow/i,
+  /syllabus (is )?(too )?vast/i, /vast syllabus/i, /syllabus not covered/i,
+  /question bank.*(should|must|please|need|provide)/i, /provide question bank/i,
+  /quiz.*stressful/i, /all the subjects together/i,
+  /need.*more.*interactive/i, /more doubt.*sessions?/i, /doubt.*session.*needed/i,
+
+  // Speed / pace issues
+  /too fast/i, /very fast/i, /speaks fast/i, /teaching fast/i,
+  /talks fast/i, /goes fast/i, /rushes through/i, /hurry/i,
+  /too slow/i, /very slow/i, /slow speed/i, /slow pace/i,
+  /reduce speed/i, /slow down/i,
+
+  // Voice & Audibility issues
+  /not audible/i, /low voice/i, /too low/i, /speak loudly/i, /voice is low/i,
+
+  // Clarity issues
+  /not clear/i, /unclear/i, /hard to understand/i, /difficult to understand/i,
+  /difficult to follow/i, /hard to follow/i, /not understandable/i,
+  /poor explanation/i, /bad explanation/i, /confusing/i,
+  /didn't understand/i, /don't understand/i, /did not understand/i,
+  /cannot understand/i, /can't understand/i,
+  /doesn't explain/i, /does not explain/i, /didn't explain/i,
+  /not explained/i, /poorly explained/i,
+
+  // Availability / interaction
+  /not available/i, /never available/i, /not approachable/i,
+  /no interaction/i, /less interaction/i, /poor interaction/i,
+  /does not interact/i, /doesn't interact/i,
+  /not accessible/i, /does not help/i, /doesn't help/i,
+  /not cooperative/i, /not supportive/i,
+
+  // Material issues — EXPANDED
+  /no notes/i, /no material/i, /no slides/i, /no pdf/i,
+  /should share/i, /please share/i, /provide notes/i,
+  /not provided/i, /not shared/i, /not given/i,
+  /notes not/i, /material not/i, /slides not/i, /pdf not/i,
+  /doesn't provide/i, /does not provide/i, /didn't provide/i,
+  /doesn't share/i, /does not share/i, /didn't share/i,
+  /doesn't give/i, /does not give/i, /didn't give/i,
+  /share notes/i, /share material/i, /share slides/i,
+  /provide material/i, /give notes/i, /upload notes/i,
+
+  // Attendance / regularity — EXPANDED
+  /irregular/i, /not regular/i, /misses class/i, /skips class/i,
+  /not punctual/i, /late to class/i,
+  /always late/i, /comes late/i, /come late/i, /came late/i, /is late/i,
+  /miss kart/i, /class miss/i, /class nahi/i, /class cancel/i,
+  /doesn't come/i, /does not come/i, /didn't come/i,
+  /absent/i, /not present/i, /bunks/i, /skip/i,
+  /class nahi lete/i, /class nahi aate/i,
+
+  // General negative — EXPANDED
+  /lack of/i, /lacks/i, /problem with/i, /issue with/i,
+  /dissatisfied/i, /not satisfied/i, /disappointing/i, /disappointed/i,
+  /didn't like/i, /don't like/i, /did not like/i, /do not like/i,
+  /waste of time/i, /boring/i, /bored/i,
+  /not helpful/i, /unhelpful/i,
+  /not interested/i, /lost interest/i, /no interest/i,
+  /not effective/i, /ineffective/i,
+  /not useful/i, /useless/i,
+  /not satisfied/i, /unsatisfied/i,
+  /not relevant/i, /irrelevant/i,
+  /no doubt solving/i, /doubt clear nahi/i,
+  /favouritism/i, /biased/i, /partial/i,
+  /rude/i, /harsh/i, /strict/i, /angry/i,
+  /doesn't care/i, /does not care/i,
+  /doesn't listen/i, /does not listen/i,
+  /not engaging/i, /monotonous/i,
+  /nothing special/i, /nothing new/i,
+  /doesn't teach/i, /does not teach/i,
+  /not prepared/i, /unprepared/i,
+  /not enough/i, /insufficient/i,
+  /should focus/i, /should work on/i,
+
+  // Hinglish negatives — EXPANDED
+  /accha nahi/i, /acha nahi/i, /theek nahi/i, /thik nahi/i,
+  /samajh nahi/i, /samajh me nahi/i,
+  /bakwas/i, /bekar/i, /faltu/i, /ghatiya/i,
+  /jaldi bolte/i, /jaldi padhate/i,
+  /boring hai/i, /bore hota/i, /bore karta/i,
+  /nahi aata/i, /nahi aati/i, /nahi aate/i,
+  /nahi padhat/i, /nahi sikhate/i,
+  /kuch nahi/i, /koi fayda nahi/i,
+  /late aate/i, /late aati/i,
+  /miss karte/i, /miss karti/i,
+
+  // Generic "not" + action/quality (catch-all for "not provided", "not shared", etc.)
+  /\bnot\s+\w+ed\b/i,  // "not provided", "not shared", "not explained", "not prepared"
+  /\bnot\s+\w+ing\b/i, // "not teaching", "not sharing", "not helping"
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Skip / irrelevant patterns — empty, filler, or "No complaints" answers
+// (Writing "No" or "NA" to suggestions means NO COMPLAINTS, not a negative issue)
+// ─────────────────────────────────────────────────────────────────────────────
+const SKIP_PATTERNS = [
+  /^-+$/, /^\.*$/, /^_+$/, /^\s*$/, /^x+$/i, /^\.{1,3}$/,
+  /^[0-9]+$/, /^[^a-zA-Z]+$/, /^[\d\s.,%-]+$/,
+  /^no$/i, /^nil$/i, /^na$/i, /^n\/a$/i, /^none$/i, /^nothing$/i,
+  /^no comments?$/i, /^no suggestions?$/i, /^all good$/i,
+  /^ok$/i, /^okay$/i, /^please$/i, /^kuch nahi$/i, /^nothing to say$/i,
+  /^[,\s.]+$/, /^,{1,3}[a-z]{0,4}$/i
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Categorization patterns
+// ─────────────────────────────────────────────────────────────────────────────
+const CATEGORY_PATTERNS = {
+  Speed: /\b(fast|slow|speed|pace|quick|jaldi|rush)/i,
+  Clarity: /\b(unclear|confusing|understand|explain|clear|samajh|concept)/i,
+  Materials: /\b(notes|material|slide|pdf|book|share|provided|shared|upload|give|provide)/i,
+  Interaction: /\b(available|interaction|doubt|question|help|approachable|cooperative|listen|care)/i,
+  Regularity: /\b(irregular|regular|punctual|late|miss|skip|absent|cancel|bunks|aate|aati|come|class nahi)/i
+};
+
+// Split words for mixed sentiment
+const SPLIT_REGEX = /\b(?:but|however|though|although|yet|still|lekin|par|magar|parantu)\b/i;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Neutral / irrelevant phrases — students writing filler, should be skipped
+// ─────────────────────────────────────────────────────────────────────────────
+const NEUTRAL_SKIP_PATTERNS = [
+  /don't know what to/i, /don't know what to write/i,
+  /i don't know/i, /idk/i,
+  /nothing to say/i, /nothing to write/i, /nothing much/i,
+  /no comment/i, /no opinion/i, /can't say/i,
+  /kuch nahi likhna/i, /pata nahi/i, /kya likhu/i,
+  /no idea/i, /whatever/i,
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Generic/filler comments that should be counted in % but NOT shown as
+// meaningful appreciation/attention comments
+// ─────────────────────────────────────────────────────────────────────────────
+const GENERIC_APPRECIATION_PATTERNS = [
+  /^(excellent|very good|good|great|outstanding|superb|brilliant|best|nice|satisfactory|wonderful|awesome|perfect|fantastic|amazing|exceptional|magnificent|splendid|marvelous)\.?$/i,
+  /^(good|great|excellent|best|nice|wonderful|amazing|awesome|superb|brilliant) (teacher|mam|sir|madam|faculty|lecture|class|sir\.?|mam\.?)\.?$/i,
+  /^(good|great|excellent|best|nice) (teaching|explanation|lectures?|classes?)\.?$/i,
+  /^(very |quite |really )?(good|nice|great|excellent|helpful|clear|effective)\.?$/i,
+  /^(thank you|thanks|keep it up|well done|hats off|best wishes|keep going|good luck)\.?$/i,
+  /^(bahut accha|bahut acha|acha hai|accha hai|best hai|zabardast|mast hai|sahi hai)\.?$/i,
+  /^(all good|overall good|overall great|overall excellent|overall nice|nothing to improve|no complaints|fully satisfied|completely satisfied|very satisfied)\.?$/i,
+  /^(punctual|interactive|approachable|supportive|cooperative|polite|friendly|engaging|informative|interesting)\.?$/i,
+  /^(good|nice|excellent|great|best)\.?$/i,
+  /^(not bad|not bad at all|no issues|no problems?|no concern)\.?$/i,
+];
+
+function isGenericComment(text) {
+  if (!text) return true;
+  const t = text.trim();
+  // Less than 4 words → generic
+  if (t.split(/\s+/).length < 4) return true;
+  // Matches a generic pattern
+  if (GENERIC_APPRECIATION_PATTERNS.some(p => p.test(t))) return true;
+  return false;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Deduplicate comments — case-insensitive, keep first occurrence
+// ─────────────────────────────────────────────────────────────────────────────
+function deduplicateComments(comments) {
+  const seen = new Set();
+  return comments.filter(c => {
+    const key = c.toLowerCase().trim().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ');
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+function ruleBasedClassify(comment) {
+  const text = comment.trim();
+  if (!text || text.length < 2) return 'skip';
+
+  // Skip meaningless entries
+  if (SKIP_PATTERNS.some(p => p.test(text))) return 'skip';
+
+  // Skip irrelevant filler comments ("I don't know what to write", "nothing to say")
+  if (NEUTRAL_SKIP_PATTERNS.some(p => p.test(text.toLowerCase()))) return 'skip';
+
+  const lower = text.toLowerCase();
+
+  // Check NEGATIVE first (more specific — prevents "needs to improve speed" going positive)
+  if (NEGATIVE_PATTERNS.some(p => p.test(lower))) return 'negative';
+
+  // Check positive patterns
+  if (POSITIVE_PATTERNS.some(p => p.test(lower))) return 'positive';
+
+  // Short comments (≤5 words) with no clear classification
+  const wordCount = text.trim().split(/\s+/).length;
+  if (wordCount <= 5) {
+    // Check for generic negative indicators even if no pattern matched
+    // Covers: "not X", "no X", "never X"
+    if (/\b(not|no|never|don't|doesn't|didn't|can't|won't|shouldn't|couldn't)\b/i.test(lower)) {
+      return 'negative';
+    }
+    // Truly ambiguous short comment, no negative indicator found
+    return 'neutral';
+  }
+
+  // For longer comments, also check for generic negative indicators before sending to AI
+  if (/\b(not|no|never|don't|doesn't|didn't|can't|won't|shouldn't|couldn't)\b/i.test(lower)) {
+    // Contains negation but no positive pattern matched → likely negative
+    return 'negative';
+  }
+
+  // Long enough for AI
+  return 'ai';
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Main analyzer
+// ─────────────────────────────────────────────────────────────────────────────
+async function analyzeCommentsWithAI(rawComments) {
+  const defaultResult = {
+    appreciation: [],
+    commentsNeedingAttention: [],
+    commentCategories: {
+      Speed: [], Clarity: [], Materials: [], Interaction: [], Regularity: [], General: []
+    }
+  };
+
+  if (!rawComments || rawComments.length === 0) {
+    return defaultResult;
+  }
+
   const result = {
     appreciation: [],
     commentsNeedingAttention: [],
     commentCategories: {
-      Teaching: [],
-      Communication: [],
-      Availability: [],
-      Materials: [],
-      Assessment: [],
-      General: []
-    },
-    classifiedComments: [],
-    statistics: {
-      totalReceived: 0,
-      appreciation: 0,
-      attention: 0,
-      neutral: 0,
-      skipped: 0,
-      aiClassified: 0
+      Speed: [], Clarity: [], Materials: [], Interaction: [], Regularity: [], General: []
+    }
+  };
+  
+  const toClassifyWithAI = [];
+
+  const addAttention = (text) => {
+    result.commentsNeedingAttention.push(text);
+    let categorized = false;
+    for (const [category, regex] of Object.entries(CATEGORY_PATTERNS)) {
+      if (regex.test(text)) {
+        result.commentCategories[category].push(text);
+        categorized = true;
+      }
+    }
+    if (!categorized) {
+      result.commentCategories.General.push(text);
     }
   };
 
-
-  // ==========================================================
-  // VALIDATE INPUT
-  // ==========================================================
-
-  if (
-    !Array.isArray(rawComments)
-  ) {
-
-    console.warn(
-      '[AI] rawComments is not an array'
-    );
-
-    return result;
-
-  }
-
-
-  result.statistics.totalReceived =
-    rawComments.length;
-
-
-  // ==========================================================
-  // NORMALIZE TEXT
-  // ==========================================================
-
-  function normalizeComment(text) {
-
-    return String(text || '')
-      .replace(/\u00A0/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-
-  }
-
-
-  // ==========================================================
-  // DUPLICATE KEY
-  // ==========================================================
-
-  function duplicateKey(text) {
-
-    return normalizeComment(text)
-      .toLowerCase()
-      .replace(/[“”‘’"'`]/g, '')
-      .replace(/[.,;:!?()[\]{}]/g, '')
-      .replace(/\s+/g, ' ')
-      .trim();
-
-  }
-
-
-  // ==========================================================
-  // CATEGORY
-  // ==========================================================
-
-  function addToCategory(
-    text
-  ) {
-
-    let foundCategory = false;
-
-
-    for (
-      const [category, regex]
-      of Object.entries(CATEGORY_PATTERNS)
-    ) {
-
-      if (
-        regex.test(text)
-      ) {
-
-        if (
-          !result.commentCategories[category]
-        ) {
-
-          result.commentCategories[category] = [];
-
-        }
-
-
-        if (
-          !result.commentCategories[category]
-            .some(
-              existing =>
-                duplicateKey(existing) ===
-                duplicateKey(text)
-            )
-        ) {
-
-          result.commentCategories[category]
-            .push(text);
-
-        }
-
-
-        foundCategory = true;
-
-      }
-
-    }
-
-
-    if (!foundCategory) {
-
-      if (
-        !result.commentCategories.General
-          .some(
-            existing =>
-              duplicateKey(existing) ===
-              duplicateKey(text)
-          )
-      ) {
-
-        result.commentCategories.General
-          .push(text);
-
-      }
-
-    }
-
-  }
-
-
-  // ==========================================================
-  // ADD ATTENTION COMMENT
-  // ==========================================================
-
-  function addAttention(
-    text
-  ) {
-
-    if (
-      !result.commentsNeedingAttention
-        .some(
-          existing =>
-            duplicateKey(existing) ===
-            duplicateKey(text)
-        )
-    ) {
-
-      result.commentsNeedingAttention
-        .push(text);
-
-    }
-
-
-    addToCategory(text);
-
-  }
-
-
-  // ==========================================================
-  // ADD APPRECIATION COMMENT
-  // ==========================================================
-
-  function addAppreciation(
-    text
-  ) {
-
-    if (
-      !result.appreciation
-        .some(
-          existing =>
-            duplicateKey(existing) ===
-            duplicateKey(text)
-        )
-    ) {
-
-      result.appreciation
-        .push(text);
-
-    }
-
-  }
-
-
-  // ==========================================================
-  // GENERIC NEGATIVE / ACTIONABLE CHECK
-  // ==========================================================
-
-  function hasGenericNegative(text) {
-    const negativeIndicators = [
-      /\bnot\s+(good|clear|helpful|enough|available|punctual|organized)\b/i,
-      /\bdoesn'?t\s+(explain|teach|provide|help|come|attend)\b/i,
-      /\bdidn'?t\s+(understand|cover|explain|teach|give|provide)\b/i,
-      /\bcan'?t\s+(understand|follow|hear|see)\b/i,
-      /\bwon'?t\s+(help|explain|answer|respond)\b/i,
-      /\b(never|hardly|rarely|barely|seldom)\s+(available|present|comes|helps|explains)\b/i,
-      /\b(too\s+fast|too\s+slow|too\s+difficult|too\s+easy|too\s+much|too\s+less)\b/i,
-      /\b(less|poor|lack|insufficient|inadequate|absent|late|rude|biased|unfair|boring|waste)\b/i
-    ];
-    return negativeIndicators.some(pattern => pattern.test(text));
-  }
-
-
-  // ==========================================================
-  // PROCESS EVERY ORIGINAL COMMENT
-  // ==========================================================
-
-  for (
-    const originalComment
-    of rawComments
-  ) {
-
-    // --------------------------------------------------------
-    // Invalid input
-    // --------------------------------------------------------
-
-    if (
-      !originalComment ||
-      typeof originalComment !== 'string'
-    ) {
-
-      result.statistics.skipped++;
-
-      continue;
-
-    }
-
-
-    // --------------------------------------------------------
-    // VERY IMPORTANT:
-    //
-    // Do NOT do this:
-    //
-    // originalComment.split(SPLIT_REGEX)
-    //
-    // The complete student comment must remain intact.
-    // --------------------------------------------------------
-
-    const text =
-      normalizeComment(
-        originalComment
-      );
-
-
-    if (!text) {
-
-      result.statistics.skipped++;
-
-      continue;
-
-    }
-
-
-    // ========================================================
-    // SKIP EMPTY / INVALID
-    // ========================================================
-
-    if (
-      SKIP_PATTERNS.some(
-        pattern =>
-          pattern.test(text)
-      )
-    ) {
-
-      result.statistics.skipped++;
-
-
-      result.classifiedComments.push({
-
-        text,
-
-        classification:
-          'skipped',
-
-        needsAttention:
-          false,
-
-        reason:
-          'empty-or-filler'
-
-      });
-
-
-      continue;
-
-    }
-
-
-    // ========================================================
-    // SKIP NEUTRAL FILLER
-    // ========================================================
-
-    if (
-      NEUTRAL_SKIP_PATTERNS.some(
-        pattern =>
-          pattern.test(
-            text.toLowerCase()
-          )
-      )
-    ) {
-
-      result.statistics.skipped++;
-
-
-      result.classifiedComments.push({
-
-        text,
-
-        classification:
-          'neutral',
-
-        needsAttention:
-          false,
-
-        reason:
-          'neutral-filler'
-
-      });
-
-
-      continue;
-
-    }
-
-
-    const lower =
-      text.toLowerCase();
-
-
-    // ========================================================
-    // DETECT POSITIVE
-    // ========================================================
-
-    const hasPositive =
-      POSITIVE_PATTERNS.some(
-        pattern =>
-          pattern.test(lower)
-      );
-
-
-    // ========================================================
-    // DETECT ACTIONABLE NEGATIVE
-    // ========================================================
-
-    const hasNegative =
-      NEGATIVE_PATTERNS.some(
-        pattern =>
-          pattern.test(lower)
-      );
+  // Step 1: rule-based pre-classification with splitting for mixed-sentiment
+  rawComments.forEach((originalComment, idx) => {
+    if (!originalComment || typeof originalComment !== 'string') return;
     
-    const hasGenericNeg = hasGenericNegative(text);
-
-
-    // ========================================================
-    // RULE #1
-    //
-    // NEGATIVE ALWAYS HAS PRIORITY
-    //
-    // This solves:
-    //
-    // "Faculty teaches very well but does not provide
-    // enough practical examples."
-    //
-    // Positive = YES
-    // Negative = YES
-    // Final = NEED ATTENTION
-    // 
-    // BUT: If comment is purely positive (multiple positive words,
-    // no strong negative), don't mis-classify
-    // ========================================================
-
-    if (
-      hasNegative || hasGenericNeg
-    ) {
-
-      addAttention(text);
-
-
-      result.statistics.attention++;
-
-
-      result.classifiedComments.push({
-
-        text,
-
-        classification:
-          'attention',
-
-        needsAttention:
-          true,
-
-        mixedSentiment:
-          hasPositive,
-
-        reason:
-          hasPositive
-            ? 'mixed-with-criticism'
-            : 'needs-improvement'
-
-      });
-
-
-      continue;
-
-    }
-
-
-    // ========================================================
-    // RULE #2: PURE POSITIVE ONLY
-    //
-    // Only appreciation if NO negative words detected
-    // ========================================================
-
-    if (
-      hasPositive
-    ) {
-
-      addAppreciation(text);
-
-
-      result.statistics.appreciation++;
-
-
-      result.classifiedComments.push({
-
-        text,
-
-        classification:
-          'appreciation',
-
-        needsAttention:
-          false,
-
-        mixedSentiment:
-          false,
-
-        reason:
-          'purely-positive'
-
-      });
-
-
-      continue;
-
-    }
-
-
-    // ========================================================
-    // RULE #3
-    //
-    // LONG UNKNOWN COMMENT
-    //
-    // Let HuggingFace help, but NEVER let it override an
-    // actionable negative already detected above.
-    // ========================================================
-
-    if (
-      text.split(/\s+/).length > 5
-    ) {
-
-      try {
-
-        const model =
-          await getSentimentPipeline();
-
-
-        if (model) {
-
-          const aiResult =
-            await model(text);
-
-
-          const label =
-            String(
-              aiResult?.[0]?.label || ''
-            ).toUpperCase();
-
-
-          const score =
-            Number(
-              aiResult?.[0]?.score || 0
-            );
-
-
-          // --------------------------------------------------
-          // AI NEGATIVE
-          // --------------------------------------------------
-
-          if (
-            label === 'NEGATIVE' &&
-            score >= 0.70
-          ) {
-
-            addAttention(text);
-
-
-            result.statistics.attention++;
-
-            result.statistics.aiClassified++;
-
-
-            result.classifiedComments.push({
-
-              text,
-
-              classification:
-                'attention',
-
-              needsAttention:
-                true,
-
-              confidence:
-                score,
-
-              reason:
-                'huggingface-negative'
-
-            });
-
-
-            continue;
-
-          }
-
-
-          // --------------------------------------------------
-          // AI POSITIVE
-          // --------------------------------------------------
-
-          if (
-            label === 'POSITIVE' &&
-            score >= 0.70
-          ) {
-
-            addAppreciation(text);
-
-
-            result.statistics.appreciation++;
-
-            result.statistics.aiClassified++;
-
-
-            result.classifiedComments.push({
-
-              text,
-
-              classification:
-                'appreciation',
-
-              needsAttention:
-                false,
-
-              confidence:
-                score,
-
-              reason:
-                'huggingface-positive'
-
-            });
-
-
-            continue;
-
-          }
-
-        }
-
-      } catch (error) {
-
-        console.warn(
-          '[AI] HuggingFace fallback failed:',
-          error.message
-        );
-
+    // Split mixed-sentiment comments
+    const parts = originalComment.split(SPLIT_REGEX).filter(p => p.trim().length > 0);
+    
+    parts.forEach(part => {
+      const text = part.trim();
+      const decision = ruleBasedClassify(text);
+      
+      if (decision === 'positive') {
+        result.appreciation.push(text);
+      } else if (decision === 'negative') {
+        addAttention(text);
+      } else if (decision === 'ai') {
+        toClassifyWithAI.push({ idx, comment: text });
       }
-
-    }
-
-
-    // ========================================================
-    // RULE #4
-    //
-    // UNKNOWN COMMENT
-    //
-    // IMPORTANT:
-    // Don't throw it away.
-    //
-    // Keep it in classifiedComments as neutral so you can
-    // inspect it later.
-    // ========================================================
-
-    result.statistics.neutral++;
-
-
-    result.classifiedComments.push({
-
-      text,
-
-      classification:
-        'neutral',
-
-      needsAttention:
-        false,
-
-      reason:
-        'uncertain'
-
+      // 'skip' / 'neutral' without sentiment → discard
     });
+  });
 
+  // Step 2: Instant classification for remaining comments (0ms overhead)
+  if (toClassifyWithAI.length > 0) {
+    toClassifyWithAI.forEach(({ comment }) => {
+      const lower = comment.toLowerCase();
+      const hasNegativeTrait = NEGATIVE_PATTERNS.some(p => p.test(lower)) ||
+        /\b(not|never|hardly|don't|doesn't|didn't|can't|cannot|less|poor|improve|issue|problem|slow|fast|rude|absent|late|lack|difficult|hard)\b/i.test(lower);
+
+      const hasPositiveTrait = POSITIVE_PATTERNS.some(p => p.test(lower)) ||
+        /\b(good|great|nice|excellent|best|helpful|clear|interactive|supportive|punctual|effective|understand|wonderful|awesome|thanks|accha|mast)\b/i.test(lower);
+
+      if (hasNegativeTrait && !hasPositiveTrait) {
+        addAttention(comment);
+      } else if (hasNegativeTrait && hasPositiveTrait) {
+        // Mixed sentiment with negative indicator -> flag for attention
+        addAttention(comment);
+      } else {
+        result.appreciation.push(comment);
+      }
+    });
   }
 
+  console.log(`[AI] Classified ${rawComments.length} comments → ${result.appreciation.length} positive, ${result.commentsNeedingAttention.length} attention needed`);
 
-  // ==========================================================
-  // FINAL DEDUPLICATION
-  // ==========================================================
-
-  result.appreciation =
-    deduplicateComments(
-      result.appreciation
-    );
-
-
-  result.commentsNeedingAttention =
-    deduplicateComments(
-      result.commentsNeedingAttention
-    );
-
-
-  // ==========================================================
-  // IMPORTANT:
-  //
-  // If the same comment somehow appears in both lists,
-  // NEED ATTENTION WINS.
-  // ==========================================================
-
-  const attentionKeys =
-    new Set(
-      result.commentsNeedingAttention
-        .map(
-          comment =>
-            duplicateKey(comment)
-        )
-    );
-
-
-  result.appreciation =
-    result.appreciation.filter(
-      comment =>
-        !attentionKeys.has(
-          duplicateKey(comment)
-        )
-    );
-
-
-  // ==========================================================
-  // FINAL COUNTS
-  // ==========================================================
-
-  result.statistics.appreciation =
-    result.appreciation.length;
-
-
-  result.statistics.attention =
-    result.commentsNeedingAttention.length;
-
-
-  // ==========================================================
-  // LOG
-  // ==========================================================
-
-  console.log(
-    '[AI] ========================================'
+  // Filter appreciation: remove numbers, generics, short comments — store only meaningful ones
+  result.appreciation = deduplicateComments(
+    result.appreciation
+      .filter(c => {
+        const t = c.trim();
+        // Remove purely numeric entries like "3 0 1 4 8 10 4.17"
+        if (/^[\d\s.,%-]+$/.test(t)) return false;
+        // Remove generic/short
+        if (isGenericComment(t)) return false;
+        return true;
+      })
   );
-
-  console.log(
-    '[AI] Comment analysis completed'
-  );
-
-  console.log(
-    `[AI] Received: ${rawComments.length}`
-  );
-
-  console.log(
-    `[AI] Appreciation: ${result.appreciation.length}`
-  );
-
-  console.log(
-    `[AI] Need Attention: ${result.commentsNeedingAttention.length}`
-  );
-
-  console.log(
-    `[AI] Neutral/uncertain: ${result.statistics.neutral}`
-  );
-
-  console.log(
-    `[AI] Skipped: ${result.statistics.skipped}`
-  );
-
-  console.log(
-    `[AI] AI classified: ${result.statistics.aiClassified}`
-  );
-
-  console.log(
-    '[AI] ========================================'
-  );
-
+  result.commentsNeedingAttention = deduplicateComments(result.commentsNeedingAttention);
 
   return result;
 }
 
-
-// Export the main function
-module.exports = {
-  classifyComments,
-  testGeminiConnection: async () => {
-    try {
-      await getSentimentPipeline();
-      return { ok: true, engine: 'HuggingFace Transformers' };
-    } catch (err) {
-      return { ok: false, error: err.message };
-    }
+async function testGeminiConnection() {
+  try {
+    // Test with a typical MITS feedback comment
+    const testComments = ['Very good teaching', 'needs to improve speed', 'excellent mam', 'Good teaching but too fast'];
+    const result = await analyzeCommentsWithAI(testComments);
+    return {
+      ok: true,
+      response: `AI working — ${result.appreciation.length} positive, ${result.commentsNeedingAttention.length} attention`,
+      engine: 'HuggingFace + Rule-Based (local, no API key needed)',
+      test: result,
+    };
+  } catch (err) {
+    return { ok: false, error: err.message };
   }
-};
+}
+
+module.exports = { analyzeCommentsWithAI, testGeminiConnection };

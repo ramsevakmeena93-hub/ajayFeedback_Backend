@@ -1,22 +1,22 @@
-# 🚀 MITS Faculty Feedback System - Deployment Status
+# ≡ƒÜÇ MITS Faculty Feedback System - Deployment Status
 
-## ✅ Code Updates Completed
+## Γ£à Code Updates Completed
 
 ### 1. **Backend Code Fixed**
-- ✅ Fixed `render.yaml` to use `MONGO_URI` instead of `MONGODB_URI`
-- ✅ Updated `pdfAnalyzer.js` to use Google Drive service account
-- ✅ Updated `pdfGenerator.js` to use Google Drive service account
-- ✅ Both services now support domain-restricted Drive folders
-- ✅ All code pushed to GitHub
+- Γ£à Fixed `render.yaml` to use `MONGO_URI` instead of `MONGODB_URI`
+- Γ£à Updated `pdfAnalyzer.js` to use Google Drive service account
+- Γ£à Updated `pdfGenerator.js` to use Google Drive service account
+- Γ£à Both services now support domain-restricted Drive folders
+- Γ£à All code pushed to GitHub
 
 ### 2. **GitHub Repositories**
 - **Backend**: https://github.com/ramsevakmeena93-hub/ajayFeedback_Backend
 - **Frontend**: https://github.com/ramsevakmeena93-hub/ajayFeedback_Frontent
-- ✅ Auto-deploy enabled (pushes trigger redeployment)
+- Γ£à Auto-deploy enabled (pushes trigger redeployment)
 
 ---
 
-## 🔧 Manual Setup Required
+## ≡ƒöº Manual Setup Required
 
 ### **Step 1: Fix Render Backend Deployment**
 
@@ -40,8 +40,8 @@ GOOGLE_DRIVE_PRIVATE_KEY=-----BEGIN PRIVATE KEY-----\nYour_Key_Here\n-----END PR
 5. **Click "Save Changes"**
 6. **Watch deployment logs** - should see:
    ```
-   ✅ MongoDB connected
-   ✅ Server running on port 10000
+   Γ£à MongoDB connected
+   Γ£à Server running on port 10000
    ```
 
 ---
@@ -57,7 +57,7 @@ When you set Google Drive folder to "MITS domain only", the service account lose
 #### **B. Share Folder with Service Account**
 1. Go to Google Drive
 2. Find your **feedback reports folder**
-3. Right-click → **Share**
+3. Right-click ΓåÆ **Share**
 4. Paste the service account email
 5. Set permission: **Viewer**
 6. Uncheck "Notify people"
@@ -67,19 +67,19 @@ When you set Google Drive folder to "MITS domain only", the service account lose
 Your folder should now have TWO types of access:
 
 ```
-🌐 General Access:
-   └─ Anyone at Madhav Institute of Technology & Science
-      └─ Can edit
+≡ƒîÉ General Access:
+   ΓööΓöÇ Anyone at Madhav Institute of Technology & Science
+      ΓööΓöÇ Can edit
 
-👥 Shared with:
-   └─ feedback-drive-access@project-id.iam.gserviceaccount.com
-      └─ Viewer
+≡ƒæÑ Shared with:
+   ΓööΓöÇ feedback-drive-access@project-id.iam.gserviceaccount.com
+      ΓööΓöÇ Viewer
 ```
 
 This allows:
-- ✅ MITS faculty can upload/edit
-- ✅ Service account (AI) can read
-- ❌ External users blocked
+- Γ£à MITS faculty can upload/edit
+- Γ£à Service account (AI) can read
+- Γ¥î External users blocked
 
 #### **D. Test Drive Access**
 ```bash
@@ -94,9 +94,9 @@ node test_drive_link_access.js
 
 **Expected output:**
 ```
-✅ File metadata access successful!
-✅ File download successful!
-🎉 All tests passed!
+Γ£à File metadata access successful!
+Γ£à File download successful!
+≡ƒÄë All tests passed!
 ```
 
 ---
@@ -134,7 +134,7 @@ node test_drive_link_access.js
 
 ---
 
-## 🧪 Testing Checklist
+## ≡ƒº¬ Testing Checklist
 
 After all setup is complete:
 
@@ -151,34 +151,34 @@ After all setup is complete:
 
 ---
 
-## 📊 System Architecture
+## ≡ƒôè System Architecture
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                   FRONTEND                          │
-│              Vercel (React + Vite)                  │
-│         https://your-app.vercel.app                 │
-└──────────────────┬──────────────────────────────────┘
-                   │
-                   │ API Calls
-                   │
-┌──────────────────▼──────────────────────────────────┐
-│                   BACKEND                           │
-│           Render (Node.js + Express)                │
-│   https://faculty-feedback-backend.onrender.com     │
-└──────┬─────────────────────┬────────────────────────┘
-       │                     │
-       │                     │
-       ▼                     ▼
-┌─────────────┐      ┌──────────────────┐
-│   MongoDB   │      │  Google Drive    │
-│   (Atlas)   │      │  (Service Acc)   │
-└─────────────┘      └──────────────────┘
+ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ
+Γöé                   FRONTEND                          Γöé
+Γöé              Vercel (React + Vite)                  Γöé
+Γöé         https://your-app.vercel.app                 Γöé
+ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓö¼ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ
+                   Γöé
+                   Γöé API Calls
+                   Γöé
+ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓû╝ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ
+Γöé                   BACKEND                           Γöé
+Γöé           Render (Node.js + Express)                Γöé
+Γöé   https://faculty-feedback-backend.onrender.com     Γöé
+ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓö¼ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓö¼ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ
+       Γöé                     Γöé
+       Γöé                     Γöé
+       Γû╝                     Γû╝
+ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ      ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ
+Γöé   MongoDB   Γöé      Γöé  Google Drive    Γöé
+Γöé   (Atlas)   Γöé      Γöé  (Service Acc)   Γöé
+ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ      ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ
 ```
 
 ---
 
-## 🔐 Security Features
+## ≡ƒöÉ Security Features
 
 1. **Domain Restriction**: Only @mitsgwl.ac.in and @mitsgwalior.in emails can login
 2. **Google Drive**: Folder restricted to MITS domain + service account access
@@ -188,7 +188,7 @@ After all setup is complete:
 
 ---
 
-## 📝 Key Files
+## ≡ƒô¥ Key Files
 
 ### Backend
 - `server.js` - Main server file
@@ -208,18 +208,18 @@ After all setup is complete:
 
 ---
 
-## 🎯 Next Steps
+## ≡ƒÄ» Next Steps
 
-1. ✅ Complete Render environment variable setup
-2. ✅ Share Drive folder with service account
-3. ✅ Deploy frontend to Vercel
-4. ✅ Update FRONTEND_URL in Render
-5. ✅ Run complete system test
-6. 🚀 Go live!
+1. Γ£à Complete Render environment variable setup
+2. Γ£à Share Drive folder with service account
+3. Γ£à Deploy frontend to Vercel
+4. Γ£à Update FRONTEND_URL in Render
+5. Γ£à Run complete system test
+6. ≡ƒÜÇ Go live!
 
 ---
 
-## 📞 Support
+## ≡ƒô₧ Support
 
 If issues occur:
 1. Check Render logs for backend errors

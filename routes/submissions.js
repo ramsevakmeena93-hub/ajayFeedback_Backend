@@ -13,7 +13,7 @@ const {
 } = require('./middleware');
 
 // ─────────────────────────────────────────────────────────────────────────────
-// HOD: Send reports to Pro-VC
+// HOD: Send reports to VC
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
@@ -164,7 +164,7 @@ router.post('/send',
         actorRole:   req.user.role,
         workspace:   req.user.activeWorkspace || 'hod',
         event:       'submission_approved',  // using closest enum; status is 'submitted'
-        description: `HOD submitted ${reports.length} report(s) to Pro-VC. Status: ${submissionStatus}`,
+        description: `HOD submitted ${reports.length} report(s) to VC. Status: ${submissionStatus}`,
         targetType:  'submission',
         targetId:    submission._id,
         meta:        { reportCount: reports.length, status: submissionStatus },
@@ -173,7 +173,7 @@ router.post('/send',
       res.json({
         message: conflictCheck.conflict
           ? `Reports submitted with conflict status: ${submissionStatus}`
-          : 'Reports sent to Pro-VC successfully',
+          : 'Reports sent to VC successfully',
         submission,
         conflict: conflictCheck.conflict ? {
           detected:           true,
@@ -250,7 +250,7 @@ router.get('/faculty', authMiddleware, requireAnyRole('faculty'), async (req, re
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Pro-VC: Get all submissions
+// VC: Get all submissions
 // ─────────────────────────────────────────────────────────────────────────────
 
 router.get('/all', authMiddleware, requireRole('vc'), async (req, res) => {
@@ -271,7 +271,7 @@ router.get('/all', authMiddleware, requireRole('vc'), async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Pro-VC / alternate-approver: Update submission status
+// VC / alternate-approver: Update submission status
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
@@ -286,13 +286,13 @@ router.get('/all', authMiddleware, requireRole('vc'), async (req, res) => {
 router.patch('/:id/status', authMiddleware, async (req, res) => {
     try {
       const User = require('../models/User');
-      // Determine if caller is Pro-VC or an authorized alternate approver
+      // Determine if caller is VC or an authorized alternate approver
       const callerRoles = new Set([
         ...(req.user?.roles || []),
         ...(req.user?.role ? [req.user.role] : []),
       ]);
 
-    const isVC    = callerRoles.has('vc');  // Pro-VC role
+    const isVC    = callerRoles.has('vc');
     const isAdmin = callerRoles.has('admin');
 
     if (!isVC && !isAdmin) {
@@ -302,7 +302,7 @@ router.patch('/:id/status', authMiddleware, async (req, res) => {
 
       const isAlternate = sub.alternateApproverId?.toString() === req.user.id.toString();
       if (!isAlternate) {
-        return res.status(403).json({ error: 'Access denied — only Pro-VC or the designated alternate approver can update this submission' });
+        return res.status(403).json({ error: 'Access denied — only VC or the designated alternate approver can update this submission' });
       }
       // Alternate can only act on 'conflict' submissions
       if (sub.status !== 'conflict') {
@@ -373,7 +373,7 @@ router.patch('/:id/status', authMiddleware, async (req, res) => {
           });
         }
       } catch (emailErr) {
-        console.warn('[Email] Pro-VC status email failed:', emailErr.message);
+        console.warn('[Email] VC status email failed:', emailErr.message);
       }
     }
 

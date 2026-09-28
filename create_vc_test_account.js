@@ -27,11 +27,11 @@ async function main() {
   try {
     console.log('[Setup] Connecting to MongoDB...');
     await mongoose.connect(MONGO_URI);
-    console.log('[Setup] ✅ Connected to MongoDB\n');
+    console.log('[Setup] Γ£à Connected to MongoDB\n');
 
-    // ═══════════════════════════════════════════════════════════════
+    // ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
     // STEP 1: Find HOD
-    // ═══════════════════════════════════════════════════════════════
+    // ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
     console.log('[Step 1] Finding HOD account...');
     const hod = await User.findOne({ email: HOD_EMAIL });
     
@@ -65,28 +65,28 @@ async function main() {
         }
       ]);
 
-      console.log(`[Setup] ✅ Created HOD: ${HOD_NAME} (${HOD_EMAIL})`);
+      console.log(`[Setup] Γ£à Created HOD: ${HOD_NAME} (${HOD_EMAIL})`);
       console.log(`[Setup]    Password: shivam123`);
       console.log(`[Setup]    Department: Humanities\n`);
       
       return; // Exit - user needs to upload reports first
     }
 
-    console.log(`[Step 1] ✅ Found HOD: ${hod.name} (${hod.email})`);
+    console.log(`[Step 1] Γ£à Found HOD: ${hod.name} (${hod.email})`);
     console.log(`[Step 1]    ID: ${hod._id}`);
     console.log(`[Step 1]    Role: ${hod.role}`);
     console.log(`[Step 1]    Department: ${hod.department}\n`);
 
-    // ═══════════════════════════════════════════════════════════════
+    // ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
     // STEP 2: Find HOD's reports
-    // ═══════════════════════════════════════════════════════════════
+    // ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
     console.log('[Step 2] Finding HOD reports...');
     const reports = await FacultyReport.find({ hodId: hod._id });
     
-    console.log(`[Step 2] ✅ Found ${reports.length} reports`);
+    console.log(`[Step 2] Γ£à Found ${reports.length} reports`);
     
     if (reports.length === 0) {
-      console.log('[Step 2] ⚠️  No reports found!');
+      console.log('[Step 2] ΓÜá∩╕Å  No reports found!');
       console.log('[Step 2]    Please upload Excel file as HOD first.');
       console.log('[Step 2]    Then run this script again.\n');
       process.exit(0);
@@ -102,15 +102,15 @@ async function main() {
     }
     console.log('');
 
-    // ═══════════════════════════════════════════════════════════════
+    // ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
     // STEP 3: Create/Find VC account
-    // ═══════════════════════════════════════════════════════════════
+    // ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
     console.log('[Step 3] Creating VC test account...');
     
     let vc = await User.findOne({ email: VC_EMAIL });
     
     if (vc) {
-      console.log(`[Step 3] ✅ VC account already exists: ${vc.name}`);
+      console.log(`[Step 3] Γ£à VC account already exists: ${vc.name}`);
       
       // Update to VC role if needed
       if (vc.role !== 'vc') {
@@ -129,7 +129,7 @@ async function main() {
           active: true
         });
         
-        console.log(`[Step 3] ✅ Updated to VC role`);
+        console.log(`[Step 3] Γ£à Updated to VC role`);
       }
     } else {
       // Create new VC account
@@ -152,7 +152,7 @@ async function main() {
         active: true
       });
 
-      console.log(`[Step 3] ✅ Created VC account`);
+      console.log(`[Step 3] Γ£à Created VC account`);
     }
 
     console.log(`[Step 3]    Name: ${vc.name}`);
@@ -160,9 +160,9 @@ async function main() {
     console.log(`[Step 3]    Password: ${VC_PASSWORD}`);
     console.log(`[Step 3]    ID: ${vc._id}\n`);
 
-    // ═══════════════════════════════════════════════════════════════
+    // ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
     // STEP 4: Update reports to faculty_approved status
-    // ═══════════════════════════════════════════════════════════════
+    // ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
     console.log('[Step 4] Updating report statuses...');
     
     const updateResult = await FacultyReport.updateMany(
@@ -170,25 +170,25 @@ async function main() {
       { status: 'faculty_approved' }
     );
     
-    console.log(`[Step 4] ✅ Updated ${updateResult.modifiedCount} reports to faculty_approved\n`);
+    console.log(`[Step 4] Γ£à Updated ${updateResult.modifiedCount} reports to faculty_approved\n`);
 
-    // ═══════════════════════════════════════════════════════════════
+    // ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
     // STEP 5: Check if submission already exists
-    // ═══════════════════════════════════════════════════════════════
+    // ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
     console.log('[Step 5] Checking existing submissions...');
     
     const existingSubmission = await Submission.findOne({ hodId: hod._id });
     
     if (existingSubmission) {
-      console.log(`[Step 5] ✅ Submission already exists`);
+      console.log(`[Step 5] Γ£à Submission already exists`);
       console.log(`[Step 5]    ID: ${existingSubmission._id}`);
       console.log(`[Step 5]    Status: ${existingSubmission.status}`);
       console.log(`[Step 5]    Reports: ${existingSubmission.reports.length}`);
       console.log(`[Step 5]    Created: ${existingSubmission.createdAt}\n`);
     } else {
-      // ═══════════════════════════════════════════════════════════════
+      // ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
       // STEP 6: Create submission to VC
-      // ═══════════════════════════════════════════════════════════════
+      // ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
       console.log('[Step 6] Creating submission to VC...');
       
       const currentYear = new Date().getFullYear();
@@ -207,7 +207,7 @@ async function main() {
         submittedFromWorkspace: 'hod'
       });
 
-      console.log(`[Step 6] ✅ Created submission`);
+      console.log(`[Step 6] Γ£à Created submission`);
       console.log(`[Step 6]    ID: ${submission._id}`);
       console.log(`[Step 6]    Status: ${submission.status}`);
       console.log(`[Step 6]    Academic Year: ${academicYear}`);
@@ -215,24 +215,24 @@ async function main() {
       console.log(`[Step 6]    Department: ${hod.department || 'Humanities'}\n`);
     }
 
-    // ═══════════════════════════════════════════════════════════════
+    // ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
     // FINAL: Show login instructions
-    // ═══════════════════════════════════════════════════════════════
-    console.log('═══════════════════════════════════════════════════════════');
-    console.log('✅ SETUP COMPLETE!');
-    console.log('═══════════════════════════════════════════════════════════\n');
+    // ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+    console.log('ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ');
+    console.log('Γ£à SETUP COMPLETE!');
+    console.log('ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ\n');
     
-    console.log('🔐 VC LOGIN CREDENTIALS:');
+    console.log('≡ƒöÉ VC LOGIN CREDENTIALS:');
     console.log(`   Email: ${VC_EMAIL}`);
     console.log(`   Password: ${VC_PASSWORD}\n`);
     
-    console.log('📊 WHAT TO DO NEXT:');
+    console.log('≡ƒôè WHAT TO DO NEXT:');
     console.log('   1. Open your frontend app');
     console.log('   2. Login with VC credentials above');
     console.log(`   3. You will see ${reports.length} reports from HOD "${HOD_NAME}"`);
     console.log('   4. Approve/Reject the submission\n');
     
-    console.log('👤 HOD ACCOUNT (for reference):');
+    console.log('≡ƒæñ HOD ACCOUNT (for reference):');
     console.log(`   Email: ${HOD_EMAIL}`);
     console.log(`   Name: ${HOD_NAME}`);
     console.log(`   Reports: ${reports.length}\n`);

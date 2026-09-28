@@ -1,12 +1,12 @@
-# 🧪 How to Test New Changes
+# ≡ƒº¬ How to Test New Changes
 
-## ⚠️ **IMPORTANT: You're Seeing Old Data!**
+## ΓÜá∩╕Å **IMPORTANT: You're Seeing Old Data!**
 
 The code changes ARE deployed, but you're seeing **old reports from the database** that were processed with the old code.
 
 ---
 
-## ✅ **Steps to See New Changes:**
+## Γ£à **Steps to See New Changes:**
 
 ### **Option 1: Delete Old Reports (Recommended)**
 
@@ -35,7 +35,7 @@ The code changes ARE deployed, but you're seeing **old reports from the database
 
 ---
 
-## 🔍 **What Changed in the Code:**
+## ≡ƒöì **What Changed in the Code:**
 
 ### **1. Comment Filters (backend/services/pdfAnalyzer.js):**
 ```javascript
@@ -66,8 +66,8 @@ const programme = courseNameParts.join('\n').trim();
 ```javascript
 // Strategy 1: Check expected column (X: 280-370)
 // Strategy 2: Wider search (X: 230-450)
-// Strategy 3: Scan nearby rows (±15 units)
-// Strategy 4: Look for "Sem: 5" or Roman numerals (I→1, IV→4, VI→6)
+// Strategy 3: Scan nearby rows (┬▒15 units)
+// Strategy 4: Look for "Sem: 5" or Roman numerals (IΓåÆ1, IVΓåÆ4, VIΓåÆ6)
 ```
 
 ### **4. Frontend Display (src/components/FeedbackTable.jsx):**
@@ -83,7 +83,7 @@ if (field === 'programme' && value) {
 
 ---
 
-## 🎯 **Expected Results After Re-Upload:**
+## ≡ƒÄ» **Expected Results After Re-Upload:**
 
 ### **Before (Old):**
 ```
@@ -107,11 +107,11 @@ Semester: 5
 
 ---
 
-## 📊 **How to Verify Deployment:**
+## ≡ƒôè **How to Verify Deployment:**
 
 1. **Check Render Logs:**
    - Go to https://dashboard.render.com
-   - Click your service → Logs
+   - Click your service ΓåÆ Logs
    - Should show: "Build successful" with latest commit hash `b71ddea`
 
 2. **Check Git Commit:**
@@ -129,15 +129,15 @@ Semester: 5
 
 ---
 
-## 🚀 **Timeline:**
+## ≡ƒÜÇ **Timeline:**
 
-- ✅ Code pushed to GitHub: **DONE**
-- ⏱️ Render auto-deploy: **3-5 minutes** (wait for this!)
-- ⏱️ Re-upload Excel: **After deployment completes**
+- Γ£à Code pushed to GitHub: **DONE**
+- ΓÅ▒∩╕Å Render auto-deploy: **3-5 minutes** (wait for this!)
+- ΓÅ▒∩╕Å Re-upload Excel: **After deployment completes**
 
 ---
 
-## ❓ **Still Not Working?**
+## Γ¥ô **Still Not Working?**
 
 If after re-upload you still see bad data:
 
@@ -148,4 +148,4 @@ If after re-upload you still see bad data:
 
 ---
 
-**The code IS changed. You just need to re-upload Excel after Render deploys!** 🎉
+**The code IS changed. You just need to re-upload Excel after Render deploys!** ≡ƒÄë

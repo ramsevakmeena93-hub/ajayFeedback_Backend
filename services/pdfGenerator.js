@@ -133,19 +133,10 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
   }
 
   // ── De-duplicate reports ──────────────────────────────────────────────────
-  const normalizeKey = value => String(value || "").toLowerCase().trim().replace(/\s+/g, " ");
   const seenR = new Set();
   const uniqueReports = reports.filter(r => {
-    const k = [
-      normalizeKey(r.facultyUserId),
-      normalizeKey(r.facultyName),
-      normalizeKey(r.subjectCode),
-      normalizeKey(r.programme),
-      normalizeKey(r.semester),
-      normalizeKey(r.academicYear),
-      normalizeKey(r.session),
-      normalizeKey(r.batch)
-    ].join("|");
+    const k = (r.facultyName || "").toLowerCase().trim() + "|" +
+              (r.subjectCode  || "").toLowerCase().trim();
     if (seenR.has(k)) return false;
     seenR.add(k);
     return true;
@@ -545,265 +536,129 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
     return url;
   }
 
-  async function downloadWithRetry(url, retries = 3) {
-    // Check if it's a Google Drive link
-    const fileIdMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)|[?&]id=([a-zA-Z0-9_-]+)/);
-    
-    if (fileIdMatch) {
-      // Google Drive link - try service account first
-      const fileId = fileIdMatch[1] || fileIdMatch[2];
-      
-      try {
-        const { google } = require('googleapis');
-        
-        // Check if service account credentials are available
-        const clientEmail = process.env.GOOGLE_DRIVE_CLIENT_EMAIL;
-        const privateKey = process.env.GOOGLE_DRIVE_PRIVATE_KEY;
-        
-        if (clientEmail && privateKey) {
-          console.log('[PDF] Using service account to download Drive file:', fileId);
-          
-          // Create authentication
-          const auth = new google.auth.GoogleAuth({
-            credentials: {
-              client_email: clientEmail,
-              private_key: privateKey.replace(/\\n/g, '\n'),
-            },
-            scopes: ['https://www.googleapis.com/auth/drive.readonly'],
-          });
-          
-          const drive = google.drive({ version: 'v3', auth });
-          
-          // Download file using Drive API
-          const response = await drive.files.get({
-            fileId: fileId,
-            alt: 'media',
-          }, {
-            responseType: 'arraybuffer'
-          });
-          
-          const buf = Buffer.from(response.data);
-          
-          // Validate PDF header
-          const header = buf.subarray(0, 5).toString("latin1");
-          if (header !== "%PDF-") {
-            throw new Error("Downloaded response is not a PDF. Header: " + JSON.stringify(header));
-          }
-          if (buf.length < 1000) {
-            throw new Error("Downloaded PDF is too small");
-          }
-          
-          console.log(`[PDF] Valid PDF downloaded via service account: ${buf.length} bytes`);
-          return buf;
-        } else {
-          console.warn('[PDF] Service account credentials not found, falling back to public download');
-        }
-      } catch (error) {
-        console.error('[PDF] Service account download failed:', error.message);
-        console.log('[PDF] Falling back to public download method');
-      }
-    }
-    
-    // Fallback: Use public download (works if file is publicly accessible)
+  async function downloadWithRetry(url, retries = 2) {
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
         const res = await axios.get(url, {
           responseType: "arraybuffer",
-          timeout: 20000,
-          headers: {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/153 Safari/537.36",
-            Accept: "application/pdf,*/*"
-          },
-          maxRedirects: 10,
-          validateStatus: status => status >= 200 && status < 300
+          timeout: 15000,
+          headers: { "User-Agent": "Mozilla/5.0" },
+          maxRedirects: 10
         });
         const buf = Buffer.from(res.data);
-        // Must be a real PDF
-        const header = buf.subarray(0, 5).toString("latin1");
-        if (header !== "%PDF-") {
-          throw new Error("Downloaded response is not a PDF. Header: " + JSON.stringify(header));
-        }
-        if (buf.length < 1000) {
-          throw new Error("Downloaded PDF is too small");
-        }
-        console.log(`[PDF] Valid PDF downloaded: ${buf.length} bytes`);
-        return buf;
+        if (buf.subarray(0, 4).toString() !== "%PDF") throw new Error("Not a PDF");
+        return res.data;
       } catch (err) {
-        console.warn(`[PDF] Attempt ${attempt}/${retries}: ${err.message}`);
-        if (attempt < retries) {
-          await new Promise(resolve => setTimeout(resolve, 1500 * attempt));
-        }
+        console.warn("[PDF] Attempt " + attempt + ": " + err.message);
+        if (attempt < retries) await new Promise(r => setTimeout(r, 1000 * attempt));
       }
     }
     return null;
   }
 
-  // ── Append original faculty PDFs safely ─────────────────────────────────────
   const seenLinks = new Set();
   if (!isPreview) {
+  // Wrap entire Drive download + append in a 25s timeout so Render never kills the response
+  const appendTimeout = new Promise(resolve => setTimeout(resolve, 25000));
+  try {
+  await Promise.race([
+    (async () => {
+  // Download PDFs in parallel with concurrency limit to avoid timeout
+  const downloadQueue = [];
+  for (let ri = 0; ri < uniqueReports.length; ri++) {
+    const rp = uniqueReports[ri];
+    const raw = rp.driveLink || rp.pdfLink;
+    if (!raw || raw.startsWith("uploaded:")) continue;
+    const lk = convertDriveLink(raw);
+    if (!lk || seenLinks.has(lk)) continue;
+    seenLinks.add(lk);
+    downloadQueue.push({ rp, lk });
+  }
+
+  // Download all in parallel (max 3 at a time)
+  const pLimit = require('p-limit');
+  const limit = pLimit(3);
+  const downloadResults = await Promise.all(
+    downloadQueue.map(({ rp, lk }) =>
+      limit(async () => {
+        console.log("[PDF] Downloading for " + rp.facultyName + "...");
+        const data = await downloadWithRetry(lk);
+        return { rp, data };
+      })
+    )
+  );
+
+  for (const { rp, data } of downloadResults) {
+    if (!data) { console.warn("[PDF] Skipped " + rp.facultyName); continue; }
+
     try {
-      const downloadQueue = [];
-      // ---------------------------------------------------------
-      // STEP 1: Build unique download queue
-      // ---------------------------------------------------------
-      for (let ri = 0; ri < uniqueReports.length; ri++) {
-        const rp = uniqueReports[ri];
-        const raw = rp.driveLink || rp.pdfLink;
-        if (!raw) continue;
-        if (String(raw).startsWith("uploaded:")) {
-          continue;
-        }
-        const lk = convertDriveLink(raw);
-        if (!lk) continue;
-        if (seenLinks.has(lk)) {
-          continue;
-        }
-        seenLinks.add(lk);
-        downloadQueue.push({ rp, lk });
-      }
-      console.log(`[PDF] Preparing ${downloadQueue.length} original PDF(s)`);
+      const srcDoc = await PDFDocument.load(data);
+      const copied = await pdfDoc.copyPages(srcDoc, srcDoc.getPageIndices());
+      const pagesBefore = pdfDoc.getPageCount();
+      copied.forEach(p => pdfDoc.addPage(p));
 
-      // ---------------------------------------------------------
-      // STEP 2: Download first
-      //
-      // IMPORTANT:
-      // We do NOT modify pdfDoc during downloading.
-      // ---------------------------------------------------------
-      const pLimit = require("p-limit");
-      const limit = pLimit(3);
-      const downloadResults = await Promise.all(
-        downloadQueue.map(({ rp, lk }) =>
-          limit(async () => {
-            try {
-              console.log("[PDF] Downloading for " + (rp.facultyName || "Unknown Faculty") + "...");
-              const data = await downloadWithRetry(lk, 3);
-              if (!data) {
-                return { rp, data: null, error: "PDF download failed" };
-              }
-              const buffer = Buffer.isBuffer(data) ? data : Buffer.from(data);
-              // Validate PDF header
-              const header = buffer.subarray(0, 5).toString("latin1");
-              if (header !== "%PDF-") {
-                return { rp, data: null, error: "Downloaded file is not a valid PDF. Header: " + JSON.stringify(header) };
-              }
-              if (buffer.length < 1000) {
-                return { rp, data: null, error: "Downloaded PDF is unexpectedly small" };
-              }
-              return { rp, data: buffer, error: null };
-            } catch (downloadErr) {
-              console.warn("[PDF] Download failed for " + (rp.facultyName || "Unknown Faculty") + ": " + downloadErr.message);
-              return { rp, data: null, error: downloadErr.message };
-            }
-          })
-        )
-      );
-      console.log(`[PDF] Download phase completed: ${downloadResults.length} file(s)`);
-
-      // ---------------------------------------------------------
-      // STEP 3: ONLY NOW modify pdfDoc
-      // ---------------------------------------------------------
-      for (const result of downloadResults) {
-        const { rp, data, error } = result;
-        if (!data) {
-          console.warn("[PDF] Skipping " + (rp.facultyName || "Unknown Faculty") + ": " + (error || "No PDF data"));
-          continue;
-        }
+      // Stamp HOD + VC signatures — wrapped in try/catch so stamp failure never kills PDF gen
+      if (!withoutSignatures) {
         try {
-          console.log("[PDF] Appending PDF for " + (rp.facultyName || "Unknown Faculty"));
-          // Load source PDF
-          const srcDoc = await PDFDocument.load(data);
-          const sourcePageIndices = srcDoc.getPageIndices();
-          if (!sourcePageIndices || sourcePageIndices.length === 0) {
-            console.warn("[PDF] No pages found for " + (rp.facultyName || "Unknown Faculty"));
-            continue;
-          }
-          // Remember where this faculty's pages start
-          const pagesBefore = pdfDoc.getPageCount();
-          // Copy pages
-          const copied = await pdfDoc.copyPages(srcDoc, sourcePageIndices);
-          // Add copied pages
-          for (const copiedPage of copied) {
-            pdfDoc.addPage(copiedPage);
-          }
-          console.log("[PDF] Added " + copied.length + " page(s) for " + (rp.facultyName || "Unknown Faculty"));
+          const fSig = facultySigMap[(rp.facultyName || "").toLowerCase().trim()];
+          const pdfjsLib = require("pdfjs-dist/legacy/build/pdf.js");
+          const rawUint8 = new Uint8Array(data);
+          const pdfJsDoc = await pdfjsLib.getDocument({ data: rawUint8 }).promise;
 
-          // -----------------------------------------------------
-          // STEP 4: Signature stamping
-          // -----------------------------------------------------
-          if (!withoutSignatures) {
-            try {
-              const fSig = facultySigMap[(rp.facultyName || "").toLowerCase().trim()];
-              const pdfjsLib = require("pdfjs-dist/legacy/build/pdf.js");
-              const rawUint8 = new Uint8Array(data);
-              const pdfJsDoc = await pdfjsLib.getDocument({
-                data: rawUint8,
-                useWorkerFetch: false,
-                isEvalSupported: false
-              }).promise;
+          let sigPageIdx = null;
+          let facItem = null;
+          let hodItem = null;
+          let vcItem = null;
 
-              let sigPageIdx = null;
-              let facItem = null;
-              let hodItem = null;
-              let vcItem = null;
-
-              // Find the page containing HOD
-              for (let pi = 1; pi <= pdfJsDoc.numPages; pi++) {
-                const pg = await pdfJsDoc.getPage(pi);
-                const tc = await pg.getTextContent();
-                const items = Array.isArray(tc.items) ? tc.items : [];
-                const foundHod = items.find(item =>
-                  String(item.str || "").trim().toUpperCase() === "HOD"
-                );
-                if (!foundHod) {
-                  continue;
-                }
-                sigPageIdx = pi - 1;
-                hodItem = foundHod;
-                facItem = items.find(item => {
-                  const value = String(item.str || "").trim();
-                  return value.includes("Signature") && !value.includes("Faculty Name & Signature");
-                });
-                if (!facItem) {
-                  facItem = items.find(item => /Faculty/i.test(String(item.str || "")));
-                }
-                vcItem = items.find(item => /PRO\s*-?\s*VC/i.test(String(item.str || "")));
-                break;
-              }
-
-              // Stamp signatures if signature page exists
-              if (sigPageIdx !== null) {
-                const targetPage = pdfDoc.getPage(pagesBefore + sigPageIdx);
-                const SIG_W = 75;
-                const drawSig = (sigImg, labelItem, defaultX, paddingX = 10, sigW = SIG_W) => {
-                  if (!sigImg) return;
-                  const itemX = labelItem ? Number(labelItem.transform?.[4]) || 0 : null;
-                  const itemW = labelItem ? Number(labelItem.width) || 0 : 0;
-                  const itemY = labelItem ? Number(labelItem.transform?.[5]) || 100 : 100;
-                  const x = itemX !== null ? itemX + itemW + paddingX : defaultX;
-                  const h = sigImg.width > 0 ? Math.min(sigW * (sigImg.height / sigImg.width), 22) : 18;
-                  targetPage.drawImage(sigImg, { x, y: itemY - 6, width: sigW, height: h });
-                };
-                drawSig(fSig, facItem, 250, 10);
-                drawSig(hodSig, hodItem, 380, 10);
-                drawSig(vcSig, vcItem, 545, 10, 45);
-                console.log("[PDF] Signatures stamped for " + (rp.facultyName || "Unknown Faculty"));
-              }
-            } catch (stampErr) {
-              // Signature failure must NEVER invalidate the final PDF.
-              console.warn("[PDF] Signature stamping skipped for " + (rp.facultyName || "Unknown Faculty") + ": " + stampErr.message);
+          for (let pi = 1; pi <= pdfJsDoc.numPages; pi++) {
+            const pg = await pdfJsDoc.getPage(pi);
+            const tc = await pg.getTextContent();
+            const foundHod = tc.items.find(item => item.str.trim() === "HOD");
+            if (foundHod) {
+              sigPageIdx = pi - 1;
+              hodItem = foundHod;
+              facItem = tc.items.find(item => item.str.trim().includes("Signature") && !item.str.trim().includes("Faculty Name & Signature"));
+              if (!facItem) facItem = tc.items.find(item => item.str.trim().includes("Faculty"));
+              vcItem = tc.items.find(item => /PRO\s*-?\s*VC/i.test(item.str.trim()));
+              break;
             }
           }
-        } catch (appendErr) {
-          // One bad source PDF must not corrupt the complete final report.
-          console.warn("[PDF] Could not append PDF for " + (rp.facultyName || "Unknown Faculty") + ": " + appendErr.message);
-          continue;
+
+          if (sigPageIdx !== null) {
+            const targetPage = pdfDoc.getPage(pagesBefore + sigPageIdx);
+            const SIG_W = 75;
+            const baseY = hodItem ? hodItem.transform[5] : 100;
+            const drawSig = (sigImg, labelItem, defaultX, paddingX = 10, sigW = SIG_W) => {
+              if (!sigImg) return;
+              const itemX = labelItem ? labelItem.transform[4] : null;
+              const itemW = labelItem ? (labelItem.width || 0) : null;
+              const itemY = labelItem ? labelItem.transform[5] : baseY;
+              const x = (itemX !== null && itemW !== null) ? itemX + itemW + paddingX : defaultX;
+              const h = Math.min(sigW * (sigImg.height / sigImg.width), 22);
+              targetPage.drawImage(sigImg, { x, y: itemY - 6, width: sigW, height: h });
+            };
+            drawSig(fSig,  facItem, 250, 10);
+            drawSig(hodSig, hodItem, 380, 10);
+            drawSig(vcSig,  vcItem,  545, 10, 45);
+            console.log("[PDF] Stamped sigs on page " + (sigPageIdx + 1));
+          }
+        } catch (stampErr) {
+          console.warn("[PDF] Sig stamp skipped for " + rp.facultyName + ": " + stampErr.message);
         }
       }
-      console.log("[PDF] Original PDF append phase completed");
-    } catch (appendErr) {
-      console.warn("[PDF] Original PDF append phase failed. Returning main report only:", appendErr.message);
+
+      console.log("[PDF] Added " + copied.length + " pages for " + rp.facultyName);
+    } catch (err) {
+      console.warn("[PDF] Parse error for " + rp.facultyName + ": " + err.message);
     }
   }
+    })(),
+    appendTimeout
+  ]);
+  } catch (appendErr) {
+    console.warn("[PDF] Appending Drive PDFs failed — returning table PDF only:", appendErr.message);
+  }
+  } // end if (!isPreview)
 
   // ── Page numbers ──────────────────────────────────────────────────────────
   const total = pdfDoc.getPageCount();
@@ -815,20 +670,7 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
     } catch (e) {}
   }
 
-  // ── Final PDF generation with validation ──────────────────────────────────
-  const finalPdfBytes = await pdfDoc.save({ useObjectStreams: false });
-  const finalPdfBuffer = Buffer.from(finalPdfBytes);
-
-  // Final PDF validation
-  const finalHeader = finalPdfBuffer.subarray(0, 5).toString("latin1");
-  if (finalHeader !== "%PDF-") {
-    throw new Error("Final PDF generation failed: invalid PDF header " + JSON.stringify(finalHeader));
-  }
-  if (finalPdfBuffer.length < 1000) {
-    throw new Error("Final PDF generation failed: PDF is unexpectedly small (" + finalPdfBuffer.length + " bytes)");
-  }
-  console.log("[PDF] FINAL PDF READY:", finalPdfBuffer.length, "bytes");
-  return finalPdfBuffer;
+  return Buffer.from(await pdfDoc.save());
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
