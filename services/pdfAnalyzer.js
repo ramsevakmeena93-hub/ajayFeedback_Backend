@@ -587,31 +587,55 @@ async function extractMetaFromBuffer(buffer) {
             // Look in the semester column area
             let semester = '';
             
-            // First try: exact position
+            // Strategy 1: Look in expected semester column position
             const semItem = dataRowItems.find(i =>
-                i.x >= 290 && i.x < 360 && /^\d{1,2}$/.test(i.str)
+                i.x >= 280 && i.x < 370 && /^\d{1,2}$/.test(i.str)
             );
             if (semItem) {
                 semester = semItem.str;
-            } else {
-                // Second try: any single digit 1-8 in wider range
+            } 
+            
+            if (!semester) {
+                // Strategy 2: Look for ANY single digit 1-8 in wider area
                 const fallbackSem = dataRowItems.find(i => 
-                    i.x >= 250 && i.x < 400 && /^[1-8]$/.test(i.str)
+                    i.x >= 230 && i.x < 450 && /^[1-8]$/.test(i.str)
                 );
                 if (fallbackSem) {
                     semester = fallbackSem.str;
-                } else {
-                    // Third try: look near the course name for semester info
-                    const nearbyItems = items.filter(i => 
-                        Math.abs(i.y - dataY) < 10 && 
-                        i.x >= 250 && i.x < 450
-                    );
-                    for (const item of nearbyItems) {
-                        const match = item.str.match(/^\d{1,2}$/);
-                        if (match && parseInt(match[0]) >= 1 && parseInt(match[0]) <= 8) {
-                            semester = match[0];
-                            break;
-                        }
+                }
+            }
+            
+            if (!semester) {
+                // Strategy 3: Scan all nearby rows (above and below data row)
+                const nearbyItems = items.filter(i => 
+                    Math.abs(i.y - dataY) < 15 && 
+                    i.x >= 230 && i.x < 450
+                );
+                for (const item of nearbyItems) {
+                    if (/^[1-8]$/.test(item.str)) {
+                        semester = item.str;
+                        break;
+                    }
+                }
+            }
+            
+            if (!semester) {
+                // Strategy 4: Look in all items for semester near faculty/course info
+                const allNearby = items.filter(i => 
+                    Math.abs(i.y - dataY) < 25
+                );
+                for (const item of allNearby) {
+                    const match = item.str.match(/^(sem|semester|sem\.|s)\s*[:\-]?\s*([1-8])$/i);
+                    if (match) {
+                        semester = match[2];
+                        break;
+                    }
+                    // Also check for Roman numerals
+                    const romanMatch = item.str.match(/^(I{1,3}V?|V?I{1,3})$/);
+                    if (romanMatch) {
+                        const romanToNum = { 'I': '1', 'II': '2', 'III': '3', 'IV': '4', 'V': '5', 'VI': '6', 'VII': '7', 'VIII': '8' };
+                        semester = romanToNum[romanMatch[1].toUpperCase()] || romanMatch[1];
+                        break;
                     }
                 }
             }
@@ -658,7 +682,7 @@ async function extractMetaFromBuffer(buffer) {
                 }
             }
 
-            const programme = courseNameParts.join(' ').replace(/\s+/g, ' ').trim();
+            const programme = courseNameParts.join('\n').trim(); // Preserve line breaks
 
             // Calculate missing response percent if possible
             if (facultyName || subjectCode || ffiScore !== null) {
