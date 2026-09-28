@@ -3,12 +3,12 @@ const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
 const Report = require('../models/Report');
-const { authenticate, authorize } = require('../middleware/auth');
+const { authMiddleware, requireRole, requireAnyRole } = require('./middleware');
 
 // ============================================================================
 // UPDATE VC NAME
 // ============================================================================
-router.post('/update-vc-name', authenticate, authorize('admin', 'hod', 'vc'), async (req, res) => {
+router.post('/update-vc-name', authMiddleware, requireAnyRole(['admin', 'hod', 'vc']), async (req, res) => {
   try {
     const result = await User.updateOne(
       { role: 'vc' },
@@ -40,7 +40,7 @@ router.post('/update-vc-name', authenticate, authorize('admin', 'hod', 'vc'), as
 // ============================================================================
 // CLEAN COURSE NAMES
 // ============================================================================
-router.post('/clean-course-names', authenticate, authorize('admin', 'hod', 'vc'), async (req, res) => {
+router.post('/clean-course-names', authMiddleware, requireAnyRole(['admin', 'hod', 'vc']), async (req, res) => {
   try {
     console.log('[Clean] Starting course name cleanup...');
     
@@ -117,7 +117,7 @@ router.post('/clean-course-names', authenticate, authorize('admin', 'hod', 'vc')
 });
 
 // Preview what would be cleaned (dry run)
-router.get('/preview-clean-course-names', authenticate, authorize('admin', 'hod', 'vc'), async (req, res) => {
+router.get('/preview-clean-course-names', authMiddleware, requireAnyRole(['admin', 'hod', 'vc']), async (req, res) => {
   try {
     const reportsToUpdate = await Report.find({
       $or: [
