@@ -253,7 +253,7 @@ router.get('/faculty', authMiddleware, requireAnyRole('faculty'), async (req, re
 // Pro-VC: Get all submissions
 // ─────────────────────────────────────────────────────────────────────────────
 
-router.get('/all', authMiddleware, requireRole('vc'), async (req, res) => {
+router.get('/all', authMiddleware, requireAnyRole('vc', 'provc'), async (req, res) => {
   try {
     const submissions = await Submission.find()
       .populate('hodId', 'name email department')
@@ -261,7 +261,7 @@ router.get('/all', authMiddleware, requireRole('vc'), async (req, res) => {
       .populate({
         path: 'reports',
         model: 'FacultyReport',
-        select: 'facultyName subjectCode ffiScore status appreciationCount attentionCount commentsNeedingAttention appreciation commentPercentages actionTaken hodRemarks driveLink responseCount totalResponses',
+        select: 'facultyName subjectCode ffiScore status appreciationCount attentionCount commentsNeedingAttention appreciation commentPercentages actionTaken hodRemarks driveLink responseCount totalResponses semester programme academicYear session',
       })
       .sort({ createdAt: -1 });
     res.json(submissions);
