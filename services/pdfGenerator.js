@@ -356,7 +356,7 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
       : (r.subjectCode || "-");
 
     const attText = (r.commentsNeedingAttention || []).length > 0
-      ? r.commentsNeedingAttention.map(x => "\u2022 " + x).join("\n")
+      ? r.commentsNeedingAttention.map(x => "\u2022 " + x).join("\n\n")
       : "None";
 
     const pcts = r.commentPercentages || {};
@@ -364,11 +364,11 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
       .filter(([, v]) => v > 0)
       .sort((a, b) => b[1] - a[1])
       .map(([k, v]) => "\u2022 " + k + ": " + v + "%")
-      .join("\n");
+      .join("\n\n");
     const longAppreciations = (r.appreciation || [])
       .filter(c => c.trim().split(/\s+/).length > 4)
       .map(x => "\u2022 " + x);
-    const appText = [pctLines, ...longAppreciations].filter(Boolean).join("\n") || "-";
+    const appText = [pctLines, ...longAppreciations].filter(Boolean).join("\n\n") || "-";
 
     // Calculate dynamic row height — use actual column widths
     const attLines  = calcLines(attText,             155, FS);
