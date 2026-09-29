@@ -1029,3 +1029,86 @@ router.post('/:id/move-comment', authMiddleware, requireAnyRole('hod', 'admin'),
     res.status(500).json({ error: err.message });
   }
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DEBUG: Check reports sent by specific HOD
+// ─────────────────────────────────────────────────────────────────────────────
+
+router.get('/debug/hod-reports/:hodEmail', authMiddleware, requireAnyRole('admin', 'hod'), async (req, res) => {
+  try {
+    const User = require('../models/User');
+    const hod = await User.findOne({ email: req.params.hodEmail });
+    
+    if (!hod) {
+      return res.status(404).json({ error: 'HOD not found' });
+    }
+
+    const reports = await FacultyReport.find({ hodId: hod._id })
+      .select('facultyName facultyUserId status sentToFacultyAt subjectCode')
+      .sort({ sentToFacultyAt: -1 })
+      .lean();
+
+    const stats = {
+      total: reports.length,
+      byStatus: {},
+      withFacultyUserId: reports.filter(r => r.facultyUserId).length,
+      withoutFacultyUserId: reports.filter(r => !r.facultyUserId).length,
+    };
+
+    reports.forEach(r => {
+      stats.byStatus[r.status] = (stats.byStatus[r.status] || 0) + 1;
+    });
+
+    res.json({
+      hodEmail: req.params.hodEmail,
+      hodId: hod._id,
+      hodName: hod.name,
+      stats,
+      sampleReports: reports.slice(0, 10), // First 10 as sample
+    });
+
+  } catch (err) {
+    console.error('[Debug] Error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DEBUG: Check what a specific faculty member should see
+// ─────────────────────────────────────────────────────────────────────────────
+
+router.get('/debug/faculty-view/:facultyEmail', authMiddleware, requireAnyRole('admin', 'hod'), async (req, res) => {
+  try {
+    const User = require('../models/User');
+    const faculty = await User.findOne({ email: req.params.facultyEmail });
+    
+    if (!faculty) {
+      return res.status(404).json({ error: 'Faculty not found' });
+    }
+
+    const firstName = faculty.name.split(' ')[0];
+    
+    // Try different query methods
+    const byUserId = await FacultyReport.find({ facultyUserId: faculty._id }).select('facultyName subjectCode status').lean();
+    const byName = await FacultyReport.find({ facultyName: new RegExp(firstName, 'i'), status: { $in: ['sent_to_faculty', 'faculty_approved'] } }).select('facultyName subjectCode status').lean();
+    
+    res.json({
+      facultyEmail: req.params.facultyEmail,
+      facultyId: faculty._id,
+      facultyName: faculty.name,
+      firstName: firstName,
+      foundByUserId: {
+        count: byUserId.length,
+        reports: byUserId.slice(0, 5),
+      },
+      foundByName: {
+        count: byName.length,
+        reports: byName.slice(0, 5),
+      },
+    });
+
+  } catch (err) {
+    console.error('[Debug] Error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
