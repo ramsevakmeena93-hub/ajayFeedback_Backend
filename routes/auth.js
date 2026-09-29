@@ -1407,3 +1407,69 @@ router.post(
 // -----------------------------------------------------------------------------
 
 module.exports = router;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Workspace switch endpoint - for HOD/Faculty dual-role users
+// ─────────────────────────────────────────────────────────────────────────────
+
+router.post('/workspace/switch', authMiddleware, async (req, res) => {
+  try {
+    const { workspace } = req.body; // 'hod' or 'faculty'
+    
+    if (!['hod', 'faculty'].includes(workspace)) {
+      return res.status(400).json({ error: 'Invalid workspace. Must be "hod" or "faculty"' });
+    }
+
+    // Check if user has the requested role
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const userRoles = user.roles || [];
+    const hasRequestedRole = userRoles.includes(workspace) || user.role === workspace;
+
+    if (!hasRequestedRole) {
+      return res.status(403).json({ error: `You don't have ${workspace} role` });
+    }
+
+    // Update active workspace
+    user.activeWorkspace = workspace;
+    await user.save();
+
+    // Generate new token with updated workspace
+    const tokenPayload = {
+      id: user._id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      roles: user.roles,
+      activeWorkspace: workspace,
+      department: user.department,
+      departmentScope: user.departmentScope,
+    };
+
+    const token = jwt.sign(tokenPayload, JWT_SECRET, { expiresIn: TOKEN_EXPIRY });
+
+    res.json({
+      success: true,
+      token,
+      user: {
+        id: user._id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        roles: user.roles,
+        activeWorkspace: workspace,
+        department: user.department,
+        profilePhoto: user.profilePhoto,
+        signatureImage: user.signatureImage,
+      },
+      message: `Switched to ${workspace} workspace`
+    });
+
+  } catch (err) {
+    console.error('[Workspace Switch Error]', err);
+    res.status(500).json({ error: err.message || 'Failed to switch workspace' });
+  }
+});
