@@ -60,7 +60,8 @@ const facultyReportSchema = new mongoose.Schema({
   status: { type: String, enum: ['pending', 'processed', 'error', 'sent_to_faculty', 'faculty_approved'], default: 'pending' },
   errorMessage: { type: String },
   analyzedAt: { type: Date },
-  academicYear: { type: String, default: () => new Date().getFullYear().toString() } // e.g. "2025"
+  academicYear: { type: String, default: () => new Date().getFullYear().toString() }, // e.g. "2025"
+  fileHash: { type: String, default: '' }, // MD5 hash of uploaded CSV file to detect duplicates
 }, { timestamps: true });
 
 module.exports = mongoose.model('FacultyReport', facultyReportSchema);

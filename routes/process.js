@@ -42,6 +42,32 @@ router.post('/upload-csv', authMiddleware, csvUpload.any(), async (req, res) => 
 
     console.log(`[upload-csv] Received file: ${file.originalname}, size: ${file.size} bytes, mimetype: ${file.mimetype}`);
     
+    // Generate file hash to detect duplicates
+    const fileHash = crypto.createHash('md5').update(file.buffer).digest('hex');
+    console.log(`[upload-csv] File hash: ${fileHash}`);
+    
+    // Check if this exact file has been uploaded before by this HOD
+    const existingReport = await FacultyReport.findOne({
+      hodId: req.user.id,
+      fileHash: fileHash
+    });
+    
+    if (existingReport) {
+      console.log(`[upload-csv] Duplicate file detected. Hash: ${fileHash}`);
+      return res.status(409).json({ 
+        error: 'Duplicate file detected',
+        message: `This CSV file has already been uploaded on ${new Date(existingReport.createdAt).toLocaleDateString('en-IN', { 
+          day: '2-digit', 
+          month: 'short', 
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        })}. Please upload a different file or modify the existing reports.`,
+        uploadedAt: existingReport.createdAt,
+        isDuplicate: true
+      });
+    }
+    
     const entries = parseCSV(file.buffer);
     console.log(`[upload-csv] Parsed ${entries.length} entries from file: ${file.originalname}`);
     
@@ -60,10 +86,12 @@ router.post('/upload-csv', authMiddleware, csvUpload.any(), async (req, res) => 
     console.log(`[upload-csv] Sample entries:`, entries.slice(0, 3));
 
     // Return just the links — don't create DB records yet
+    // Include fileHash so frontend can send it when processing
     res.json({
       message: `Found ${entries.length} PDF links`,
       links: entries, // Send full objects {pdfLink, responseCount}
-      total: entries.length
+      total: entries.length,
+      fileHash: fileHash // Send hash to frontend for later use
     });
   } catch (err) {
     console.error('[upload-csv] Error parsing file:', err);
@@ -78,7 +106,7 @@ router.post('/process-one', authMiddleware, async (req, res) => {
   req.setTimeout(120000);
   res.setTimeout(120000);
   try {
-    const { pdfLink, sno } = req.body;
+    const { pdfLink, sno, fileHash } = req.body;
     if (!pdfLink) return res.status(400).json({ error: 'No PDF link provided' });
 
     // Check cache first
@@ -162,7 +190,8 @@ router.post('/process-one', authMiddleware, async (req, res) => {
         commentCategories: result.commentCategories || {},
         commentPercentages: result.commentPercentages || {},
         status: 'processed',
-        analyzedAt: result.analyzedAt
+        analyzedAt: result.analyzedAt,
+        fileHash: fileHash || existingReport.fileHash || ''
       }, { new: true });
     } else {
       // Save to DB as new report
@@ -187,7 +216,8 @@ router.post('/process-one', authMiddleware, async (req, res) => {
         commentCategories: result.commentCategories || {},
         commentPercentages: result.commentPercentages || {},
         status: 'processed',
-        analyzedAt: result.analyzedAt
+        analyzedAt: result.analyzedAt,
+        fileHash: fileHash || ''
       });
     }
 
