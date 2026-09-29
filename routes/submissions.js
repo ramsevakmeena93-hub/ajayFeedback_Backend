@@ -505,6 +505,61 @@ router.get('/:id/download-pdf', authMiddleware, async (req, res) => {
   }
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Admin: Clear all submissions for a specific HOD (for testing/cleanup)
+// ─────────────────────────────────────────────────────────────────────────────
+
+router.delete('/admin/clear-hod/:hodEmail', authMiddleware, requireAnyRole('admin'), async (req, res) => {
+  try {
+    const { hodEmail } = req.params;
+    
+    const User = require('../models/User');
+    const hod = await User.findOne({ email: hodEmail, role: 'hod' });
+    
+    if (!hod) {
+      return res.status(404).json({ error: `No HOD found with email: ${hodEmail}` });
+    }
+    
+    // Find all submissions for this HOD
+    const submissions = await Submission.find({ hodId: hod._id });
+    const count = submissions.length;
+    
+    if (count === 0) {
+      return res.json({ 
+        message: 'No submissions found for this HOD',
+        hodEmail,
+        hodName: hod.name,
+        deleted: 0
+      });
+    }
+    
+    // Delete all submissions
+    await Submission.deleteMany({ hodId: hod._id });
+    
+    // Log deletion
+    await AuditLog.record({
+      actorId: req.user.id,
+      actorRole: req.user.role,
+      workspace: req.user.activeWorkspace || 'admin',
+      event: 'bulk_delete',
+      description: `Admin cleared all ${count} submissions for HOD ${hod.name} (${hodEmail})`,
+      targetType: 'user',
+      targetId: hod._id,
+      meta: { deletedCount: count, hodEmail },
+    });
+    
+    res.json({ 
+      message: `Successfully deleted ${count} submission(s) for HOD ${hod.name}`,
+      hodEmail,
+      hodName: hod.name,
+      deleted: count
+    });
+  } catch (err) {
+    console.error('[Admin Clear HOD]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
 
 // ─────────────────────────────────────────────────────────────────────────────
