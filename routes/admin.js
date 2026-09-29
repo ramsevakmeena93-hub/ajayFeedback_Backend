@@ -142,7 +142,7 @@ router.post('/users', ...adminOnly, async (req, res) => {
 
     // Determine the full roles list (legacy role + any extras provided)
     const allRoles = [...new Set([role, ...(extraRoles || [])])].filter(r =>
-      ['hod','faculty','vc','admin'].includes(r)
+      ['hod','faculty','provc','admin'].includes(r)
     );
 
     const user = await User.create({
