@@ -101,25 +101,10 @@ function deduplicateComments(comments) {
 }
 
 async function getSentimentPipeline() {
-  if (pipeline) return pipeline;
-  if (pipelineLoading) {
-    while (pipelineLoading) await new Promise(r => setTimeout(r, 100));
-    return pipeline;
-  }
-  pipelineLoading = true;
-  try {
-    // Use require instead of dynamic import for better compatibility
-    const { pipeline: createPipeline } = require('@xenova/transformers');
-    pipeline = await createPipeline('sentiment-analysis', 'Xenova/distilbert-base-uncased-finetuned-sst-2-english');
-    console.log('[AI] HuggingFace sentiment model loaded');
-  } catch (err) {
-    console.error('[AI] Failed to load HuggingFace model:', err.message);
-    // Don't throw - fall back to rule-based classification only
-    pipeline = null;
-  } finally {
-    pipelineLoading = false;
-  }
-  return pipeline;
+  // DISABLED: HuggingFace models crash on Render free tier
+  // Always use rule-based classification instead
+  console.log('[AI] Using rule-based classification (HuggingFace disabled to prevent crashes)');
+  return null;
 }
 
 // Patterns and classification logic
