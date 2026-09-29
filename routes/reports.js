@@ -35,42 +35,19 @@ async function getFacultyFirstName(userId) {
  * @param {boolean} useAssignments — if true, restrict to assigned subjectCodes
  */
 async function buildFacultyQuery(userId, extraFilters = {}, useAssignments = true) {
-  const user = await User.findById(userId).select('name email').lean();
-  if (!user) {
-    console.error('[buildFacultyQuery] User not found:', userId);
-    return { _id: null }; // Return query that matches nothing
+  const firstName = await getFacultyFirstName(userId);
+  const nameRegex = firstName ? new RegExp(firstName, 'i') : null;
+
+  // Base: match by exact userId OR by name (backward compat)
+  const orClauses = [{ facultyUserId: userId }];
+  if (nameRegex) {
+    orClauses.push({ facultyName: nameRegex, status: { $in: ['sent_to_faculty', 'faculty_approved'] } });
   }
 
-  const firstName = user.name.split(' ')[0];
-  const fullName = user.name;
-  const email = user.email;
-  
-  // VERY PERMISSIVE MATCHING: Match by userId OR name OR email
-  const orClauses = [
-    { facultyUserId: userId },
-    { facultyName: new RegExp(firstName, 'i') },
-    { facultyName: new RegExp(fullName, 'i') },
-    { facultyEmail: email },
-  ];
-  
-  // Build query: $or for user matching + extra filters
-  // REMOVED status restriction - show reports in ANY status
-  const query = { 
-    $or: orClauses,
-    ...extraFilters 
-  };
-  
-  // Debug logging
-  console.log('[buildFacultyQuery] userId:', userId);
-  console.log('[buildFacultyQuery] firstName:', firstName);
-  console.log('[buildFacultyQuery] fullName:', fullName);
-  console.log('[buildFacultyQuery] email:', email);
-  console.log('[buildFacultyQuery] extraFilters:', extraFilters);
-  console.log('[buildFacultyQuery] Final query:', JSON.stringify(query));
+  const query = { $or: orClauses, ...extraFilters };
 
-  // DISABLED: Don't filter by teaching assignments - too restrictive
-  // Faculty should see ALL reports that match their name
-  if (useAssignments && false) { // Force disabled
+  // Optionally restrict to assigned subjects (for multi-role HOD-as-faculty)
+  if (useAssignments) {
     const assignments = await TeachingAssignment.find({
       facultyUserId: userId,
       active: true,
@@ -78,15 +55,12 @@ async function buildFacultyQuery(userId, extraFilters = {}, useAssignments = tru
       ...(extraFilters.semester     ? { semester:     extraFilters.semester }     : {}),
     }).select('subjectCode branch section').lean();
 
-    console.log('[buildFacultyQuery] Found', assignments.length, 'teaching assignments');
-
+    // Only apply assignment filter if assignments are configured for this user
     if (assignments.length > 0) {
       const assignedCodes = [...new Set(assignments.map(a => a.subjectCode))];
       query.subjectCode = { $in: assignedCodes };
-      console.log('[buildFacultyQuery] Filtering by assigned subjects:', assignedCodes);
-    } else {
-      console.log('[buildFacultyQuery] No assignments - showing all reports');
     }
+    // If no assignments are configured, show all reports (open access — backward compat)
   }
 
   return query;
@@ -558,35 +532,10 @@ router.get('/faculty/my', authMiddleware, requireAnyRole('faculty', 'hod'), asyn
     if (req.query.year)     extra.academicYear = req.query.year;
     if (req.query.semester) extra.semester     = req.query.semester;
 
-    // SIMPLIFIED QUERY: Don't use teaching assignments by default (too restrictive)
-    const query = await buildFacultyQuery(req.user.id, extra, false); // false = no assignment filter
-    
-    console.log('[Faculty Reports] User ID:', req.user.id);
-    console.log('[Faculty Reports] User Email:', req.user.email);
-    console.log('[Faculty Reports] Query:', JSON.stringify(query));
-    
+    const query = await buildFacultyQuery(req.user.id, extra, true);
     const reports = await FacultyReport.find(query).sort({ createdAt: -1 });
-    
-    console.log('[Faculty Reports] Found:', reports.length, 'reports');
-    
-    if (reports.length === 0) {
-      // DEBUG: Check if there are ANY reports with this faculty's name
-      const User = require('../models/User');
-      const user = await User.findById(req.user.id);
-      if (user) {
-        const byName = await FacultyReport.find({ 
-          facultyName: new RegExp(user.name, 'i') 
-        }).select('facultyName facultyUserId status hodId').lean();
-        console.log('[Faculty Reports] DEBUG: Found', byName.length, 'reports by name match');
-        if (byName.length > 0) {
-          console.log('[Faculty Reports] DEBUG: Sample:', JSON.stringify(byName[0]));
-        }
-      }
-    }
-    
     res.json(reports);
   } catch (err) {
-    console.error('[Faculty Reports] Error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
