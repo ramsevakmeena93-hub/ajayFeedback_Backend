@@ -35,15 +35,31 @@ async function getFacultyFirstName(userId) {
  * @param {boolean} useAssignments — if true, restrict to assigned subjectCodes
  */
 async function buildFacultyQuery(userId, extraFilters = {}, useAssignments = true) {
-  const firstName = await getFacultyFirstName(userId);
-  const nameRegex = firstName ? new RegExp(firstName, 'i') : null;
-
-  console.log('[buildFacultyQuery] userId:', userId, 'firstName:', firstName);
+  const User = require('../models/User');
+  const user = await User.findById(userId).select('name email');
+  const firstName = user?.name ? user.name.split(' ')[0] : null;
+  const fullName = user?.name || null;
+  
+  console.log('[buildFacultyQuery] userId:', userId, 'fullName:', fullName, 'firstName:', firstName);
 
   // Base: match by exact userId OR by name (backward compat)
+  // Try multiple name matching strategies for robustness
   const orClauses = [{ facultyUserId: userId }];
-  if (nameRegex) {
-    orClauses.push({ facultyName: nameRegex, status: { $in: ['sent_to_faculty', 'faculty_approved'] } });
+  
+  if (fullName) {
+    // Exact full name match (case-insensitive)
+    orClauses.push({ 
+      facultyName: new RegExp(`^${fullName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i'),
+      status: { $in: ['sent_to_faculty', 'faculty_approved'] } 
+    });
+  }
+  
+  if (firstName) {
+    // First name match (backward compat for old reports)
+    orClauses.push({ 
+      facultyName: new RegExp(firstName, 'i'),
+      status: { $in: ['sent_to_faculty', 'faculty_approved'] } 
+    });
   }
 
   const query = { $or: orClauses, ...extraFilters };
