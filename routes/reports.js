@@ -552,6 +552,33 @@ router.get('/faculty/advanced-analytics',
 
 router.get('/faculty/my', authMiddleware, requireAnyRole('faculty', 'hod'), async (req, res) => {
   try {
+    // AUTO-FIX: Link this user to their reports if facultyUserId is missing
+    const User = require('../models/User');
+    const currentUser = await User.findById(req.user.id).select('name email');
+    if (currentUser?.name) {
+      const reportsToFix = await FacultyReport.find({
+        facultyName: new RegExp(currentUser.name, 'i'),
+        status: { $in: ['sent_to_faculty', 'faculty_approved'] },
+        $or: [
+          { facultyUserId: { $exists: false } },
+          { facultyUserId: null }
+        ]
+      });
+      
+      if (reportsToFix.length > 0) {
+        console.log('[Faculty My Auto-Fix] Fixing', reportsToFix.length, 'reports for', currentUser.name);
+        await FacultyReport.updateMany(
+          { _id: { $in: reportsToFix.map(r => r._id) } },
+          { 
+            $set: { 
+              facultyUserId: req.user.id,
+              facultyEmail: currentUser.email 
+            } 
+          }
+        );
+      }
+    }
+    
     const extra = {};
     if (req.query.year)     extra.academicYear = req.query.year;
     if (req.query.semester) extra.semester     = req.query.semester;
@@ -570,6 +597,37 @@ router.get('/faculty/my', authMiddleware, requireAnyRole('faculty', 'hod'), asyn
 
 router.get('/faculty/analysis', authMiddleware, requireAnyRole('faculty', 'hod'), async (req, res) => {
   try {
+    // AUTO-FIX: Link this user to their reports if facultyUserId is missing
+    const User = require('../models/User');
+    const currentUser = await User.findById(req.user.id).select('name email');
+    if (currentUser?.name) {
+      console.log('[Faculty Analysis Auto-Fix] Checking reports for:', currentUser.name);
+      
+      // Find reports that match this user's name but don't have facultyUserId set
+      const reportsToFix = await FacultyReport.find({
+        facultyName: new RegExp(currentUser.name, 'i'),
+        status: { $in: ['sent_to_faculty', 'faculty_approved'] },
+        $or: [
+          { facultyUserId: { $exists: false } },
+          { facultyUserId: null }
+        ]
+      });
+      
+      if (reportsToFix.length > 0) {
+        console.log('[Faculty Analysis Auto-Fix] Fixing', reportsToFix.length, 'reports for', currentUser.name);
+        await FacultyReport.updateMany(
+          { _id: { $in: reportsToFix.map(r => r._id) } },
+          { 
+            $set: { 
+              facultyUserId: req.user.id,
+              facultyEmail: currentUser.email 
+            } 
+          }
+        );
+        console.log('[Faculty Analysis Auto-Fix] ✅ Fixed', reportsToFix.length, 'reports');
+      }
+    }
+    
     const extra = { status: { $in: ['sent_to_faculty', 'faculty_approved'] } };
     if (req.query.year)     extra.academicYear = req.query.year;
     if (req.query.semester) extra.semester     = req.query.semester;
