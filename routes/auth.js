@@ -915,9 +915,9 @@ router.post(
       } = req.body;
 
       // Accept either 'credential' or 'idToken'
-      const token = credential || idToken;
+      const googleToken = credential || idToken;
 
-      if (!token) {
+      if (!googleToken) {
         return res.status(400).json({
           error:
             'No credential provided'
@@ -945,7 +945,7 @@ router.post(
         const ticket =
           await client.verifyIdToken({
             idToken:
-              token,
+              googleToken,
             audience:
               process.env.GOOGLE_CLIENT_ID
           });
