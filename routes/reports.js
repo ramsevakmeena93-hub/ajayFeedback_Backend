@@ -37,14 +37,28 @@ async function getFacultyFirstName(userId) {
 async function buildFacultyQuery(userId, extraFilters = {}, useAssignments = true) {
   const firstName = await getFacultyFirstName(userId);
   const nameRegex = firstName ? new RegExp(firstName, 'i') : null;
-
+  
   // Base: match by exact userId OR by name (backward compat)
   const orClauses = [{ facultyUserId: userId }];
   if (nameRegex) {
-    orClauses.push({ facultyName: nameRegex, status: { $in: ['sent_to_faculty', 'faculty_approved'] } });
+    // Name-based fallback for old reports (before facultyUserId was added)
+    orClauses.push({ 
+      facultyName: nameRegex, 
+      status: { $in: ['sent_to_faculty', 'faculty_approved'] } 
+    });
   }
-
-  const query = { $or: orClauses, ...extraFilters };
+  
+  // Build query: $or for user matching + extra filters
+  const query = { 
+    $or: orClauses,
+    ...extraFilters 
+  };
+  
+  // Debug logging
+  console.log('[buildFacultyQuery] userId:', userId);
+  console.log('[buildFacultyQuery] firstName:', firstName);
+  console.log('[buildFacultyQuery] extraFilters:', extraFilters);
+  console.log('[buildFacultyQuery] Final query:', JSON.stringify(query));
 
   // Optionally restrict to assigned subjects (for multi-role HOD-as-faculty)
   if (useAssignments) {
@@ -55,10 +69,15 @@ async function buildFacultyQuery(userId, extraFilters = {}, useAssignments = tru
       ...(extraFilters.semester     ? { semester:     extraFilters.semester }     : {}),
     }).select('subjectCode branch section').lean();
 
+    console.log('[buildFacultyQuery] Found', assignments.length, 'teaching assignments');
+
     // Only apply assignment filter if assignments are configured for this user
     if (assignments.length > 0) {
       const assignedCodes = [...new Set(assignments.map(a => a.subjectCode))];
       query.subjectCode = { $in: assignedCodes };
+      console.log('[buildFacultyQuery] Filtering by assigned subjects:', assignedCodes);
+    } else {
+      console.log('[buildFacultyQuery] No assignments - showing all reports');
     }
     // If no assignments are configured, show all reports (open access — backward compat)
   }
