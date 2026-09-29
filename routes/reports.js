@@ -956,3 +956,76 @@ router.get('/:id/summary-pdf', async (req, res) => {
 });
 
 module.exports = router;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Move comment between appreciation and attention categories
+// ─────────────────────────────────────────────────────────────────────────────
+
+router.post('/:id/move-comment', authMiddleware, requireAnyRole('hod', 'admin'), async (req, res) => {
+  try {
+    const { comment, from, to } = req.body;
+    
+    if (!comment || !from || !to) {
+      return res.status(400).json({ error: 'Missing required fields: comment, from, to' });
+    }
+    
+    if (!['appreciation', 'attention'].includes(from) || !['appreciation', 'attention'].includes(to)) {
+      return res.status(400).json({ error: 'Invalid category. Use "appreciation" or "attention"' });
+    }
+    
+    if (from === to) {
+      return res.status(400).json({ error: 'Source and destination cannot be the same' });
+    }
+
+    const report = await FacultyReport.findOne({ _id: req.params.id, hodId: req.user.id });
+    if (!report) return res.status(404).json({ error: 'Report not found' });
+
+    // Remove from source category
+    const sourceField = from === 'appreciation' ? 'appreciation' : 'commentsNeedingAttention';
+    const destField = to === 'appreciation' ? 'appreciation' : 'commentsNeedingAttention';
+    
+    const sourceArray = report[sourceField] || [];
+    const commentIndex = sourceArray.indexOf(comment);
+    
+    if (commentIndex === -1) {
+      return res.status(404).json({ error: 'Comment not found in source category' });
+    }
+
+    // Remove from source
+    sourceArray.splice(commentIndex, 1);
+    
+    // Add to destination (avoid duplicates)
+    const destArray = report[destField] || [];
+    if (!destArray.includes(comment)) {
+      destArray.push(comment);
+    }
+
+    // Update counts
+    const appreciationCount = to === 'appreciation' ? destArray.length : sourceArray.length;
+    const attentionCount = to === 'attention' ? destArray.length : sourceArray.length;
+
+    // Save to database
+    const updated = await FacultyReport.findByIdAndUpdate(
+      report._id,
+      {
+        [sourceField]: sourceArray,
+        [destField]: destArray,
+        appreciationCount: from === 'appreciation' ? sourceArray.length : destArray.length,
+        attentionCount: from === 'attention' ? sourceArray.length : destArray.length,
+      },
+      { new: true }
+    );
+
+    console.log(`[Move Comment] Moved comment from ${from} to ${to} in report ${report._id}`);
+    
+    res.json({
+      success: true,
+      message: `Comment moved from ${from} to ${to}`,
+      report: updated
+    });
+
+  } catch (err) {
+    console.error('[Move Comment] Error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
