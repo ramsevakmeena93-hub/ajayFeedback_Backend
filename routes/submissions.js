@@ -506,3 +506,49 @@ router.get('/:id/download-pdf', authMiddleware, async (req, res) => {
 });
 
 module.exports = router;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HOD: Delete own submission (before approval)
+// ─────────────────────────────────────────────────────────────────────────────
+
+router.delete('/:id', authMiddleware, requireAnyRole('hod'), async (req, res) => {
+  try {
+    const submission = await Submission.findById(req.params.id);
+    
+    if (!submission) {
+      return res.status(404).json({ error: 'Submission not found' });
+    }
+    
+    // Only allow HOD to delete their own submissions
+    if (submission.hodId.toString() !== req.user.id.toString()) {
+      return res.status(403).json({ error: 'You can only delete your own submissions' });
+    }
+    
+    // Only allow deletion if not yet approved
+    if (submission.status === 'approved') {
+      return res.status(403).json({ error: 'Cannot delete approved submissions' });
+    }
+    
+    await Submission.findByIdAndDelete(req.params.id);
+    
+    // Log deletion
+    await AuditLog.record({
+      actorId: req.user.id,
+      actorRole: req.user.role,
+      workspace: req.user.activeWorkspace || 'hod',
+      event: 'submission_deleted',
+      description: `Deleted submission ${req.params.id} with ${submission.reports.length} reports`,
+      targetType: 'submission',
+      targetId: req.params.id,
+      meta: { reportCount: submission.reports.length, status: submission.status },
+    });
+    
+    res.json({ 
+      message: 'Submission deleted successfully',
+      deleted: submission._id,
+      reportCount: submission.reports.length
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
