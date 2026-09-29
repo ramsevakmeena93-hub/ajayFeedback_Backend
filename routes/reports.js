@@ -521,10 +521,19 @@ router.get('/faculty/my', authMiddleware, requireAnyRole('faculty', 'hod'), asyn
     if (req.query.year)     extra.academicYear = req.query.year;
     if (req.query.semester) extra.semester     = req.query.semester;
 
-    const query = await buildFacultyQuery(req.user.id, extra, true);
+    // SIMPLIFIED QUERY: Don't use teaching assignments by default (too restrictive)
+    const query = await buildFacultyQuery(req.user.id, extra, false); // false = no assignment filter
+    
+    console.log('[Faculty Reports] User ID:', req.user.id);
+    console.log('[Faculty Reports] Query:', JSON.stringify(query));
+    
     const reports = await FacultyReport.find(query).sort({ createdAt: -1 });
+    
+    console.log('[Faculty Reports] Found:', reports.length, 'reports');
+    
     res.json(reports);
   } catch (err) {
+    console.error('[Faculty Reports] Error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
