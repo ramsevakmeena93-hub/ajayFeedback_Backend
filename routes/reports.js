@@ -38,6 +38,8 @@ async function buildFacultyQuery(userId, extraFilters = {}, useAssignments = tru
   const firstName = await getFacultyFirstName(userId);
   const nameRegex = firstName ? new RegExp(firstName, 'i') : null;
 
+  console.log('[buildFacultyQuery] userId:', userId, 'firstName:', firstName);
+
   // Base: match by exact userId OR by name (backward compat)
   const orClauses = [{ facultyUserId: userId }];
   if (nameRegex) {
@@ -55,14 +57,20 @@ async function buildFacultyQuery(userId, extraFilters = {}, useAssignments = tru
       ...(extraFilters.semester     ? { semester:     extraFilters.semester }     : {}),
     }).select('subjectCode branch section').lean();
 
+    console.log('[buildFacultyQuery] Found', assignments.length, 'teaching assignments');
+
     // Only apply assignment filter if assignments are configured for this user
     if (assignments.length > 0) {
       const assignedCodes = [...new Set(assignments.map(a => a.subjectCode))];
       query.subjectCode = { $in: assignedCodes };
+      console.log('[buildFacultyQuery] Filtering by assigned subject codes:', assignedCodes);
+    } else {
+      console.log('[buildFacultyQuery] No assignments found - showing all matched reports');
     }
     // If no assignments are configured, show all reports (open access — backward compat)
   }
 
+  console.log('[buildFacultyQuery] Final query:', JSON.stringify(query));
   return query;
 }
 
@@ -551,7 +559,9 @@ router.get('/faculty/analysis', authMiddleware, requireAnyRole('faculty', 'hod')
     if (req.query.semester) extra.semester     = req.query.semester;
 
     const query   = await buildFacultyQuery(req.user.id, extra, true);
+    console.log('[Faculty Analysis] User:', req.user.email, 'Query:', JSON.stringify(query));
     const reports = await FacultyReport.find(query);
+    console.log('[Faculty Analysis] Found', reports.length, 'reports');
 
     if (reports.length === 0) return res.json({ reports: [], summary: null });
 
