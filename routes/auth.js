@@ -48,7 +48,7 @@ const DESIGNATED_HOD_DEPARTMENT =
 // -----------------------------------------------------------------------------
 
 /**
- * buildUserPayload — reads the User doc + active UserRoles and returns the
+ * buildUserPayload ï¿½ reads the User doc + active UserRoles and returns the
  * standardised object the frontend expects.
  *
  * Shape:
@@ -133,7 +133,7 @@ async function buildUserPayload(user) {
 // -----------------------------------------------------------------------------
 
 /**
- * signToken — includes roles[] and activeWorkspace in the JWT.
+ * signToken ï¿½ includes roles[] and activeWorkspace in the JWT.
  *
  * The backend NEVER trusts role values submitted in request bodies.
  */
@@ -321,7 +321,7 @@ router.post('/login', async (req, res) => {
 
     if (!user) {
       console.warn(
-        `[Auth] Login failed — unknown email: ${cleanEmail}`
+        `[Auth] Login failed ï¿½ unknown email: ${cleanEmail}`
       );
       return res.status(400).json({
         error: 'Invalid credentials'
@@ -349,7 +349,7 @@ router.post('/login', async (req, res) => {
 
     if (!match) {
       console.warn(
-        `[Auth] Login failed — wrong password for: ${cleanEmail}`
+        `[Auth] Login failed ï¿½ wrong password for: ${cleanEmail}`
       );
       return res.status(400).json({
         error: 'Invalid credentials'
@@ -910,10 +910,14 @@ router.post(
   async (req, res) => {
     try {
       const {
-        credential
+        credential,
+        idToken
       } = req.body;
 
-      if (!credential) {
+      // Accept either 'credential' or 'idToken'
+      const token = credential || idToken;
+
+      if (!token) {
         return res.status(400).json({
           error:
             'No credential provided'
@@ -941,7 +945,7 @@ router.post(
         const ticket =
           await client.verifyIdToken({
             idToken:
-              credential,
+              token,
             audience:
               process.env.GOOGLE_CLIENT_ID
           });
@@ -1006,7 +1010,7 @@ router.post(
         !user
       ) {
         console.warn(
-          `[Auth] Google OAuth — blocked email: ${cleanEmail}`
+          `[Auth] Google OAuth ï¿½ blocked email: ${cleanEmail}`
         );
 
         return res.status(403).json({
@@ -1132,7 +1136,7 @@ router.post(
         }
 
         console.log(
-          `[Auth] Google OAuth — new user: ${user.name} (${email}) [${assignedRole}]`
+          `[Auth] Google OAuth ï¿½ new user: ${user.name} (${email}) [${assignedRole}]`
         );
       } else {
         // -----------------------------------------------------
@@ -1188,7 +1192,7 @@ router.post(
          */
         if (correctedRole) {
           console.log(
-            `[Auth] Google OAuth — applying designated account configuration for ${cleanEmail}`
+            `[Auth] Google OAuth ï¿½ applying designated account configuration for ${cleanEmail}`
           );
 
           user.role =
@@ -1356,7 +1360,7 @@ router.post(
         }
 
         console.log(
-          `[Auth] Google OAuth — login: ${user.name} (${email}) [${user.role}]`
+          `[Auth] Google OAuth ï¿½ login: ${user.name} (${email}) [${user.role}]`
         );
       }
 
