@@ -1146,3 +1146,89 @@ router.get('/debug/faculty-view/:facultyEmail', authMiddleware, requireAnyRole('
     res.status(500).json({ error: err.message });
   }
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FIX: Update all reports to link facultyUserId by matching names
+// ─────────────────────────────────────────────────────────────────────────────
+
+router.post('/admin/fix-faculty-userids', authMiddleware, requireAnyRole('admin', 'hod'), async (req, res) => {
+  try {
+    const User = require('../models/User');
+    
+    // Get all reports that don't have facultyUserId but have facultyName
+    const reportsToFix = await FacultyReport.find({
+      facultyName: { $exists: true, $ne: '' },
+      $or: [
+        { facultyUserId: { $exists: false } },
+        { facultyUserId: null }
+      ]
+    }).lean();
+
+    console.log(`[Fix Faculty IDs] Found ${reportsToFix.length} reports to fix`);
+
+    let fixed = 0;
+    let failed = 0;
+    const results = [];
+
+    for (const report of reportsToFix) {
+      try {
+        // Try multiple matching strategies
+        let facultyUser = await User.findOne({ name: report.facultyName });
+        
+        if (!facultyUser) {
+          // Try first name match
+          const firstName = report.facultyName.split(' ')[0];
+          facultyUser = await User.findOne({ name: new RegExp(`^${firstName}`, 'i') });
+        }
+        
+        if (!facultyUser) {
+          // Try full name case-insensitive
+          facultyUser = await User.findOne({ name: new RegExp(report.facultyName, 'i') });
+        }
+
+        if (facultyUser) {
+          await FacultyReport.findByIdAndUpdate(report._id, {
+            facultyUserId: facultyUser._id,
+            facultyEmail: facultyUser.email,
+          });
+          fixed++;
+          results.push({
+            reportId: report._id,
+            facultyName: report.facultyName,
+            matchedUser: facultyUser.email,
+            status: 'fixed'
+          });
+        } else {
+          failed++;
+          results.push({
+            reportId: report._id,
+            facultyName: report.facultyName,
+            status: 'no_user_found'
+          });
+        }
+      } catch (err) {
+        failed++;
+        results.push({
+          reportId: report._id,
+          facultyName: report.facultyName,
+          status: 'error',
+          error: err.message
+        });
+      }
+    }
+
+    console.log(`[Fix Faculty IDs] Fixed: ${fixed}, Failed: ${failed}`);
+
+    res.json({
+      success: true,
+      total: reportsToFix.length,
+      fixed,
+      failed,
+      results: results.slice(0, 20), // First 20 as sample
+    });
+
+  } catch (err) {
+    console.error('[Fix Faculty IDs] Error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
