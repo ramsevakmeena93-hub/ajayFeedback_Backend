@@ -577,7 +577,24 @@ router.get('/faculty/analysis', authMiddleware, requireAnyRole('faculty', 'hod')
     const query   = await buildFacultyQuery(req.user.id, extra, true);
     const reports = await FacultyReport.find(query);
 
-    if (reports.length === 0) return res.json({ reports: [], summary: null });
+    // If no reports found, return empty data (prevents blank page crash)
+    if (reports.length === 0) {
+      console.log('[Faculty Analysis] No reports found for user:', req.user.email);
+      return res.json({ 
+        reports: [], 
+        summary: {
+          totalReports: 0,
+          avgFFI: 0,
+          totalAppreciation: 0,
+          totalAttention: 0,
+          grade: 'N/A',
+          ffiBySubject: [],
+          commentPercentages: {},
+          years: [],
+          semesters: []
+        }
+      });
+    }
 
     const totalReports       = reports.length;
     const avgFFI             = reports.reduce((s, r) => s + (r.ffiScore || 0), 0) / totalReports;
