@@ -562,11 +562,27 @@ router.get('/faculty/my', authMiddleware, requireAnyRole('faculty', 'hod'), asyn
     const query = await buildFacultyQuery(req.user.id, extra, false); // false = no assignment filter
     
     console.log('[Faculty Reports] User ID:', req.user.id);
+    console.log('[Faculty Reports] User Email:', req.user.email);
     console.log('[Faculty Reports] Query:', JSON.stringify(query));
     
     const reports = await FacultyReport.find(query).sort({ createdAt: -1 });
     
     console.log('[Faculty Reports] Found:', reports.length, 'reports');
+    
+    if (reports.length === 0) {
+      // DEBUG: Check if there are ANY reports with this faculty's name
+      const User = require('../models/User');
+      const user = await User.findById(req.user.id);
+      if (user) {
+        const byName = await FacultyReport.find({ 
+          facultyName: new RegExp(user.name, 'i') 
+        }).select('facultyName facultyUserId status hodId').lean();
+        console.log('[Faculty Reports] DEBUG: Found', byName.length, 'reports by name match');
+        if (byName.length > 0) {
+          console.log('[Faculty Reports] DEBUG: Sample:', JSON.stringify(byName[0]));
+        }
+      }
+    }
     
     res.json(reports);
   } catch (err) {
