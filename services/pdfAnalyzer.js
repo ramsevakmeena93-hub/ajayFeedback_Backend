@@ -680,7 +680,7 @@ async function extractMetaFromBuffer(buffer) {
                 const text = item.str.trim();
                 if (text && text.length > 1 && 
                     !seenTexts.has(text.toLowerCase()) &&
-                    !text.match(/^(semester|sem|ffi|resp|programme|code|faculty|name|students|link|send|response|course|registered|\d+)$/i)) {
+                    !text.match(/^(semester|sem|ffi|resp|programme|code|faculty|name|students|link|send|response|course|registered|submitted|answer|\d+)$/i)) {
                     courseNameParts.push(text);
                     seenTexts.add(text.toLowerCase());
                 }
