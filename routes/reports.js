@@ -1205,3 +1205,72 @@ router.post('/admin/fix-faculty-userids', authMiddleware, requireAnyRole('admin'
     res.status(500).json({ error: err.message });
   }
 });
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Admin/HOD: Recall reports from specific faculty (remove from faculty side)
+// ─────────────────────────────────────────────────────────────────────────────
+
+router.post('/admin/recall-from-faculty', authMiddleware, requireAnyRole('hod', 'admin'), async (req, res) => {
+  try {
+    const { facultyName } = req.body;
+    
+    if (!facultyName) {
+      return res.status(400).json({ error: 'Faculty name is required' });
+    }
+
+    console.log('[Recall Reports] Looking for reports sent to:', facultyName);
+
+    // Find all reports sent to this faculty member
+    const reportsToRecall = await FacultyReport.find({
+      facultyName: new RegExp(facultyName, 'i'),
+      status: { $in: ['sent_to_faculty', 'faculty_approved'] }
+    });
+
+    console.log('[Recall Reports] Found', reportsToRecall.length, 'reports to recall');
+
+    if (reportsToRecall.length === 0) {
+      return res.json({ 
+        success: true, 
+        recalled: 0, 
+        message: `No reports found for ${facultyName}` 
+      });
+    }
+
+    // Reset reports back to processed status (removes from faculty view)
+    const result = await FacultyReport.updateMany(
+      { _id: { $in: reportsToRecall.map(r => r._id) } },
+      { 
+        $set: { 
+          status: 'processed',
+          sentToFacultyAt: null,
+        },
+        $unset: {
+          facultyUserId: 1,
+          facultyAcknowledged: 1,
+          facultyAcknowledgedAt: 1
+        }
+      }
+    );
+
+    console.log('[Recall Reports] ✅ Recalled', result.modifiedCount, 'reports from', facultyName);
+
+    res.json({ 
+      success: true, 
+      recalled: result.modifiedCount,
+      total: reportsToRecall.length,
+      message: `✅ Recalled ${result.modifiedCount} reports from ${facultyName}. They are now back on HOD dashboard with 'Send to Faculty' button.`,
+      reports: reportsToRecall.map(r => ({ 
+        id: r._id, 
+        facultyName: r.facultyName,
+        subjectCode: r.subjectCode,
+        programme: r.programme,
+        semester: r.semester
+      }))
+    });
+
+  } catch (err) {
+    console.error('[Recall Reports Error]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
