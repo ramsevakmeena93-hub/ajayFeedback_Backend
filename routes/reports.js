@@ -35,20 +35,26 @@ async function getFacultyFirstName(userId) {
  * @param {boolean} useAssignments — if true, restrict to assigned subjectCodes
  */
 async function buildFacultyQuery(userId, extraFilters = {}, useAssignments = true) {
-  const firstName = await getFacultyFirstName(userId);
-  const nameRegex = firstName ? new RegExp(firstName, 'i') : null;
-  
-  // Base: match by exact userId OR by name (backward compat)
-  const orClauses = [{ facultyUserId: userId }];
-  if (nameRegex) {
-    // Name-based fallback for old reports (before facultyUserId was added)
-    orClauses.push({ 
-      facultyName: nameRegex, 
-      status: { $in: ['sent_to_faculty', 'faculty_approved'] } 
-    });
+  const user = await User.findById(userId).select('name email').lean();
+  if (!user) {
+    console.error('[buildFacultyQuery] User not found:', userId);
+    return { _id: null }; // Return query that matches nothing
   }
+
+  const firstName = user.name.split(' ')[0];
+  const fullName = user.name;
+  const email = user.email;
+  
+  // VERY PERMISSIVE MATCHING: Match by userId OR name OR email
+  const orClauses = [
+    { facultyUserId: userId },
+    { facultyName: new RegExp(firstName, 'i') },
+    { facultyName: new RegExp(fullName, 'i') },
+    { facultyEmail: email },
+  ];
   
   // Build query: $or for user matching + extra filters
+  // REMOVED status restriction - show reports in ANY status
   const query = { 
     $or: orClauses,
     ...extraFilters 
@@ -57,11 +63,14 @@ async function buildFacultyQuery(userId, extraFilters = {}, useAssignments = tru
   // Debug logging
   console.log('[buildFacultyQuery] userId:', userId);
   console.log('[buildFacultyQuery] firstName:', firstName);
+  console.log('[buildFacultyQuery] fullName:', fullName);
+  console.log('[buildFacultyQuery] email:', email);
   console.log('[buildFacultyQuery] extraFilters:', extraFilters);
   console.log('[buildFacultyQuery] Final query:', JSON.stringify(query));
 
-  // Optionally restrict to assigned subjects (for multi-role HOD-as-faculty)
-  if (useAssignments) {
+  // DISABLED: Don't filter by teaching assignments - too restrictive
+  // Faculty should see ALL reports that match their name
+  if (useAssignments && false) { // Force disabled
     const assignments = await TeachingAssignment.find({
       facultyUserId: userId,
       active: true,
@@ -71,7 +80,6 @@ async function buildFacultyQuery(userId, extraFilters = {}, useAssignments = tru
 
     console.log('[buildFacultyQuery] Found', assignments.length, 'teaching assignments');
 
-    // Only apply assignment filter if assignments are configured for this user
     if (assignments.length > 0) {
       const assignedCodes = [...new Set(assignments.map(a => a.subjectCode))];
       query.subjectCode = { $in: assignedCodes };
@@ -79,7 +87,6 @@ async function buildFacultyQuery(userId, extraFilters = {}, useAssignments = tru
     } else {
       console.log('[buildFacultyQuery] No assignments - showing all reports');
     }
-    // If no assignments are configured, show all reports (open access — backward compat)
   }
 
   return query;
@@ -313,15 +320,22 @@ router.post('/:id/send-to-faculty', authMiddleware, requireAnyRole('hod'), async
 
     const User = require('../models/User');
     let facultyUserId = report.facultyUserId;
+    let facultyUser = null;
+    
     if (!facultyUserId && report.facultyName) {
-      let fu = await User.findOne({ name: report.facultyName });
-      if (!fu) fu = await User.findOne({ name: { $regex: report.facultyName.split(' ')[0], $options: 'i' } });
-      if (fu) facultyUserId = fu._id;
+      // Try multiple matching strategies
+      facultyUser = await User.findOne({ name: report.facultyName });
+      if (!facultyUser) facultyUser = await User.findOne({ name: { $regex: report.facultyName.split(' ')[0], $options: 'i' } });
+      if (!facultyUser) facultyUser = await User.findOne({ name: { $regex: report.facultyName, $options: 'i' } });
+      if (facultyUser) facultyUserId = facultyUser._id;
+    } else if (facultyUserId) {
+      facultyUser = await User.findById(facultyUserId);
     }
 
     if (!facultyUserId) {
       return res.status(400).json({
-        error: `Faculty "${report.facultyName}" has not registered yet.`,
+        error: `Faculty "${report.facultyName}" has not registered yet. Please ask them to register first.`,
+        facultyName: report.facultyName,
       });
     }
 
@@ -342,10 +356,14 @@ router.post('/:id/send-to-faculty', authMiddleware, requireAnyRole('hod'), async
         status:          'sent_to_faculty',
         sentToFacultyAt: new Date(),
         facultyUserId,
+        facultyEmail:    facultyUser?.email || null,
         ...(teachingAssignmentId ? { teachingAssignmentId } : {}),
       },
       { new: true }
     );
+    
+    console.log(`[Send to Faculty] Report ${report._id} sent to ${report.facultyName} (${facultyUser?.email})`);
+    console.log(`[Send to Faculty] facultyUserId: ${facultyUserId}, status: sent_to_faculty`);
 
     try {
       const Notification = require('../models/Notification');
