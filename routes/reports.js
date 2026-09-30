@@ -1442,3 +1442,126 @@ router.delete('/admin/delete-by-faculty', authMiddleware, requireAnyRole(['admin
     res.status(500).json({ error: err.message });
   }
 });
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HOD: Save/Update Department Comment
+// ─────────────────────────────────────────────────────────────────────────────
+router.post('/hod-comment', authMiddleware, requireAnyRole(['hod', 'admin']), async (req, res) => {
+  try {
+    const HODComment = require('../models/HODComment');
+    const User = require('../models/User');
+    
+    const { department, academicYear, session, comment } = req.body;
+    
+    if (!department || !comment) {
+      return res.status(400).json({ 
+        error: 'Department and comment are required' 
+      });
+    }
+    
+    if (comment.length > 2000) {
+      return res.status(400).json({ 
+        error: 'Comment must be less than 2000 characters' 
+      });
+    }
+    
+    // Get HOD user info
+    const hodUser = await User.findById(req.user.id).select('name department');
+    
+    // Use provided department or fall back to HOD's department
+    const targetDepartment = department || hodUser?.department || '';
+    
+    // Find existing comment or create new one
+    const filter = {
+      department: targetDepartment,
+      academicYear: academicYear || '2026-2027',
+      session: session || ''
+    };
+    
+    const update = {
+      comment,
+      hodUserId: req.user.id,
+      hodName: hodUser?.name || '',
+      updatedAt: Date.now()
+    };
+    
+    const options = {
+      upsert: true, // Create if doesn't exist
+      new: true,    // Return updated document
+      setDefaultsOnInsert: true
+    };
+    
+    const savedComment = await HODComment.findOneAndUpdate(filter, update, options);
+    
+    log('info', `[HOD Comment] Saved by ${hodUser?.name} for ${targetDepartment} (${academicYear}, ${session})`);
+    
+    res.json({
+      success: true,
+      message: 'Comment saved successfully',
+      comment: savedComment
+    });
+    
+  } catch (err) {
+    log('error', '[HOD Comment Save Error]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HOD: Get Department Comment
+// ─────────────────────────────────────────────────────────────────────────────
+router.get('/hod-comment', authMiddleware, requireAnyRole(['hod', 'admin', 'vc']), async (req, res) => {
+  try {
+    const HODComment = require('../models/HODComment');
+    const User = require('../models/User');
+    
+    const { department, academicYear, session } = req.query;
+    
+    // Get user's department if not provided
+    let targetDepartment = department;
+    if (!targetDepartment) {
+      const user = await User.findById(req.user.id).select('department');
+      targetDepartment = user?.department || '';
+    }
+    
+    if (!targetDepartment) {
+      return res.status(400).json({ 
+        error: 'Department is required' 
+      });
+    }
+    
+    const query = {
+      department: targetDepartment,
+      academicYear: academicYear || '2026-2027',
+      session: session || ''
+    };
+    
+    const comment = await HODComment.findOne(query)
+      .populate('hodUserId', 'name email')
+      .lean();
+    
+    if (!comment) {
+      return res.json({
+        success: true,
+        comment: null,
+        message: 'No comment found'
+      });
+    }
+    
+    res.json({
+      success: true,
+      comment
+    });
+    
+  } catch (err) {
+    log('error', '[HOD Comment Get Error]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Export router
+// ─────────────────────────────────────────────────────────────────────────────
+
+module.exports = router;
