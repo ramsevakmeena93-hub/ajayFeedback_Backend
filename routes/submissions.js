@@ -13,11 +13,110 @@ const {
 } = require('./middleware');
 
 // ─────────────────────────────────────────────────────────────────────────────
-// HOD: Send reports to Pro-VC (DELETED - To be rebuilt)
+// HOD: Send reports to Pro-VC (REBUILT - Clean with Faculty Approval Check)
 // ─────────────────────────────────────────────────────────────────────────────
 
-// ENDPOINT REMOVED: POST /api/submissions/send
-// Reason: Rebuilding from scratch to fix errors
+router.post('/send',
+  authMiddleware,
+  requireAnyRole('hod'),
+  async (req, res) => {
+    try {
+      const { reportIds, academicYear, department, semester, session, feedbackFormNo, submissionDate } = req.body;
+
+      // Validate input
+      if (!reportIds || !Array.isArray(reportIds) || reportIds.length === 0) {
+        return res.status(400).json({ error: 'No report IDs provided' });
+      }
+
+      console.log(`[Send to Pro-VC] HOD ${req.user.email} sending ${reportIds.length} reports`);
+
+      // Find reports that belong to this HOD
+      const reports = await FacultyReport.find({
+        _id: { $in: reportIds },
+        hodId: req.user.id,
+      });
+
+      if (reports.length === 0) {
+        return res.status(404).json({ error: 'No reports found for this HOD' });
+      }
+
+      console.log(`[Send to Pro-VC] Found ${reports.length} reports`);
+
+      // ✅ STRICT CHECK: All reports MUST be faculty-approved
+      const notApproved = reports.filter(r => r.status !== 'faculty_approved');
+      
+      if (notApproved.length > 0) {
+        const names = notApproved.map(r => `${r.facultyName} (${r.subjectCode})`).join(', ');
+        console.log(`[Send to Pro-VC] ❌ Blocked: ${notApproved.length} reports not approved`);
+        
+        return res.status(400).json({
+          error: `Cannot send to Pro-VC: ${notApproved.length} report(s) must be approved by faculty first`,
+          notApproved: notApproved.map(r => ({
+            id: r._id,
+            facultyName: r.facultyName,
+            subjectCode: r.subjectCode,
+            status: r.status
+          })),
+          message: `Not approved: ${names}`
+        });
+      }
+
+      console.log(`[Send to Pro-VC] ✅ All ${reports.length} reports are faculty-approved`);
+
+      // Create submission
+      const submission = await Submission.create({
+        hodId: req.user.id,
+        reports: reports.map(r => r._id),
+        academicYear: academicYear || new Date().getFullYear().toString(),
+        department: department || req.user.department || '',
+        semester: semester || '',
+        session: session || '',
+        feedbackFormNo: feedbackFormNo || 'I',
+        submissionDate: submissionDate ? new Date(submissionDate) : new Date(),
+        status: 'submitted',
+        submittedFromWorkspace: req.user.activeWorkspace || 'hod',
+      });
+
+      console.log(`[Send to Pro-VC] ✅ Submission created: ${submission._id}`);
+
+      // Log audit trail
+      try {
+        await AuditLog.record({
+          actorId: req.user.id,
+          actorRole: req.user.role,
+          workspace: req.user.activeWorkspace || 'hod',
+          event: 'submission_created',
+          description: `HOD submitted ${reports.length} faculty-approved report(s) to Pro-VC`,
+          targetType: 'submission',
+          targetId: submission._id,
+          meta: { 
+            reportCount: reports.length,
+            department: department || req.user.department,
+            academicYear: academicYear 
+          },
+        });
+      } catch (auditErr) {
+        console.error('[Send to Pro-VC] Audit log failed:', auditErr.message);
+      }
+
+      res.json({
+        success: true,
+        message: `Successfully sent ${reports.length} reports to Pro-VC`,
+        submission: {
+          id: submission._id,
+          reportCount: reports.length,
+          status: submission.status,
+          submissionDate: submission.submissionDate,
+          department: submission.department
+        }
+      });
+
+    } catch (err) {
+      console.error('[Send to Pro-VC Error]', err);
+      res.status(500).json({ error: err.message });
+    }
+  }
+);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HOD: Get own submissions
