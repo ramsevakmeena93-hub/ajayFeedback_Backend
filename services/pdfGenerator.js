@@ -20,12 +20,20 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
   let hodCommentText = null;
   try {
     if (hodUser?.department) {
+      console.log('[PDF] Fetching HOD comment for:', {
+        department: hodUser.department,
+        academicYear: submission?.academicYear || '2026-2027',
+        session: submission?.session || ''
+      });
       const commentDoc = await HODComment.findOne({
         department: hodUser.department,
         academicYear: submission?.academicYear || '2026-2027',
         session: submission?.session || ''
       }).lean();
+      console.log('[PDF] HOD comment found:', commentDoc ? 'YES' : 'NO', commentDoc?.comment?.substring(0, 50));
       hodCommentText = commentDoc?.comment || null;
+    } else {
+      console.log('[PDF] No hodUser.department, skipping comment fetch');
     }
   } catch (err) {
     console.warn('[PDF] Failed to fetch HOD comment:', err.message);
