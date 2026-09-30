@@ -183,7 +183,7 @@ router.get('/faculty', authMiddleware, requireAnyRole('faculty'), async (req, re
 // Pro-VC: Get all submissions
 // ─────────────────────────────────────────────────────────────────────────────
 
-router.get('/all', authMiddleware, requireAnyRole('provc'), async (req, res) => {
+router.get('/all', authMiddleware, requireAnyRole('vc', 'provc', 'admin'), async (req, res) => {
   try {
     const submissions = await Submission.find()
       .populate('hodId', 'name email department')
@@ -222,7 +222,7 @@ router.patch('/:id/status', authMiddleware, async (req, res) => {
         ...(req.user?.role ? [req.user.role] : []),
       ]);
 
-    const isVC    = callerRoles.has('provc');  // Pro-VC role
+    const isVC    = callerRoles.has('provc') || callerRoles.has('vc');  // Pro-VC role (both 'vc' and 'provc' accepted)
     const isAdmin = callerRoles.has('admin');
 
     if (!isVC && !isAdmin) {
