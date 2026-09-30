@@ -661,8 +661,12 @@ const handleHODExportPDF = async (req, res) => {
     const { generateFeedbackReportPDF } = require('../services/pdfGenerator');
     const pdfBuffer = await generateFeedbackReportPDF({
       submission: {
-        academicYear: reports[0]?.academicYear || new Date().getFullYear().toString(),
-        department: req.user.department || hodUser?.department || ''
+        academicYear: reports[0]?.academicYear || '2026-2027',
+        session: reports[0]?.session || '',  // Add session for HOD comment lookup
+        department: req.user.department || hodUser?.department || '',
+        feedbackFormNo: 'I',
+        submissionDate: new Date(),
+        finalReportDate: new Date()
       },
       reports,
       hodUser,
