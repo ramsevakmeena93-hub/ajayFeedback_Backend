@@ -917,6 +917,7 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
 // GENERATE INDIVIDUAL FACULTY FEEDBACK REPORT PDF
 // ─────────────────────────────────────────────────────────────────────────────
 async function generateIndividualFacultyPDF(report) {
+  const User = require('../models/User');  // Add User model
   const pdfDoc = await PDFDocument.create();
   const font          = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const boldFont      = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
@@ -1123,16 +1124,41 @@ async function generateIndividualFacultyPDF(report) {
   const footerY = curY - 50;
   page.drawLine({ start: { x: ML, y: curY - 8 }, end: { x: PW - MR, y: curY - 8 }, thickness: 0.5, color: borderCol });
 
-  // Faculty Signature / Acknowledgment Box
-  page.drawText("Faculty Acknowledgment:", { x: ML + 10, y: footerY + 30, size: 8, font: boldFont, color: gray });
+  // Faculty Name & Signature Box (left side)
+  page.drawText("Faculty Name & Signature:", { x: ML + 10, y: footerY + 30, size: 8, font: boldFont, color: gray });
+  
+  // Draw faculty signature if available
+  const facultyUser = await User.findOne({ 
+    $or: [
+      { name: { $regex: new RegExp(report.facultyName, 'i') } },
+      { _id: report.facultyUserId }
+    ]
+  }).select('signatureImage name').lean();
+  
+  if (facultyUser?.signatureImage) {
+    try {
+      const facSigImg = await pdfDoc.embedPng(facultyUser.signatureImage);
+      const sigScale = Math.min(80 / facSigImg.width, 20 / facSigImg.height, 1);
+      page.drawImage(facSigImg, {
+        x: ML + 10,
+        y: footerY + 6,
+        width: facSigImg.width * sigScale,
+        height: facSigImg.height * sigScale
+      });
+    } catch (err) {
+      console.warn('[PDF] Failed to embed faculty signature:', err.message);
+    }
+  }
+  
+  // Faculty name
+  page.drawText(report.facultyName || "Faculty", { x: ML + 100, y: footerY + 16, size: 8.5, font: boldFont, color: black });
+  
   if (report.facultyAcknowledged) {
     const ackDate = report.facultyAcknowledgedAt ? new Date(report.facultyAcknowledgedAt).toLocaleDateString("en-IN") : "Verified";
-    page.drawText(`[Digitally Acknowledged - ${ackDate}]`, { x: ML + 10, y: footerY + 16, size: 8.5, font: boldFont, color: green });
-  } else {
-    page.drawText("[Pending Review]", { x: ML + 10, y: footerY + 16, size: 8.5, font, color: gray });
+    page.drawText(`[Acknowledged - ${ackDate}]`, { x: ML + 100, y: footerY + 4, size: 7, font, color: green });
   }
 
-  // HOD Signature Box
+  // HOD Signature Box (right side)
   page.drawText("Head of Department (HOD):", { x: PW - MR - 160, y: footerY + 30, size: 8, font: boldFont, color: gray });
   page.drawText("Verified & Submitted", { x: PW - MR - 160, y: footerY + 16, size: 8.5, font: boldFont, color: navy });
 
