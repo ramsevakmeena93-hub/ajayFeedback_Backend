@@ -11,7 +11,7 @@ try {
   }
 } catch (e) {}
 
-async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser, approvedAt, isPreview = false, withoutSignatures = false }) {
+async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser, approvedAt, isPreview = false, withoutSignatures = false, hideVCSignature = false }) {
   const User = require("../models/User");
   const HODComment = require("../models/HODComment");
   const axios = require("axios");
@@ -602,7 +602,7 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
   txt(coverPage, "HOD/Dean", c2X + 4, sY - 48, 7, timesFont, gray);
 
   // Pro-VC: Signature first (top), then name, then position
-  if (vcSig && !withoutSignatures) {
+  if (vcSig && !withoutSignatures && !hideVCSignature) {
     const sc = Math.min((c3W - 10) / vcSig.width, 25 / vcSig.height, 1);
     coverPage.drawImage(vcSig, {
       x: c3X + 4, y: sY - 28,

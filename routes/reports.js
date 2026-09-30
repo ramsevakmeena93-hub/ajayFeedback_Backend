@@ -673,7 +673,8 @@ const handleHODExportPDF = async (req, res) => {
       vcUser,
       approvedAt: new Date(),  // Set approval date to enable signatures
       isPreview: false,  // Explicitly enable original PDF appending
-      withoutSignatures: false, // Show signatures in export PDF (like final report)
+      withoutSignatures: false, // Show HOD & Faculty signatures (Pro-VC signature hidden via hideVCSignature flag)
+      hideVCSignature: true, // Hide Pro-VC signature in Export PDF (only HOD downloads this)
     });
 
     res.setHeader('Content-Type', 'application/pdf');
