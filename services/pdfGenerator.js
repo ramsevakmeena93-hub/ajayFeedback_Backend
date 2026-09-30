@@ -1141,7 +1141,7 @@ async function generateIndividualFacultyPDF(report) {
   // Faculty Name & Signature Box (left side)
   page.drawText("Faculty Name & Signature:", { x: ML + 10, y: footerY + 30, size: 8, font: boldFont, color: gray });
   
-  // Draw faculty signature if available
+  // Draw faculty signature if available (signature at top)
   const facultyUser = await User.findOne({ 
     $or: [
       { name: { $regex: new RegExp(report.facultyName, 'i') } },
@@ -1152,24 +1152,32 @@ async function generateIndividualFacultyPDF(report) {
   if (facultyUser?.signatureImage) {
     try {
       const facSigImg = await pdfDoc.embedPng(facultyUser.signatureImage);
-      const sigScale = Math.min(80 / facSigImg.width, 20 / facSigImg.height, 1);
+      const sigScale = Math.min(80 / facSigImg.width, 22 / facSigImg.height, 1);
       page.drawImage(facSigImg, {
         x: ML + 10,
-        y: footerY + 6,
+        y: footerY + 2,  // Signature at top (just below label)
         width: facSigImg.width * sigScale,
         height: facSigImg.height * sigScale
       });
     } catch (err) {
       console.warn('[PDF] Failed to embed faculty signature:', err.message);
     }
+  } else {
+    // Draw placeholder line if no signature
+    page.drawLine({ 
+      start: { x: ML + 10, y: footerY + 10 }, 
+      end: { x: ML + 90, y: footerY + 10 }, 
+      thickness: 0.5, 
+      color: gray 
+    });
   }
   
-  // Faculty name
-  page.drawText(report.facultyName || "Faculty", { x: ML + 100, y: footerY + 16, size: 8.5, font: boldFont, color: black });
+  // Faculty name (below signature)
+  page.drawText(report.facultyName || "Faculty", { x: ML + 10, y: footerY - 14, size: 8.5, font: boldFont, color: black });
   
   if (report.facultyAcknowledged) {
     const ackDate = report.facultyAcknowledgedAt ? new Date(report.facultyAcknowledgedAt).toLocaleDateString("en-IN") : "Verified";
-    page.drawText(`[Acknowledged - ${ackDate}]`, { x: ML + 100, y: footerY + 4, size: 7, font, color: green });
+    page.drawText(`[Acknowledged - ${ackDate}]`, { x: ML + 10, y: footerY - 26, size: 7, font, color: green });
   }
 
   // HOD Signature Box (right side)
