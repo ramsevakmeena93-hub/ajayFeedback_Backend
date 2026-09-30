@@ -1389,3 +1389,56 @@ router.post('/bulk-send-to-faculty', authMiddleware, requireAnyRole('hod'), asyn
     res.status(500).json({ error: err.message });
   }
 });
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ADMIN: Delete reports by faculty name and status
+// ─────────────────────────────────────────────────────────────────────────────
+router.delete('/admin/delete-by-faculty', authMiddleware, requireAnyRole(['admin', 'vc']), async (req, res) => {
+  try {
+    const { facultyName, statuses } = req.body;
+    
+    if (!facultyName) {
+      return res.status(400).json({ error: 'Faculty name is required' });
+    }
+    
+    const query = {
+      facultyName: { $regex: new RegExp(facultyName, 'i') }
+    };
+    
+    if (statuses && Array.isArray(statuses) && statuses.length > 0) {
+      query.status = { $in: statuses };
+    }
+    
+    // Find first to show what will be deleted
+    const reports = await FacultyReport.find(query).select('_id facultyName subjectCode status');
+    
+    if (reports.length === 0) {
+      return res.json({ 
+        message: 'No reports found matching criteria',
+        deleted: 0,
+        reports: []
+      });
+    }
+    
+    // Delete them
+    const result = await FacultyReport.deleteMany(query);
+    
+    log('info', `[Admin] Deleted ${result.deletedCount} reports for faculty: ${facultyName} by user: ${req.user.email}`);
+    
+    res.json({
+      message: `Successfully deleted ${result.deletedCount} reports`,
+      deleted: result.deletedCount,
+      reports: reports.map(r => ({
+        id: r._id,
+        facultyName: r.facultyName,
+        subjectCode: r.subjectCode,
+        status: r.status
+      }))
+    });
+    
+  } catch (err) {
+    log('error', '[Admin Delete Reports Error]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
