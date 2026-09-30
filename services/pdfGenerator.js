@@ -353,7 +353,7 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
 
   // ── Data rows ─────────────────────────────────────────────────────────────
   const ROW_GAP    = 0;
-  const SIG_RESERVE = 85; // space needed at bottom for signature section (reduced from 125)
+  const SIG_RESERVE = 70; // space needed at bottom for signature section (optimized)
   const FS = 10.5;           // Times New Roman 10.5pt for all cell content
   const LH = 13;       // line height = 13pt
   const CW_CHAR = 0.58;    // Times New Roman char width factor
@@ -393,8 +393,11 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
     const ROW_H     = Math.min(500, Math.max(60, maxLines * LH + 20));
 
     // Check if we need a new page
-    // Dynamic Page break threshold
-    if (y - ROW_H < 20) {
+    // Dynamic Page break threshold - optimized to reduce blank space
+    const remainingSpace = y - ROW_H;
+    const needsNewPage = remainingSpace < SIG_RESERVE;
+    
+    if (needsNewPage && i < uniqueReports.length - 1) { // Only create new page if not last row
       const contPage = pdfDoc.addPage([PW, PH]);
       let cy = PH - 15;
       // Per user request: Header is NOT repeated on new pages
@@ -486,7 +489,8 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
 
   // ── Footer note ───────────────────────────────────────────────────────────
   // Final safety check for signatures
-  if (y < 60) { // Reduced from 80 to minimize blank space before signature section
+  // Check if signature section fits on current page
+  if (y < SIG_RESERVE) { // Optimized threshold
       coverPage = pdfDoc.addPage([PW, PH]);
       y = PH - 25;
   }
@@ -522,30 +526,32 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
   });
   line(coverPage, c3X, bY, c3X, bY - sBH, 0.5, black);
 
-  // HOD name + signature
+  // HOD/Dean name first, then signature below
   txt(coverPage, (hodUser && hodUser.name) || "Head of Department",
-      c2X + 4, bY - 12, 9, boldFont, black);
+      c2X + 4, bY - 10, 9, boldFont, black);
+  txt(coverPage, "HOD/Dean", c2X + 4, bY - 22, 7, timesFont, gray);
   if (hodSig && !withoutSignatures) {
-    const sc = Math.min((c2W - 10) / hodSig.width, (sBH - 22) / hodSig.height, 1);
+    const sc = Math.min((c2W - 10) / hodSig.width, (sBH - 28) / hodSig.height, 1);
     coverPage.drawImage(hodSig, {
-      x: c2X + 4, y: bY - sBH + 8,
+      x: c2X + 4, y: bY - sBH + 6,
       width: hodSig.width * sc, height: hodSig.height * sc
     });
   } else {
-    line(coverPage, c2X + 4, bY - sBH + 18, c2X + c2W - 8, bY - sBH + 18, 0.5, gray);
+    line(coverPage, c2X + 4, bY - sBH + 16, c2X + c2W - 8, bY - sBH + 16, 0.5, gray);
   }
 
-  // VC name + signature (forced to Dr. Manjuree Pandit)
-  txt(coverPage, "Dr. Manjuree Pandit",
-      c3X + 4, bY - 12, 9, boldFont, black);
+  // Pro-VC name first, then position below signature
+  txt(coverPage, "Dr. Manjaree Pandit",
+      c3X + 4, bY - 10, 9, boldFont, black);
+  txt(coverPage, "Pro-VC", c3X + 4, bY - 22, 7, timesFont, gray);
   if (vcSig && !withoutSignatures) {
-    const sc = Math.min((c3W - 10) / vcSig.width, (sBH - 22) / vcSig.height, 1);
+    const sc = Math.min((c3W - 10) / vcSig.width, (sBH - 28) / vcSig.height, 1);
     coverPage.drawImage(vcSig, {
-      x: c3X + 4, y: bY - sBH + 8,
+      x: c3X + 4, y: bY - sBH + 6,
       width: vcSig.width * sc, height: vcSig.height * sc
     });
   } else {
-    line(coverPage, c3X + 4, bY - sBH + 18, c3X + c3W - 8, bY - sBH + 18, 0.5, gray);
+    line(coverPage, c3X + 4, bY - sBH + 16, c3X + c3W - 8, bY - sBH + 16, 0.5, gray);
   }
 
   // ── Append CSV PDFs with HOD + VC signature stamps ────────────────────────
