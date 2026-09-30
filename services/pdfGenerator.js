@@ -353,7 +353,7 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
 
   // ── Data rows ─────────────────────────────────────────────────────────────
   const ROW_GAP    = 0;
-  const SIG_RESERVE = 125; // space needed at bottom for signature section
+  const SIG_RESERVE = 85; // space needed at bottom for signature section (reduced from 125)
   const FS = 10.5;           // Times New Roman 10.5pt for all cell content
   const LH = 13;       // line height = 13pt
   const CW_CHAR = 0.58;    // Times New Roman char width factor
@@ -486,7 +486,7 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
 
   // ── Footer note ───────────────────────────────────────────────────────────
   // Final safety check for signatures
-  if (y < 80) {
+  if (y < 60) { // Reduced from 80 to minimize blank space before signature section
       coverPage = pdfDoc.addPage([PW, PH]);
       y = PH - 25;
   }
@@ -896,7 +896,7 @@ async function generateIndividualFacultyPDF(report) {
   }
 
   function checkPageSpace(requiredSpace) {
-    if (curY - requiredSpace < 40) {
+    if (curY - requiredSpace < 30) { // Reduced from 40 to minimize blank space
       page = pdfDoc.addPage([PW, PH]);
       curY = PH - 40;
       return true;
