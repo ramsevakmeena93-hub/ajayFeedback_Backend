@@ -671,8 +671,8 @@ const handleHODExportPDF = async (req, res) => {
       reports,
       hodUser,
       vcUser,
-      approvedAt: null,
-      withoutSignatures: true, // Same as final PDF but without signatures attached
+      approvedAt: new Date(),  // Set approval date to enable signatures
+      withoutSignatures: false, // Show signatures in export PDF (like final report)
     });
 
     res.setHeader('Content-Type', 'application/pdf');
