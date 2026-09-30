@@ -246,22 +246,22 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
 
   // ── Column definitions ────────────────────────────────────────────────────
   // Total usable width = CW = 802
-  // S.No(24) | Faculty Name(90) | Code/Batch(65) | Programme(70) | Sem(24) |
-  // FFI(38) | Resp.(40) | Needs Attention(155) | Appreciation(145) |
-  // Action Taken(85) | Faculty Signature(66)
-  // Sum = 24+90+65+70+24+38+40+155+145+85+66 = 802
+  // S.No(24) | Faculty Name(90) | Code/Batch(65) | Programme(68) | Sem(24) |
+  // FFI(38) | Resp.(48) | Needs Attention(150) | Appreciation(145) |
+  // Action Taken(85) | Faculty Signature(65)
+  // Sum = 24+90+65+68+24+38+48+150+145+85+65 = 802
   const COLS = [
     { label: "S.No",              x: ML,        w: 24  },
     { label: "Faculty Name",      x: ML + 24,   w: 90  },
     { label: "Code/Batch",        x: ML + 114,  w: 65  },
-    { label: "Course Name",       x: ML + 179,  w: 70  },
-    { label: "Sem",               x: ML + 249,  w: 24  },
-    { label: "FFI",               x: ML + 273,  w: 38  },
-    { label: "Resp. %",           x: ML + 311,  w: 40  },
-    { label: "Needs Attention",   x: ML + 351,  w: 155 },
-    { label: "Appreciation",      x: ML + 506,  w: 145 },
-    { label: "Action Taken",      x: ML + 651,  w: 85  },
-    { label: "Faculty Signature", x: ML + 736,  w: 66  },
+    { label: "Course Name",       x: ML + 179,  w: 68  },  // Reduced from 70
+    { label: "Sem",               x: ML + 247,  w: 24  },
+    { label: "FFI",               x: ML + 271,  w: 38  },
+    { label: "Resp. %",           x: ML + 309,  w: 48  },  // Increased from 40
+    { label: "Needs Attention",   x: ML + 357,  w: 150 },  // Reduced from 155
+    { label: "Appreciation",      x: ML + 507,  w: 145 },
+    { label: "Action Taken",      x: ML + 652,  w: 85  },
+    { label: "Faculty Signature", x: ML + 737,  w: 65  },  // Reduced from 66
   ];
 
   const TH = 36; // table header height — 2-line for long labels
