@@ -1,4 +1,4 @@
-﻿// pdfGenerator.js — clean rewrite
+﻿// pdfGenerator.js — clean rewrite with course name cleaning
 const { PDFDocument, rgb, StandardFonts } = require("pdf-lib");
 const fs2 = require("fs");
 const path = require("path");
