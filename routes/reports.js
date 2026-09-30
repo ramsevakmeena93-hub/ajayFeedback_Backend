@@ -1394,7 +1394,7 @@ router.post('/bulk-send-to-faculty', authMiddleware, requireAnyRole('hod'), asyn
 // ─────────────────────────────────────────────────────────────────────────────
 // ADMIN: Delete reports by faculty name and status
 // ─────────────────────────────────────────────────────────────────────────────
-router.delete('/admin/delete-by-faculty', authMiddleware, requireAnyRole(['admin', 'vc']), async (req, res) => {
+router.delete('/admin/delete-by-faculty', authMiddleware, requireAnyRole('admin', 'vc'), async (req, res) => {
   try {
     const { facultyName, statuses } = req.body;
     
@@ -1447,7 +1447,7 @@ router.delete('/admin/delete-by-faculty', authMiddleware, requireAnyRole(['admin
 // ─────────────────────────────────────────────────────────────────────────────
 // HOD: Save/Update Department Comment
 // ─────────────────────────────────────────────────────────────────────────────
-router.post('/hod-comment', authMiddleware, requireAnyRole(['hod', 'admin']), async (req, res) => {
+router.post('/hod-comment', authMiddleware, requireAnyRole('hod', 'admin'), async (req, res) => {
   try {
     const HODComment = require('../models/HODComment');
     const User = require('../models/User');
@@ -1511,7 +1511,7 @@ router.post('/hod-comment', authMiddleware, requireAnyRole(['hod', 'admin']), as
 // ─────────────────────────────────────────────────────────────────────────────
 // HOD: Get Department Comment
 // ─────────────────────────────────────────────────────────────────────────────
-router.get('/hod-comment', authMiddleware, requireAnyRole(['hod', 'admin', 'vc']), async (req, res) => {
+router.get('/hod-comment', authMiddleware, requireAnyRole('hod', 'admin', 'vc'), async (req, res) => {
   try {
     const HODComment = require('../models/HODComment');
     const User = require('../models/User');
