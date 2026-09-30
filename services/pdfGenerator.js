@@ -867,7 +867,8 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
                 };
                 drawSig(fSig, facItem, 250, 10);
                 drawSig(hodSig, hodItem, 380, 10);
-                drawSig(vcSig, vcItem, 545, 10, 45);
+                // Pro-VC signature removed from individual faculty PDFs (only on cover page)
+                // drawSig(vcSig, vcItem, 545, 10, 45);
                 console.log("[PDF] Signatures stamped for " + (rp.facultyName || "Unknown Faculty"));
               }
             } catch (stampErr) {
