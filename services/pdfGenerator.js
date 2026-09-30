@@ -501,7 +501,7 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
       { v: String(i + 1),                                  bold: true,  center: true },
       { v: r.facultyName || "-" },
       { v: codeBatch },
-      { v: r.programme  || "-" },
+      { v: cleanCourseName(r.programme)  || "-" },  // Clean course name (remove "submitted answer" garbage)
       { v: r.semester   || "-",                            center: true },
       { v: ffi != null ? ffi.toFixed(2) : "-",            color: ffiColor, bold: true, center: true },
       { v: respDisplay,                                    center: true },
@@ -919,6 +919,18 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
 // ─────────────────────────────────────────────────────────────────────────────
 async function generateIndividualFacultyPDF(report) {
   const User = require('../models/User');  // Add User model
+  
+  // ── Clean course name — remove "submitted answer" and similar text ─────────
+  function cleanCourseName(name) {
+    if (!name) return "";
+    return String(name)
+      .replace(/\bsubmitted\s+answers?\s*:?\s*-?\s*/gi, "") // Remove "submitted answer(s):-" or variations
+      .replace(/\bsubmitted\s+responses?\s*:?\s*-?\s*/gi, "")
+      .replace(/\bstudent\s+feedback\s*:?\s*-?\s*/gi, "")
+      .replace(/\s+/g, " ") // Normalize whitespace
+      .trim();
+  }
+  
   const pdfDoc = await PDFDocument.create();
   const font          = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const boldFont      = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
@@ -1026,7 +1038,8 @@ async function generateIndividualFacultyPDF(report) {
 
   lineY -= 18;
   page.drawText("Course Name / Sem:", { x: leftX, y: lineY, size: 9, font: boldFont, color: gray });
-  const progSem = [report.programme, report.semester ? `Semester ${report.semester}` : "", report.branch ? `(${report.branch})` : ""].filter(Boolean).join(" · ") || "—";
+  const cleanedProgramme = cleanCourseName(report.programme);
+  const progSem = [cleanedProgramme, report.semester ? `Semester ${report.semester}` : "", report.branch ? `(${report.branch})` : ""].filter(Boolean).join(" · ") || "—";
   page.drawText(progSem, { x: leftX + 85, y: lineY, size: 9, font, color: black });
 
   lineY -= 18;
