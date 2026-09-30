@@ -495,7 +495,7 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
 
     const respDisplay = r.responsePercent != null
       ? (typeof r.responsePercent === 'number' ? r.responsePercent.toFixed(2) + '%' : r.responsePercent + '%')
-      : (r.responseCount != null ? String(r.responseCount) : (r.totalResponses != null ? String(r.totalResponses) : "-"));
+      : '%';  // Show just % symbol if no percentage data available
 
     const cellValues = [
       { v: String(i + 1),                                  bold: true,  center: true },
