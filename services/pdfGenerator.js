@@ -502,57 +502,47 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
       ML + 4, y - 13, 9, font, black);
   y -= 18;
 
-  // ── Signature section (HOD | PRO-VC) — 2 columns, no Faculty column ──────
-  const sHH = 14;  // label row height
-  const sBH = 45;  // body row height
+  // ── Signature section (HOD | PRO-VC) — Signature first, then name, then position ──────
+  const sBH = 60;  // body row height (increased for signature)
   const sY  = y;
   const c2W = Math.floor(CW / 2);
   const c3W = CW - Math.floor(CW / 2);
   const c2X = ML;
   const c3X = ML + Math.floor(CW / 2);
 
-  // Label row
-  rect(coverPage, ML, sY - sHH, CW, sHH, {
+  // Single row - no label row
+  rect(coverPage, ML, sY - sBH, CW, sBH, {
     borderColor: black, borderWidth: 0.5
   });
-  line(coverPage, c3X, sY, c3X, sY - sHH, 0.5, black);
-  txt(coverPage, "HOD/Dean",      c2X + 4, sY - 13, 9, boldFont, black);
-  txt(coverPage, "PRO - VC", c3X + 4, sY - 13, 9, boldFont, black);
+  line(coverPage, c3X, sY, c3X, sY - sBH, 0.5, black);
 
-  // Body row
-  const bY = sY - sHH;
-  rect(coverPage, ML, bY - sBH, CW, sBH, {
-    borderColor: black, borderWidth: 0.5
-  });
-  line(coverPage, c3X, bY, c3X, bY - sBH, 0.5, black);
-
-  // HOD/Dean name first, then signature below
-  txt(coverPage, (hodUser && hodUser.name) || "Head of Department",
-      c2X + 4, bY - 10, 9, boldFont, black);
-  txt(coverPage, "HOD/Dean", c2X + 4, bY - 22, 7, timesFont, gray);
+  // HOD: Signature first (top), then name, then position
   if (hodSig && !withoutSignatures) {
-    const sc = Math.min((c2W - 10) / hodSig.width, (sBH - 28) / hodSig.height, 1);
+    const sc = Math.min((c2W - 10) / hodSig.width, 25 / hodSig.height, 1);
     coverPage.drawImage(hodSig, {
-      x: c2X + 4, y: bY - sBH + 6,
+      x: c2X + 4, y: sY - 28,
       width: hodSig.width * sc, height: hodSig.height * sc
     });
   } else {
-    line(coverPage, c2X + 4, bY - sBH + 16, c2X + c2W - 8, bY - sBH + 16, 0.5, gray);
+    line(coverPage, c2X + 4, sY - 20, c2X + c2W - 8, sY - 20, 0.5, gray);
   }
+  txt(coverPage, (hodUser && hodUser.name) || "Abhishek Dixit",
+      c2X + 4, sY - 36, 9, boldFont, black);
+  txt(coverPage, "HOD/Dean", c2X + 4, sY - 48, 7, timesFont, gray);
 
-  // Pro-VC name first, then position below signature
-  txt(coverPage, "Dr. Manjaree Pandit",
-      c3X + 4, bY - 10, 9, boldFont, black);
-  txt(coverPage, "Pro-VC", c3X + 4, bY - 22, 7, timesFont, gray);
+  // Pro-VC: Signature first (top), then name, then position
   if (vcSig && !withoutSignatures) {
-    const sc = Math.min((c3W - 10) / vcSig.width, (sBH - 28) / vcSig.height, 1);
+    const sc = Math.min((c3W - 10) / vcSig.width, 25 / vcSig.height, 1);
     coverPage.drawImage(vcSig, {
-      x: c3X + 4, y: bY - sBH + 6,
+      x: c3X + 4, y: sY - 28,
       width: vcSig.width * sc, height: vcSig.height * sc
     });
   } else {
-    line(coverPage, c3X + 4, bY - sBH + 16, c3X + c3W - 8, bY - sBH + 16, 0.5, gray);
+    line(coverPage, c3X + 4, sY - 20, c3X + c3W - 8, sY - 20, 0.5, gray);
   }
+  txt(coverPage, "Dr. Manjaree Pandit",
+      c3X + 4, sY - 36, 9, boldFont, black);
+  txt(coverPage, "Pro-VC", c3X + 4, sY - 48, 7, timesFont, gray);
 
   // ── Append CSV PDFs with HOD + VC signature stamps ────────────────────────
   function convertDriveLink(url) {
@@ -782,7 +772,7 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
                 hodItem = foundHod;
                 facItem = items.find(item => {
                   const value = String(item.str || "").trim();
-                  return value.includes("Signature") && !value.includes("Faculty Name & Signature");
+                  return value.includes("Faculty Name") || value.includes("Faculty Signature");
                 });
                 if (!facItem) {
                   facItem = items.find(item => /Faculty/i.test(String(item.str || "")));
