@@ -13,7 +13,23 @@ try {
 
 async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser, approvedAt, isPreview = false, withoutSignatures = false }) {
   const User = require("../models/User");
+  const HODComment = require("../models/HODComment");
   const axios = require("axios");
+
+  // Fetch HOD comment for this department
+  let hodCommentText = null;
+  try {
+    if (hodUser?.department) {
+      const commentDoc = await HODComment.findOne({
+        department: hodUser.department,
+        academicYear: submission?.academicYear || '2026-2027',
+        session: submission?.session || ''
+      }).lean();
+      hodCommentText = commentDoc?.comment || null;
+    }
+  } catch (err) {
+    console.warn('[PDF] Failed to fetch HOD comment:', err.message);
+  }
 
   // ── PDF document & fonts ──────────────────────────────────────────────────
   const pdfDoc = await PDFDocument.create();
@@ -346,7 +362,52 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
   // Removed the line that was cutting through the text
   txt(coverPage, avgFFIText,  ML, y, 11, timesBoldFont, black);
   txt(coverPage, avgRespText, PW - MR - timesBoldFont.widthOfTextAtSize(avgRespText, 11), y, 11, timesBoldFont, black);
-  y -= 15;
+  y -= 18;
+
+  // ── HOD Comment Section (if exists) ───────────────────────────────────────
+  if (hodCommentText && hodCommentText.trim()) {
+    // Add some spacing
+    y -= 6;
+    
+    // Draw a subtle box for the comment
+    const commentLines = [];
+    const maxCharsPerLine = Math.floor(CW / (10 * 0.58)); // ~138 chars per line
+    const words = hodCommentText.trim().split(' ');
+    let currentLine = '';
+    
+    words.forEach(word => {
+      const testLine = currentLine ? currentLine + ' ' + word : word;
+      if (testLine.length <= maxCharsPerLine) {
+        currentLine = testLine;
+      } else {
+        if (currentLine) commentLines.push(currentLine);
+        currentLine = word;
+      }
+    });
+    if (currentLine) commentLines.push(currentLine);
+    
+    const commentHeight = Math.max(30, commentLines.length * 13 + 20);
+    const commentBoxY = y;
+    
+    // Draw light blue background box
+    rect(coverPage, ML, commentBoxY - commentHeight, CW, commentHeight, {
+      color: rgb(0.95, 0.97, 1), // very light blue
+      borderColor: rgb(0.7, 0.8, 0.95),
+      borderWidth: 0.5
+    });
+    
+    // Title
+    txt(coverPage, "HOD Remarks:", ML + 10, commentBoxY - 14, 10, boldFont, darkBlue);
+    
+    // Comment text
+    let commentY = commentBoxY - 28;
+    commentLines.forEach(line => {
+      txt(coverPage, line, ML + 10, commentY, 10, timesFont, black);
+      commentY -= 13;
+    });
+    
+    y = commentBoxY - commentHeight - 8;
+  }
 
   // ── Draw initial table header ─────────────────────────────────────────────
   y = drawTableHeader(coverPage, y);
