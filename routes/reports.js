@@ -1157,3 +1157,235 @@ router.post('/admin/recall-from-faculty', authMiddleware, requireAnyRole('hod', 
     res.status(500).json({ error: err.message });
   }
 });
+
+
+// ═════════════════════════════════════════════════════════════════════════════
+// NEW: SEND TO FACULTY SYSTEM (Rebuilt Clean)
+// ═════════════════════════════════════════════════════════════════════════════
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HOD: Send single report to faculty
+// ─────────────────────────────────────────────────────────────────────────────
+
+router.post('/:id/send-to-faculty', authMiddleware, requireAnyRole('hod'), async (req, res) => {
+  try {
+    const report = await FacultyReport.findOne({ 
+      _id: req.params.id, 
+      hodId: req.user.id,
+      status: 'processed'
+    });
+
+    if (!report) {
+      return res.status(404).json({ 
+        error: 'Report not found or already sent' 
+      });
+    }
+
+    // Get faculty name from report
+    const facultyName = report.facultyName;
+    if (!facultyName) {
+      return res.status(400).json({ 
+        error: 'Report does not have faculty name. Please edit the report first.' 
+      });
+    }
+
+    // Find faculty user by name
+    const User = require('../models/User');
+    let facultyUser = null;
+    
+    // Try exact match first
+    facultyUser = await User.findOne({ 
+      name: new RegExp(`^${facultyName.trim()}$`, 'i')
+    });
+    
+    // If not found, try first name match
+    if (!facultyUser) {
+      const firstName = facultyName.split(' ')[0];
+      facultyUser = await User.findOne({ 
+        name: new RegExp(firstName, 'i'),
+        roles: { $in: ['faculty', 'hod'] }
+      });
+    }
+
+    if (!facultyUser) {
+      return res.status(400).json({ 
+        error: `Faculty "${facultyName}" not found. Please ask them to register first.`,
+        facultyName: facultyName
+      });
+    }
+
+    console.log(`[Send to Faculty] Found user: ${facultyUser.name} (${facultyUser.email}) for report ${report._id}`);
+
+    // Update report status
+    const updated = await FacultyReport.findByIdAndUpdate(
+      report._id,
+      {
+        status: 'sent_to_faculty',
+        sentToFacultyAt: new Date(),
+        facultyUserId: facultyUser._id,
+        facultyEmail: facultyUser.email,
+        facultyAcknowledged: false,
+        facultyAcknowledgedAt: null
+      },
+      { new: true }
+    );
+
+    console.log(`[Send to Faculty] ✅ Report ${report._id} sent to ${facultyUser.name}`);
+
+    // Send notification to faculty
+    try {
+      const Notification = require('../models/Notification');
+      await Notification.create({
+        userId: facultyUser._id,
+        type: 'sent_to_faculty',
+        message: `HOD sent your feedback report for ${updated.subjectCode || 'your subject'} (${updated.semester ? 'Sem ' + updated.semester : ''})`,
+        reportId: updated._id,
+        read: false
+      });
+      console.log(`[Send to Faculty] ✅ Notification sent to ${facultyUser.email}`);
+    } catch (notifErr) {
+      console.error('[Send to Faculty] Notification failed:', notifErr.message);
+      // Don't fail the whole operation if notification fails
+    }
+
+    res.json({ 
+      success: true,
+      report: updated,
+      message: `Report sent to ${facultyUser.name}` 
+    });
+
+  } catch (err) {
+    console.error('[Send to Faculty Error]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HOD: Bulk send multiple reports to faculty
+// ─────────────────────────────────────────────────────────────────────────────
+
+router.post('/bulk-send-to-faculty', authMiddleware, requireAnyRole('hod'), async (req, res) => {
+  try {
+    const { reportIds } = req.body;
+
+    if (!reportIds || !Array.isArray(reportIds) || reportIds.length === 0) {
+      return res.status(400).json({ error: 'No report IDs provided' });
+    }
+
+    console.log(`[Bulk Send] Processing ${reportIds.length} reports`);
+
+    const results = {
+      success: [],
+      failed: [],
+      notFound: []
+    };
+
+    const User = require('../models/User');
+    const Notification = require('../models/Notification');
+
+    for (const reportId of reportIds) {
+      try {
+        // Find report
+        const report = await FacultyReport.findOne({ 
+          _id: reportId, 
+          hodId: req.user.id,
+          status: 'processed'
+        });
+
+        if (!report) {
+          results.notFound.push({ 
+            reportId, 
+            reason: 'Report not found or already sent' 
+          });
+          continue;
+        }
+
+        // Get faculty name
+        const facultyName = report.facultyName;
+        if (!facultyName) {
+          results.failed.push({ 
+            reportId, 
+            facultyName: 'Unknown',
+            reason: 'No faculty name in report' 
+          });
+          continue;
+        }
+
+        // Find faculty user
+        let facultyUser = await User.findOne({ 
+          name: new RegExp(`^${facultyName.trim()}$`, 'i')
+        });
+
+        if (!facultyUser) {
+          const firstName = facultyName.split(' ')[0];
+          facultyUser = await User.findOne({ 
+            name: new RegExp(firstName, 'i'),
+            roles: { $in: ['faculty', 'hod'] }
+          });
+        }
+
+        if (!facultyUser) {
+          results.failed.push({ 
+            reportId, 
+            facultyName,
+            reason: 'Faculty user not registered' 
+          });
+          continue;
+        }
+
+        // Update report
+        await FacultyReport.findByIdAndUpdate(report._id, {
+          status: 'sent_to_faculty',
+          sentToFacultyAt: new Date(),
+          facultyUserId: facultyUser._id,
+          facultyEmail: facultyUser.email,
+          facultyAcknowledged: false,
+          facultyAcknowledgedAt: null
+        });
+
+        // Send notification
+        try {
+          await Notification.create({
+            userId: facultyUser._id,
+            type: 'sent_to_faculty',
+            message: `HOD sent your feedback report for ${report.subjectCode || 'your subject'}`,
+            reportId: report._id,
+            read: false
+          });
+        } catch (notifErr) {
+          console.error('[Bulk Send] Notification failed for', facultyUser.email);
+        }
+
+        results.success.push({ 
+          reportId, 
+          facultyName: facultyUser.name,
+          facultyEmail: facultyUser.email 
+        });
+
+        console.log(`[Bulk Send] ✅ Sent report ${reportId} to ${facultyUser.name}`);
+
+      } catch (err) {
+        console.error(`[Bulk Send] Error processing ${reportId}:`, err.message);
+        results.failed.push({ 
+          reportId, 
+          reason: err.message 
+        });
+      }
+    }
+
+    console.log(`[Bulk Send] Complete: ${results.success.length} success, ${results.failed.length} failed`);
+
+    res.json({
+      success: true,
+      sent: results.success.length,
+      failed: results.failed.length,
+      notFound: results.notFound.length,
+      total: reportIds.length,
+      details: results
+    });
+
+  } catch (err) {
+    console.error('[Bulk Send Error]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
