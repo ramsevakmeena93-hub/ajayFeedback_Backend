@@ -19,6 +19,7 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
   // Fetch HOD comment for this department
   let hodCommentText = null;
   try {
+    const HODComment = require('../models/HODComment');
     if (hodUser?.department) {
       console.log('[PDF] Fetching HOD comment for:', {
         department: hodUser.department,
@@ -36,7 +37,8 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
       console.log('[PDF] No hodUser.department, skipping comment fetch');
     }
   } catch (err) {
-    console.warn('[PDF] Failed to fetch HOD comment:', err.message);
+    console.warn('[PDF] Failed to fetch HOD comment (non-fatal):', err.message);
+    hodCommentText = null; // Continue without comment
   }
 
   // ── PDF document & fonts ──────────────────────────────────────────────────

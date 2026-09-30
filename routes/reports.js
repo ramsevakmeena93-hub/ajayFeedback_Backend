@@ -1519,7 +1519,19 @@ router.post('/hod-comment', authMiddleware, requireAnyRole('hod', 'admin'), asyn
 // ─────────────────────────────────────────────────────────────────────────────
 router.get('/hod-comment', authMiddleware, requireAnyRole('hod', 'admin', 'vc'), async (req, res) => {
   try {
-    const HODComment = require('../models/HODComment');
+    // Ensure model is loaded
+    let HODComment;
+    try {
+      HODComment = require('../models/HODComment');
+    } catch (modelErr) {
+      console.error('[HOD Comment] Model load error:', modelErr);
+      return res.status(500).json({ 
+        error: 'HODComment model not available',
+        success: false,
+        comment: null
+      });
+    }
+    
     const User = require('../models/User');
     
     const { department, academicYear, session } = req.query;
@@ -1532,8 +1544,10 @@ router.get('/hod-comment', authMiddleware, requireAnyRole('hod', 'admin', 'vc'),
     }
     
     if (!targetDepartment) {
-      return res.status(400).json({ 
-        error: 'Department is required' 
+      return res.json({ 
+        success: true,
+        comment: null,
+        message: 'No department specified'
       });
     }
     
@@ -1563,7 +1577,7 @@ router.get('/hod-comment', authMiddleware, requireAnyRole('hod', 'admin', 'vc'),
     
   } catch (err) {
     console.error('[HOD Comment Get Error]', err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: err.message, stack: err.stack });
   }
 });
 
