@@ -134,6 +134,18 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
 
   // ── De-duplicate reports ──────────────────────────────────────────────────
   const normalizeKey = value => String(value || "").toLowerCase().trim().replace(/\s+/g, " ");
+  
+  // ── Clean course name — remove "submitted answer" and similar text ─────────
+  function cleanCourseName(name) {
+    if (!name) return "";
+    return String(name)
+      .replace(/\bsubmitted\s+answers?\s*:?\s*-?\s*/gi, "") // Remove "submitted answer(s):-" or variations
+      .replace(/\bsubmitted\s+responses?\s*:?\s*-?\s*/gi, "")
+      .replace(/\bstudent\s+feedback\s*:?\s*-?\s*/gi, "")
+      .replace(/\s+/g, " ") // Normalize whitespace
+      .trim();
+  }
+  
   const seenR = new Set();
   const uniqueReports = reports.filter(r => {
     const k = [
@@ -350,10 +362,11 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
     const r = uniqueReports[i];
 
     // Build cell text values
-    const codeParts = (r.subjectCode || "-").split("-");
+    const cleanedSubjectCode = cleanCourseName(r.subjectCode || "-");
+    const codeParts = cleanedSubjectCode.split("-");
     const codeBatch = codeParts.length > 1
       ? codeParts[0].trim() + "\n" + codeParts.slice(1).join("-").trim()
-      : (r.subjectCode || "-");
+      : cleanedSubjectCode;
 
     const attText = (r.commentsNeedingAttention || []).length > 0
       ? r.commentsNeedingAttention.map(x => "\u2022 " + x).join("\n\n")
@@ -499,7 +512,7 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
     borderColor: black, borderWidth: 0.5
   });
   line(coverPage, c3X, sY, c3X, sY - sHH, 0.5, black);
-  txt(coverPage, "HOD",      c2X + 4, sY - 13, 9, boldFont, black);
+  txt(coverPage, "HOD/Dean",      c2X + 4, sY - 13, 9, boldFont, black);
   txt(coverPage, "PRO - VC", c3X + 4, sY - 13, 9, boldFont, black);
 
   // Body row
