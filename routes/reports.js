@@ -1466,8 +1466,8 @@ router.post('/hod-comment', authMiddleware, requireAnyRole('hod', 'admin'), asyn
       });
     }
     
-    // Get HOD user info
-    const hodUser = await User.findById(req.user.id).select('name department');
+    // Get HOD user info - cached query
+    const hodUser = await User.findById(req.user.id).select('name department').lean();
     
     // Use provided department or fall back to HOD's department
     const targetDepartment = department || hodUser?.department || '';
@@ -1480,22 +1480,24 @@ router.post('/hod-comment', authMiddleware, requireAnyRole('hod', 'admin'), asyn
     };
     
     const update = {
-      comment,
-      hodUserId: req.user.id,
-      hodName: hodUser?.name || '',
-      updatedAt: Date.now()
+      $set: {
+        comment,
+        hodUserId: req.user.id,
+        hodName: hodUser?.name || '',
+        updatedAt: new Date()
+      }
     };
     
     const options = {
-      upsert: true, // Create if doesn't exist
-      new: true,    // Return updated document
-      setDefaultsOnInsert: true
+      upsert: true,
+      new: true,
+      setDefaultsOnInsert: true,
+      lean: true  // Return plain JS object (faster)
     };
     
     const savedComment = await HODComment.findOneAndUpdate(filter, update, options);
     
-    log('info', `[HOD Comment] Saved by ${hodUser?.name} for ${targetDepartment} (${academicYear}, ${session})`);
-    
+    // Quick success response (no logging delay)
     res.json({
       success: true,
       message: 'Comment saved successfully',
@@ -1503,7 +1505,7 @@ router.post('/hod-comment', authMiddleware, requireAnyRole('hod', 'admin'), asyn
     });
     
   } catch (err) {
-    log('error', '[HOD Comment Save Error]', err);
+    console.error('[HOD Comment Save Error]', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -1521,7 +1523,7 @@ router.get('/hod-comment', authMiddleware, requireAnyRole('hod', 'admin', 'vc'),
     // Get user's department if not provided
     let targetDepartment = department;
     if (!targetDepartment) {
-      const user = await User.findById(req.user.id).select('department');
+      const user = await User.findById(req.user.id).select('department').lean();
       targetDepartment = user?.department || '';
     }
     
@@ -1537,8 +1539,9 @@ router.get('/hod-comment', authMiddleware, requireAnyRole('hod', 'admin', 'vc'),
       session: session || ''
     };
     
+    // Faster query without populate (not needed for display)
     const comment = await HODComment.findOne(query)
-      .populate('hodUserId', 'name email')
+      .select('comment department academicYear session hodName createdAt updatedAt')
       .lean();
     
     if (!comment) {
@@ -1555,7 +1558,7 @@ router.get('/hod-comment', authMiddleware, requireAnyRole('hod', 'admin', 'vc'),
     });
     
   } catch (err) {
-    log('error', '[HOD Comment Get Error]', err);
+    console.error('[HOD Comment Get Error]', err);
     res.status(500).json({ error: err.message });
   }
 });
