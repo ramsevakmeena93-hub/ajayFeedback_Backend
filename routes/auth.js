@@ -122,6 +122,7 @@ async function buildUserPayload(user) {
     activeWorkspace,
     department: user.department || '',
     hasSignature: !!user.signatureImage,
+    signatureImage: user.signatureImage || '',
     profilePhoto: user.profilePhoto || '',
     defaultAlternateApproverId:
       user.defaultAlternateApproverId || null
@@ -1404,6 +1405,43 @@ router.post(
 
 // -----------------------------------------------------------------------------
 // Export
+// -----------------------------------------------------------------------------
+// Upload/Update Signature
+// -----------------------------------------------------------------------------
+
+router.post('/signature', authMiddleware, async (req, res) => {
+  try {
+    const { signatureImage } = req.body;
+
+    if (!signatureImage) {
+      return res.status(400).json({ error: 'Signature image required' });
+    }
+
+    // Find user and update signature
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    user.signatureImage = signatureImage;
+    await user.save();
+
+    console.log(`[Signature] Updated for ${user.email}`);
+
+    // Build full user payload
+    const userPayload = await buildUserPayload(user);
+
+    res.json({
+      message: 'Signature saved successfully',
+      user: userPayload
+    });
+
+  } catch (err) {
+    console.error('[Signature Error]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // -----------------------------------------------------------------------------
 
 module.exports = router;
