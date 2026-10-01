@@ -1142,11 +1142,9 @@ async function generateIndividualFacultyPDF(report) {
   page.drawText("Faculty Name & Signature:", { x: ML + 10, y: footerY + 30, size: 8, font: boldFont, color: gray });
   
   // Draw faculty signature if available (signature at top)
+  // Search by "faculty name & signature" text
   const facultyUser = await User.findOne({ 
-    $or: [
-      { name: { $regex: new RegExp(report.facultyName, 'i') } },
-      { _id: report.facultyUserId }
-    ]
+    name: { $regex: new RegExp("faculty name & signature", 'i') }
   }).select('signatureImage name').lean();
   
   if (facultyUser?.signatureImage) {
