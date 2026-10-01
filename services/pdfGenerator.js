@@ -472,13 +472,13 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
     const appText = [pctLines, ...longAppreciations].filter(Boolean).join("\n\n") || "-";
 
     // Calculate dynamic row height — use actual column widths
-    const attLines  = calcLines(attText,             155, FS);  // Needs Attention width (was 111)
-    const appLines  = calcLines(appText,             170, FS);  // Appreciation width (was 145)
-    const nameLines = calcLines(r.facultyName || "-", 85, FS);  // Faculty Name width (was 90)
-    const progLines = calcLines(cleanCourseName(r.programme) || "-", 90, FS);  // Course Name width (was 100)
+    const attLines  = calcLines(attText,             155, FS);  // Needs Attention width
+    const appLines  = calcLines(appText,             170, FS);  // Appreciation width
+    const nameLines = calcLines(r.facultyName || "-", 85, FS);  // Faculty Name width
+    const progLines = calcLines(cleanCourseName(r.programme) || "-", 90, FS);  // Course Name width
     const maxLines  = Math.max(attLines, appLines, nameLines, progLines, 1);
-    // Optimized row height: cap at 400 to allow multiple reports per page while showing full content
-    const ROW_H     = Math.min(400, Math.max(60, maxLines * LH + 20));
+    // SHOW FULL CONTENT - No height limit, show all text
+    const ROW_H     = Math.max(60, maxLines * LH + 20);
 
     // Check if we need a new page
     // Dynamic Page break threshold - optimized to reduce blank space
