@@ -691,7 +691,7 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
       try {
         const res = await axios.get(url, {
           responseType: "arraybuffer",
-          timeout: 20000,
+          timeout: 40000,  // Increased from 20s to 40s for large files
           headers: {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/153 Safari/537.36",
             Accept: "application/pdf,*/*"
@@ -787,7 +787,7 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
       for (const result of downloadResults) {
         const { rp, data, error } = result;
         if (!data) {
-          console.warn("[PDF] Skipping " + (rp.facultyName || "Unknown Faculty") + ": " + (error || "No PDF data"));
+          console.error("[PDF] ❌ SKIPPED " + (rp.facultyName || "Unknown Faculty") + " - Reason: " + (error || "No PDF data"));
           continue;
         }
         try {
@@ -913,6 +913,14 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
         }
       }
       console.log("[PDF] Original PDF append phase completed");
+      const successCount = downloadResults.filter(r => r.data !== null).length;
+      const failedCount = downloadResults.length - successCount;
+      console.log(`[PDF] ✅ Successfully appended: ${successCount} PDFs`);
+      if (failedCount > 0) {
+        console.error(`[PDF] ❌ Failed to append: ${failedCount} PDFs`);
+        const failedNames = downloadResults.filter(r => !r.data).map(r => r.rp.facultyName || "Unknown").join(", ");
+        console.error(`[PDF] Failed faculty PDFs: ${failedNames}`);
+      }
     } catch (appendErr) {
       console.warn("[PDF] Original PDF append phase failed. Returning main report only:", appendErr.message);
     }
