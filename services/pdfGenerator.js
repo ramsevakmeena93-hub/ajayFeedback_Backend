@@ -843,10 +843,13 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
                 hodItem = foundHod;
                 facItem = items.find(item => {
                   const value = String(item.str || "").trim();
-                  return value.includes("Faculty Name") || value.includes("Faculty Signature");
+                  return value.includes("Faculty Name & Signature");
                 });
                 if (!facItem) {
-                  facItem = items.find(item => /Faculty/i.test(String(item.str || "")));
+                  facItem = items.find(item => {
+                    const value = String(item.str || "").trim();
+                    return value.includes("Faculty Name") || value.includes("Faculty Signature");
+                  });
                 }
                 vcItem = items.find(item => /PRO\s*-?\s*VC/i.test(String(item.str || "")));
                 break;
