@@ -189,6 +189,16 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
     return true;
   });
 
+  // ── Sort reports by content size: Small reports first, big reports last ────
+  uniqueReports.sort((a, b) => {
+    // Calculate estimated content size for each report
+    const sizeA = ((a.commentsNeedingAttention || []).join(" ").length) + 
+                  ((a.appreciation || []).join(" ").length);
+    const sizeB = ((b.commentsNeedingAttention || []).join(" ").length) + 
+                  ((b.appreciation || []).join(" ").length);
+    return sizeA - sizeB; // Ascending: smallest first
+  });
+
   // ── Collect faculty signatures ────────────────────────────────────────────
   const facultySigMap = {};
   for (const r of uniqueReports) {
@@ -550,10 +560,23 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
       visLines.forEach((l, li) => {
         const fontToUse = val.bold ? boldFont : timesFont;
         const lw = fontToUse.widthOfTextAtSize(l, FS);
+        
+        // Clip text if it's too wide to prevent overflow outside cell
+        let displayText = l;
+        if (lw > col.w - 8) {
+          // Text is too wide - truncate to fit within column
+          const maxWidth = col.w - 8;
+          let truncated = l;
+          while (fontToUse.widthOfTextAtSize(truncated, FS) > maxWidth && truncated.length > 0) {
+            truncated = truncated.slice(0, -1);
+          }
+          displayText = truncated;
+        }
+        
         const tX = val.center
-          ? col.x + (col.w - lw) / 2
+          ? col.x + (col.w - fontToUse.widthOfTextAtSize(displayText, FS)) / 2
           : col.x + 5; // 5px left padding
-        txt(coverPage, l, Math.max(col.x + 1, tX), y - 15 - li * LH,
+        txt(coverPage, displayText, Math.max(col.x + 1, tX), y - 15 - li * LH,
             FS, fontToUse, val.color || black);
       });
     });
