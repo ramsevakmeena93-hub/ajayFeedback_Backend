@@ -455,13 +455,13 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
     const appText = [pctLines, ...longAppreciations].filter(Boolean).join("\n\n") || "-";
 
     // Calculate dynamic row height — use actual column widths
-    const attLines  = calcLines(attText,             155, FS);
+    const attLines  = calcLines(attText,             111, FS);  // Updated width from 155 to 111
     const appLines  = calcLines(appText,             145, FS);
     const nameLines = calcLines(r.facultyName || "-", 90, FS);
-    const progLines = calcLines(r.programme   || "-", 70, FS);
+    const progLines = calcLines(cleanCourseName(r.programme) || "-", 100, FS);  // Updated width
     const maxLines  = Math.max(attLines, appLines, nameLines, progLines, 1);
-    // Adjusted row padding
-    const ROW_H     = Math.min(500, Math.max(60, maxLines * LH + 20));
+    // Adjusted row padding - reduced max height from 500 to 350 to prevent excessive blank space
+    const ROW_H     = Math.min(350, Math.max(60, maxLines * LH + 20));
 
     // Check if we need a new page
     // Dynamic Page break threshold - optimized to reduce blank space
@@ -1009,7 +1009,7 @@ async function generateIndividualFacultyPDF(report) {
   function checkPageSpace(requiredSpace) {
     if (curY - requiredSpace < 30) { // Reduced from 40 to minimize blank space
       page = pdfDoc.addPage([PW, PH]);
-      curY = PH - 40;
+      curY = PH - 30; // Start closer to top (was 40, now 30 to reduce blank space)
       return true;
     }
     return false;
