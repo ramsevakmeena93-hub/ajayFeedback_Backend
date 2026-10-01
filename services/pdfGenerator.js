@@ -443,7 +443,7 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
   const ROW_GAP    = 0;
   const SIG_RESERVE = 70; // space needed at bottom for signature section (optimized)
   const FS = 10.5;           // Times New Roman 10.5pt for all cell content
-  const LH = 13;       // line height = 13pt
+  const LH = 11.5;       // line height = 11.5pt (reduced from 13 to save space)
   const CW_CHAR = 0.58;    // Times New Roman char width factor
 
   for (let i = 0; i < uniqueReports.length; i++) {
@@ -457,7 +457,7 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
       : cleanedSubjectCode;
 
     const attText = (r.commentsNeedingAttention || []).length > 0
-      ? r.commentsNeedingAttention.map(x => "\u2022 " + x).join("\n\n")
+      ? r.commentsNeedingAttention.map(x => "\u2022 " + x).join("\n")
       : "None";
 
     const pcts = r.commentPercentages || {};
@@ -465,11 +465,11 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
       .filter(([, v]) => v > 0)
       .sort((a, b) => b[1] - a[1])
       .map(([k, v]) => "\u2022 " + k + ": " + v + "%")
-      .join("\n\n");
+      .join("\n");
     const longAppreciations = (r.appreciation || [])
       .filter(c => c.trim().split(/\s+/).length > 4)
       .map(x => "\u2022 " + x);
-    const appText = [pctLines, ...longAppreciations].filter(Boolean).join("\n\n") || "-";
+    const appText = [pctLines, ...longAppreciations].filter(Boolean).join("\n") || "-";
 
     // Calculate dynamic row height — use actual column widths
     const attLines  = calcLines(attText,             155, FS);  // Needs Attention width
@@ -477,8 +477,8 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
     const nameLines = calcLines(r.facultyName || "-", 85, FS);  // Faculty Name width
     const progLines = calcLines(cleanCourseName(r.programme) || "-", 90, FS);  // Course Name width
     const maxLines  = Math.max(attLines, appLines, nameLines, progLines, 1);
-    // SHOW FULL CONTENT - No height limit, show all text
-    const ROW_H     = Math.max(60, maxLines * LH + 20);
+    // SHOW FULL CONTENT - Reduced padding from 20 to 12 to save space
+    const ROW_H     = Math.max(60, maxLines * LH + 12);
 
     // Check if we need a new page
     // Dynamic Page break threshold - optimized to reduce blank space
