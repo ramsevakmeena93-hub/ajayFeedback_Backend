@@ -460,8 +460,8 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
     const nameLines = calcLines(r.facultyName || "-", 90, FS);
     const progLines = calcLines(cleanCourseName(r.programme) || "-", 100, FS);  // Updated width
     const maxLines  = Math.max(attLines, appLines, nameLines, progLines, 1);
-    // Adjusted row padding - reduced max height from 500 to 350 to prevent excessive blank space
-    const ROW_H     = Math.min(350, Math.max(60, maxLines * LH + 20));
+    // FULL CONTENT: No row height limit - show all comments without truncation
+    const ROW_H     = Math.max(60, maxLines * LH + 20);
 
     // Check if we need a new page
     // Dynamic Page break threshold - optimized to reduce blank space
@@ -537,21 +537,15 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
         return;
       }
 
-      // Regular text cell — Times New Roman 12pt, NO column dividers
+      // Regular text cell — Times New Roman 10.5pt, NO column dividers
       // Safer maxChars with more horizontal padding (10px)
       const maxChars = Math.max(1, Math.floor((col.w - 10) / (FS * 0.62)));
       // Split by newlines, filter out empty lines, then wrap each segment
       const textValue = val.v || "";
       const allLines = textValue.split("\n").filter(seg => seg.trim()).flatMap(seg => wrap(seg, maxChars));
-      const maxVisibleLines = Math.floor((ROW_H - 12) / LH);
-      const visLines = allLines.slice(0, maxVisibleLines);
       
-      // If text is truncated, add "..." to the last visible line
-      const isTruncated = allLines.length > maxVisibleLines;
-      if (isTruncated && visLines.length > 0) {
-        const lastLineIndex = visLines.length - 1;
-        visLines[lastLineIndex] = visLines[lastLineIndex] + "...";
-      }
+      // SHOW ALL LINES - No truncation, full content displayed
+      const visLines = allLines;
       
       visLines.forEach((l, li) => {
         const fontToUse = val.bold ? boldFont : timesFont;
