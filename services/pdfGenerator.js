@@ -106,8 +106,8 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
 
   // Calculate how many wrapped lines a block of text needs
   function calcLines(text, colW, fontSize) {
-    // Use a safer factor (0.62 instead of 0.58) to prevent text overlap
-    const maxChars = Math.max(1, Math.floor((colW - 6) / (fontSize * 0.62)));
+    // Optimized to use more horizontal space (factor 0.58 instead of 0.62)
+    const maxChars = Math.max(1, Math.floor((colW - 6) / (fontSize * 0.58)));
     if (!text) return 1;
     const segments = text.split("\n");
     let total = 0;
@@ -538,8 +538,8 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
       }
 
       // Regular text cell — Times New Roman 10.5pt, NO column dividers
-      // Safer maxChars with more horizontal padding (10px)
-      const maxChars = Math.max(1, Math.floor((col.w - 10) / (FS * 0.62)));
+      // Optimized wrapping - use more horizontal space (reduced padding from 10 to 6)
+      const maxChars = Math.max(1, Math.floor((col.w - 6) / (FS * 0.58)));
       // Split by newlines, filter out empty lines, then wrap each segment
       const textValue = val.v || "";
       const allLines = textValue.split("\n").filter(seg => seg.trim()).flatMap(seg => wrap(seg, maxChars));
