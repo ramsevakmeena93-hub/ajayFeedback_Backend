@@ -248,21 +248,21 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
 
   // ── Column definitions ────────────────────────────────────────────────────
   // Total usable width = CW = 802, ML = 20
-  // S.No(24) | Faculty Name(90) | Code/Batch(65) | Course Name(100) | Sem(24) |
-  // FFI(38) | Resp.(55) | Needs Attention(111) | Appreciation(145) |
-  // Action Taken(85) | Faculty Signature(65)
-  // Sum = 24+90+65+100+24+38+55+111+145+85+65 = 802
+  // S.No(24) | Faculty Name(85) | Code/Batch(60) | Course Name(90) | Sem(22) |
+  // FFI(35) | Resp.(50) | Needs Attention(155) | Appreciation(170) |
+  // Action Taken(50) | Faculty Signature(61)
+  // Sum = 24+85+60+90+22+35+50+155+170+50+61 = 802
   const COLS = [
-    { label: "S.No",              x: ML,        w: 24  },    // 20
-    { label: "Faculty Name",      x: ML + 24,   w: 90  },    // 44
-    { label: "Code/Batch",        x: ML + 114,  w: 65  },    // 134
-    { label: "Course Name",       x: ML + 179,  w: 100 },    // 199 -> 231
-    { label: "Sem",               x: ML + 279,  w: 24  },    // 267 -> 303
-    { label: "FFI",               x: ML + 303,  w: 38  },    // 291 -> 341
-    { label: "Resp. %",           x: ML + 341,  w: 55  },    // 329 -> 396
-    { label: "Needs Attention",   x: ML + 396,  w: 111 },    // 377 -> 507
-    { label: "Appreciation",      x: ML + 507,  w: 145 },    // 527 -> 652
-    { label: "Action Taken",      x: ML + 652,  w: 85  },    // 672 -> 737
+    { label: "S.No",              x: ML,        w: 24  },    
+    { label: "Faculty Name",      x: ML + 24,   w: 85  },    
+    { label: "Code/Batch",        x: ML + 109,  w: 60  },    
+    { label: "Course Name",       x: ML + 169,  w: 90  },    
+    { label: "Sem",               x: ML + 259,  w: 22  },    
+    { label: "FFI",               x: ML + 281,  w: 35  },    
+    { label: "Resp. %",           x: ML + 316,  w: 50  },    
+    { label: "Needs Attention",   x: ML + 366,  w: 155 },    // +44 wider
+    { label: "Appreciation",      x: ML + 521,  w: 170 },    // +25 wider
+    { label: "Action Taken",      x: ML + 691,  w: 50  },    // Reduced from 85
     { label: "Faculty Signature", x: ML + 737,  w: 65  },    // 757
   ];
 
@@ -455,10 +455,10 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
     const appText = [pctLines, ...longAppreciations].filter(Boolean).join("\n\n") || "-";
 
     // Calculate dynamic row height — use actual column widths
-    const attLines  = calcLines(attText,             111, FS);  // Updated width from 155 to 111
-    const appLines  = calcLines(appText,             145, FS);
-    const nameLines = calcLines(r.facultyName || "-", 90, FS);
-    const progLines = calcLines(cleanCourseName(r.programme) || "-", 100, FS);  // Updated width
+    const attLines  = calcLines(attText,             155, FS);  // Needs Attention width (was 111)
+    const appLines  = calcLines(appText,             170, FS);  // Appreciation width (was 145)
+    const nameLines = calcLines(r.facultyName || "-", 85, FS);  // Faculty Name width (was 90)
+    const progLines = calcLines(cleanCourseName(r.programme) || "-", 90, FS);  // Course Name width (was 100)
     const maxLines  = Math.max(attLines, appLines, nameLines, progLines, 1);
     // FULL CONTENT: No row height limit - show all comments without truncation
     const ROW_H     = Math.max(60, maxLines * LH + 20);
