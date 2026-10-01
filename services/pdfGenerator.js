@@ -443,7 +443,7 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
   const ROW_GAP    = 0;
   const SIG_RESERVE = 70; // space needed at bottom for signature section (optimized)
   const FS = 10.5;           // Times New Roman 10.5pt for all cell content
-  const LH = 10;       // line height = 10pt (VERY compact)
+  const LH = 10.5;       // line height = 10.5pt (balanced - not too tight, not too loose)
   const CW_CHAR = 0.58;    // Times New Roman char width factor
 
   for (let i = 0; i < uniqueReports.length; i++) {
@@ -477,8 +477,8 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
     const nameLines = calcLines(r.facultyName || "-", 85, FS);  // Faculty Name width
     const progLines = calcLines(cleanCourseName(r.programme) || "-", 90, FS);  // Course Name width
     const maxLines  = Math.max(attLines, appLines, nameLines, progLines, 1);
-    // VERY COMPACT: Minimal padding (6pt), tight line spacing (10pt)
-    const ROW_H     = Math.max(45, maxLines * LH + 6);
+    // BALANCED: Some breathing space but still compact
+    const ROW_H     = Math.max(48, maxLines * LH + 8);
 
     // Check if we need a new page
     // Dynamic Page break threshold - optimized to reduce blank space
@@ -599,7 +599,7 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
         const tX = val.center
           ? col.x + (col.w - lw) / 2
           : col.x + 6; // 6px left padding
-        txt(coverPage, l, tX, y - 10 - li * LH, FS, fontToUse, val.color || black);
+        txt(coverPage, l, tX, y - 12 - li * LH, FS, fontToUse, val.color || black);
       });
     });
 
