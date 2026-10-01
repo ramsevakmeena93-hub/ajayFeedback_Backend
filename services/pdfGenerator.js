@@ -189,7 +189,7 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
     return true;
   });
 
-  // ── Sort reports by content size: Small reports first, big reports last ────
+  // ── Sort reports by content size: Small first, then BIG in middle, then small again ────
   uniqueReports.sort((a, b) => {
     // Calculate estimated content size for each report
     const sizeA = ((a.commentsNeedingAttention || []).join(" ").length) + 
@@ -198,6 +198,13 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
                   ((b.appreciation || []).join(" ").length);
     return sizeA - sizeB; // Ascending: smallest first
   });
+  
+  // Move last 4 (biggest) reports to middle for better distribution
+  if (uniqueReports.length > 8) {
+    const lastFour = uniqueReports.splice(-4); // Remove last 4
+    const middleIndex = Math.floor(uniqueReports.length / 2);
+    uniqueReports.splice(middleIndex, 0, ...lastFour); // Insert in middle
+  }
 
   // ── Collect faculty signatures ────────────────────────────────────────────
   const facultySigMap = {};
@@ -547,12 +554,41 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
         return;
       }
 
-      // Regular text cell — Times New Roman 10.5pt, NO column dividers
-      // SAFE wrapping (factor 0.65, padding 8) - PREVENT overlap and overflow
-      const maxChars = Math.max(1, Math.floor((col.w - 8) / (FS * 0.65)));
-      // Split by newlines, filter out empty lines, then wrap each segment
+      // Regular text cell — Use ACTUAL font width measurement (no estimation)
       const textValue = val.v || "";
-      const allLines = textValue.split("\n").filter(seg => seg.trim()).flatMap(seg => wrap(seg, maxChars));
+      const allLines = textValue.split("\n").filter(seg => seg.trim()).flatMap(seg => {
+        // Wrap based on ACTUAL pixel width, not character count
+        const words = seg.split(" ");
+        const wrappedLines = [];
+        let currentLine = "";
+        
+        const fontToUse = val.bold ? boldFont : timesFont;
+        const maxWidth = col.w - 12; // 12px total padding (6 on each side)
+        
+        words.forEach(word => {
+          const testLine = currentLine ? currentLine + " " + word : word;
+          const testWidth = fontToUse.widthOfTextAtSize(testLine, FS);
+          
+          if (testWidth <= maxWidth) {
+            currentLine = testLine;
+          } else {
+            if (currentLine) wrappedLines.push(currentLine);
+            // If single word is too long, truncate it
+            if (fontToUse.widthOfTextAtSize(word, FS) > maxWidth) {
+              let truncated = word;
+              while (fontToUse.widthOfTextAtSize(truncated, FS) > maxWidth && truncated.length > 1) {
+                truncated = truncated.slice(0, -1);
+              }
+              currentLine = truncated;
+            } else {
+              currentLine = word;
+            }
+          }
+        });
+        
+        if (currentLine) wrappedLines.push(currentLine);
+        return wrappedLines.length > 0 ? wrappedLines : [""];
+      });
       
       // SHOW ALL LINES - No truncation, full content displayed
       const visLines = allLines;
@@ -560,24 +596,10 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
       visLines.forEach((l, li) => {
         const fontToUse = val.bold ? boldFont : timesFont;
         const lw = fontToUse.widthOfTextAtSize(l, FS);
-        
-        // Clip text if it's too wide to prevent overflow outside cell
-        let displayText = l;
-        if (lw > col.w - 8) {
-          // Text is too wide - truncate to fit within column
-          const maxWidth = col.w - 8;
-          let truncated = l;
-          while (fontToUse.widthOfTextAtSize(truncated, FS) > maxWidth && truncated.length > 0) {
-            truncated = truncated.slice(0, -1);
-          }
-          displayText = truncated;
-        }
-        
         const tX = val.center
-          ? col.x + (col.w - fontToUse.widthOfTextAtSize(displayText, FS)) / 2
-          : col.x + 5; // 5px left padding
-        txt(coverPage, displayText, Math.max(col.x + 1, tX), y - 15 - li * LH,
-            FS, fontToUse, val.color || black);
+          ? col.x + (col.w - lw) / 2
+          : col.x + 6; // 6px left padding
+        txt(coverPage, l, tX, y - 15 - li * LH, FS, fontToUse, val.color || black);
       });
     });
 
