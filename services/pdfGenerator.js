@@ -828,30 +828,57 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
               let hodItem = null;
               let vcItem = null;
 
-              // Find the page containing HOD
+              // Find the page containing HOD (signature section at bottom)
               for (let pi = 1; pi <= pdfJsDoc.numPages; pi++) {
                 const pg = await pdfJsDoc.getPage(pi);
                 const tc = await pg.getTextContent();
                 const items = Array.isArray(tc.items) ? tc.items : [];
+                
+                // Find HOD label (this marks the signature section)
                 const foundHod = items.find(item =>
-                  String(item.str || "").trim().toUpperCase() === "HOD"
+                  String(item.str || "").trim().toUpperCase() === "HOD" ||
+                  String(item.str || "").trim().includes("Head of Department")
                 );
+                
                 if (!foundHod) {
                   continue;
                 }
+                
                 sigPageIdx = pi - 1;
                 hodItem = foundHod;
-                facItem = items.find(item => {
-                  const value = String(item.str || "").trim();
-                  return value.includes("Faculty Name & Signature");
+                
+                // Get Y position of HOD (bottom section)
+                const hodY = Number(foundHod.transform?.[5]) || 0;
+                
+                // Find "Faculty Name & Signature" label ONLY in bottom section (near HOD)
+                // Filter items that are in the same bottom area (within 100 points of HOD)
+                const bottomItems = items.filter(item => {
+                  const itemY = Number(item.transform?.[5]) || 0;
+                  return Math.abs(itemY - hodY) < 100; // Within 100 points of HOD
                 });
+                
+                // Search specifically for "Faculty Name & Signature" in bottom section
+                facItem = bottomItems.find(item => {
+                  const value = String(item.str || "").trim();
+                  return value.includes("Faculty Name & Signature") || 
+                         value.includes("Faculty Name&Signature");
+                });
+                
+                // Fallback: Look for "Signature" near "Faculty" in bottom section
                 if (!facItem) {
-                  facItem = items.find(item => {
-                    const value = String(item.str || "").trim();
-                    return value.includes("Faculty Name") || value.includes("Faculty Signature");
-                  });
+                  const facText = bottomItems.find(item => 
+                    String(item.str || "").includes("Faculty Name")
+                  );
+                  const sigText = bottomItems.find(item => 
+                    String(item.str || "").includes("Signature")
+                  );
+                  // If both found in bottom section, use the Faculty Name item
+                  if (facText && sigText) {
+                    facItem = facText;
+                  }
                 }
-                vcItem = items.find(item => /PRO\s*-?\s*VC/i.test(String(item.str || "")));
+                
+                vcItem = bottomItems.find(item => /PRO\s*-?\s*VC/i.test(String(item.str || "")));
                 break;
               }
 
