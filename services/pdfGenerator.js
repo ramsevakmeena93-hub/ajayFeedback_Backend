@@ -496,8 +496,7 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
     if (y - ROW_H < SIG_RESERVE) {
       coverPage = pdfDoc.addPage([PW, PH]);
       y = PH - 20;
-      // Repeat the column header on continuation pages
-      y = drawTableHeader(coverPage, y);
+      // DO NOT repeat header - continuous table across pages
     }
 
     // Draw main row border and white background
