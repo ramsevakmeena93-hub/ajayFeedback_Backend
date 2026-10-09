@@ -458,7 +458,7 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
 
   // ── Data rows ─────────────────────────────────────────────────────────────
   const ROW_GAP    = 2;  // Small gap between rows for visual separation
-  const BOTTOM_MARGIN = 50; // Space to leave at bottom of each page for content boundary
+  const BOTTOM_MARGIN = 30; // Reduced to allow maximum rows per page (was 50)
   const TOP_MARGIN = 30;    // Space at top of continuation pages
   const FS = 10;            // Font size for cell content
   const LH = 11;            // Line height with proper spacing
