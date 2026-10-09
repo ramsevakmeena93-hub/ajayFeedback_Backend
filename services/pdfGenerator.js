@@ -521,7 +521,16 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
     );
     
     // Calculate actual row height with proper padding
-    const ROW_H = Math.max(MIN_ROW_HEIGHT, maxLines * LH + ROW_PADDING);
+    // CAP row height to maximum that fits on a page to prevent cutoff
+    const MAX_ROW_HEIGHT = PH - 40 - BOTTOM_MARGIN; // Max height that fits: 595-40-30 = 525pt
+    const calculatedRowHeight = Math.max(MIN_ROW_HEIGHT, maxLines * LH + ROW_PADDING);
+    const ROW_H = Math.min(calculatedRowHeight, MAX_ROW_HEIGHT);
+    
+    if (calculatedRowHeight > MAX_ROW_HEIGHT) {
+      console.warn(`[PDF]   ⚠️ Row ${i+1} height capped: ${calculatedRowHeight}pt → ${ROW_H}pt (would be cut off)`);
+      console.warn(`[PDF]   This row has ${maxLines} lines of comments - consider splitting or truncating`);
+    }
+    
     const totalSpaceNeeded = ROW_H + ROW_GAP;
     const availableSpace = y - BOTTOM_MARGIN;
 
@@ -673,8 +682,14 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
         return wrappedLines.length > 0 ? wrappedLines : [""];
       });
       
-      // SHOW ALL LINES - No truncation, full content displayed
-      const visLines = allLines;
+      // SHOW LINES UP TO ROW HEIGHT LIMIT - No overflow
+      // Calculate max lines that fit in ROW_H
+      const maxLinesInRow = Math.floor((ROW_H - ROW_PADDING) / LH);
+      const visLines = allLines.slice(0, maxLinesInRow); // Limit to what fits
+      
+      if (allLines.length > maxLinesInRow) {
+        console.warn(`[PDF]   ⚠️ Cell truncated: ${allLines.length} lines → ${maxLinesInRow} lines (row height limit)`);
+      }
       
       visLines.forEach((l, li) => {
         const fontToUse = val.bold ? boldFont : timesFont;
@@ -682,7 +697,12 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
         const tX = val.center
           ? col.x + (col.w - lw) / 2
           : col.x + 6; // 6px left padding
-        txt(coverPage, l, tX, y - 12 - li * LH, FS, fontToUse, val.color || black);
+        const lineY = y - 12 - li * LH;
+        
+        // Only draw if within row bounds
+        if (lineY >= (y - ROW_H + 5)) {
+          txt(coverPage, l, tX, lineY, FS, fontToUse, val.color || black);
+        }
       });
     });
 
