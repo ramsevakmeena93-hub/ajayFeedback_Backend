@@ -441,7 +441,7 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
 
   // ── Data rows ─────────────────────────────────────────────────────────────
   const ROW_GAP    = 0;
-  const SIG_RESERVE = 70; // space needed at bottom for signature section (optimized)
+  const SIG_RESERVE = 30; // Reduced to allow more rows per page (was 70)
   const FS = 10.5;           // Times New Roman 10.5pt for all cell content
   const LH = 10.5;       // line height = 10.5pt (balanced - not too tight, not too loose)
   const CW_CHAR = 0.58;    // Times New Roman char width factor
