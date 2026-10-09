@@ -192,22 +192,39 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
       .trim();
   }
   
+  console.log(`[PDF] Total reports received: ${reports.length}`);
+  
   const seenR = new Set();
+  const duplicatesFound = [];
   const uniqueReports = reports.filter(r => {
+    // Use ONLY faculty + subject + semester as key (less aggressive)
+    // This allows same faculty teaching multiple batches to appear
     const k = [
-      normalizeKey(r.facultyUserId),
       normalizeKey(r.facultyName),
       normalizeKey(r.subjectCode),
-      normalizeKey(r.programme),
-      normalizeKey(r.semester),
-      normalizeKey(r.academicYear),
-      normalizeKey(r.session),
-      normalizeKey(r.batch)
+      normalizeKey(r.semester)
     ].join("|");
-    if (seenR.has(k)) return false;
+    
+    if (seenR.has(k)) {
+      duplicatesFound.push({
+        faculty: r.facultyName,
+        subject: r.subjectCode,
+        semester: r.semester,
+        batch: r.batch
+      });
+      return false;
+    }
     seenR.add(k);
     return true;
   });
+
+  console.log(`[PDF] After deduplication: ${uniqueReports.length} unique reports`);
+  if (duplicatesFound.length > 0) {
+    console.log(`[PDF] Removed ${duplicatesFound.length} duplicate(s):`);
+    duplicatesFound.forEach((d, i) => {
+      console.log(`[PDF]   ${i + 1}. ${d.faculty} - ${d.subject} (Sem ${d.semester}, Batch ${d.batch || 'N/A'})`);
+    });
+  }
 
   // ── Sort reports by serial number (natural order) ──────────────────────────
   // Removed content-size sorting as it's not a business requirement
