@@ -544,14 +544,8 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
       pageNumber++;
       y = PH - TOP_MARGIN;
       
-      // Repeat table header for continuation pages (professional standard)
-      const yBeforeHeader = y;
-      y = drawTableHeader(coverPage, y);
-      console.log(`[PDF]   Table header drawn, Y: ${yBeforeHeader} → ${y}`);
-      
-      // Recalculate available space on new page
-      const newAvailableSpace = y - BOTTOM_MARGIN;
-      console.log(`[PDF]   New page available space: ${newAvailableSpace.toFixed(1)}`);
+      // DO NOT repeat table header on continuation pages (per user request)
+      console.log(`[PDF]   Continuation page created, Y position: ${y}`);
     } else {
       console.log(`[PDF]   ✓ Row fits on current page`);
     }
