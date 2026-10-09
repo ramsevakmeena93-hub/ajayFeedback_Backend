@@ -440,11 +440,12 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
   y = drawTableHeader(coverPage, y);
 
   // ── Data rows ─────────────────────────────────────────────────────────────
-  const ROW_GAP    = 0;
-  const SIG_RESERVE = 150; // Reserve space for signature section at the end (not per-row)
-  const FS = 10.5;           // Times New Roman 10.5pt for all cell content
-  const LH = 10.5;       // line height = 10.5pt (balanced - not too tight, not too loose)
-  const CW_CHAR = 0.58;    // Times New Roman char width factor
+  const ROW_GAP    = 2;  // Small gap between rows for visual separation
+  const BOTTOM_MARGIN = 50; // Space to leave at bottom of each page
+  const TOP_MARGIN = 30;    // Space at top of continuation pages
+  const FS = 10;            // Font size for cell content
+  const LH = 11;            // Line height with proper spacing
+  const CW_CHAR = 0.58;     // Character width factor for Times New Roman
 
   for (let i = 0; i < uniqueReports.length; i++) {
     const r = uniqueReports[i];
@@ -472,7 +473,7 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
       .map(x => "\u2022 " + x.trim());
     const appText = [pctLines, ...allAppreciations].filter(Boolean).join("\n") || "-";
 
-    // Calculate row height using actual wrapped text
+    // Calculate row height using actual wrapped text for ALL columns
     const attLines  = calcLines(attText, 155, FS);
     const appLines  = calcLines(appText, 170, FS);
     const nameLines = calcLines(r.facultyName || "-", 85, FS);
@@ -490,14 +491,19 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
       semLines,
       1
     );
-    const ROW_H = Math.max(48, maxLines * LH + 16);
+    // Dynamic row height with reasonable padding
+    const ROW_H = Math.max(42, maxLines * LH + 12);
 
-    // Start a new page ONLY if this specific row won't fit
-    // Allow rows to use most of the page (check against bottom margin only)
-    if (y - ROW_H < 40) {  // 40pt = small bottom margin, not per-row signature reserve
+    // Smart pagination: Create new page ONLY when row cannot fit
+    const spaceNeeded = ROW_H + ROW_GAP;
+    const spaceAvailable = y - BOTTOM_MARGIN;
+    
+    if (spaceNeeded > spaceAvailable) {
+      // This row won't fit on current page - start new page
       coverPage = pdfDoc.addPage([PW, PH]);
-      y = PH - 20;
-      // DO NOT repeat header - continuous table across pages
+      y = PH - TOP_MARGIN;
+      // Repeat table header for continuation pages (professional standard)
+      y = drawTableHeader(coverPage, y);
     }
 
     // Draw main row border and white background
@@ -613,12 +619,14 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
   }
 
   // ── Footer note ───────────────────────────────────────────────────────────
-  // Final safety check for signatures
-  // Check if signature section fits on current page
-  if (y < SIG_RESERVE) { // Optimized threshold
+  // Final check: ensure signature section fits on current page
+  const SIGNATURE_HEIGHT = 150; // Total space needed for footer + signatures
+  if (y < SIGNATURE_HEIGHT) {
       coverPage = pdfDoc.addPage([PW, PH]);
-      y = PH - 25;
+      y = PH - TOP_MARGIN;
   }
+
+  y -= 10; // Small spacing before footer
 
   rect(coverPage, ML, y - 18, CW, 18, {
     borderColor: black, borderWidth: 0.5
