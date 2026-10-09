@@ -441,7 +441,7 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
 
   // ── Data rows ─────────────────────────────────────────────────────────────
   const ROW_GAP    = 0;
-  const SIG_RESERVE = 30; // Reduced to allow more rows per page (was 70)
+  const SIG_RESERVE = 150; // Reserve space for signature section at the end (not per-row)
   const FS = 10.5;           // Times New Roman 10.5pt for all cell content
   const LH = 10.5;       // line height = 10.5pt (balanced - not too tight, not too loose)
   const CW_CHAR = 0.58;    // Times New Roman char width factor
@@ -492,8 +492,9 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
     );
     const ROW_H = Math.max(48, maxLines * LH + 16);
 
-    // Start a new page when the row does not fit
-    if (y - ROW_H < SIG_RESERVE) {
+    // Start a new page ONLY if this specific row won't fit
+    // Allow rows to use most of the page (check against bottom margin only)
+    if (y - ROW_H < 40) {  // 40pt = small bottom margin, not per-row signature reserve
       coverPage = pdfDoc.addPage([PW, PH]);
       y = PH - 20;
       // DO NOT repeat header - continuous table across pages
