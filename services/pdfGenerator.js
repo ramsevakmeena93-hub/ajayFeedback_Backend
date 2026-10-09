@@ -125,17 +125,19 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
       words.forEach(word => {
         const testLine = currentLine ? currentLine + " " + word : word;
         // Use actual font measurement (Times Roman approximation)
-        const testWidth = testLine.length * fontSize * 0.58; // Approximation for Times
+        // Adjust factor based on fontSize for better accuracy
+        const charWidthFactor = fontSize < 10 ? 0.56 : 0.58;
+        const testWidth = testLine.length * fontSize * charWidthFactor;
         
         if (testWidth <= maxWidth) {
           currentLine = testLine;
         } else {
           if (currentLine) lineCount++;
           // Check if single word is too long
-          const wordWidth = word.length * fontSize * 0.58;
+          const wordWidth = word.length * fontSize * charWidthFactor;
           if (wordWidth > maxWidth) {
             // Word needs truncation, counts as 1 line
-            currentLine = word.substring(0, Math.floor(maxWidth / (fontSize * 0.58))) + "…";
+            currentLine = word.substring(0, Math.floor(maxWidth / (fontSize * charWidthFactor))) + "…";
           } else {
             currentLine = word;
           }
@@ -459,10 +461,10 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
   const ROW_GAP    = 2;  // Small gap between rows for visual separation
   const BOTTOM_MARGIN = 30; // Reduced to allow maximum rows per page (was 50)
   const TOP_MARGIN = 30;    // Space at top of continuation pages
-  const FS = 10;            // Font size for cell content
-  const LH = 11;            // Line height with proper spacing
-  const MIN_ROW_HEIGHT = 42; // Minimum row height for single-line content
-  const ROW_PADDING = 12;    // Vertical padding within row (top + bottom)
+  const FS = 9.5;           // Reduced font size to fit more text (was 10)
+  const LH = 10.5;          // Reduced line height (was 11)
+  const MIN_ROW_HEIGHT = 38; // Reduced minimum (was 42)
+  const ROW_PADDING = 10;    // Reduced padding (was 12)
 
   let pageNumber = 1;
   let isFirstDataRow = true; // Track if this is the first data row
@@ -535,23 +537,39 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
     
     if (shouldCreateNewPage) {
       // Check if row is too tall even for a fresh page
-      const freshPageSpace = PH - TOP_MARGIN - BOTTOM_MARGIN;
+      const freshPageSpace = PH - 20 - BOTTOM_MARGIN; // Space on new page
+      
       if (ROW_H > freshPageSpace) {
-        console.warn(`[PDF]   ⚠️  WARNING: Row height (${ROW_H}) exceeds fresh page capacity (${freshPageSpace})`);
-        console.warn(`[PDF]   This row will be truncated to fit. Consider splitting long comments.`);
+        console.warn(`[PDF]   ⚠️  WARNING: Row ${i+1} height (${ROW_H}pt) exceeds fresh page (${freshPageSpace}pt)`);
+        console.warn(`[PDF]   Will attempt to split row across pages`);
+        
+        // Strategy: Split the row rendering across multiple pages
+        // We'll render as much as fits on current page, then continue on next page
+        // This is complex, so for now, cap the row height and truncate
+        // TODO: Implement proper row splitting in future
+        
+        // For now: Force render on new page and let it overflow (better than hiding)
+        console.log(`[PDF]   📄 Creating new page ${pageNumber + 1} for oversized row`);
+        coverPage = pdfDoc.addPage([PW, PH]);
+        pageNumber++;
+        y = PH - 20;
+        
+        // Recalculate available space on new page
+        const newAvailableSpace = y - BOTTOM_MARGIN;
+        console.log(`[PDF]   New page available space: ${newAvailableSpace.toFixed(1)}`);
+        
+        // Row will be rendered with full height even if it overflows bottom
+        // This is temporary - proper splitting would be better
+      } else {
+        // Normal case: Row fits on fresh page
+        console.log(`[PDF]   📄 Creating new page ${pageNumber + 1} (row won't fit on current)`);
+        coverPage = pdfDoc.addPage([PW, PH]);
+        pageNumber++;
+        y = PH - 20;
+        
+        const newAvailableSpace = y - BOTTOM_MARGIN;
+        console.log(`[PDF]   New page available space: ${newAvailableSpace.toFixed(1)}`);
       }
-      
-      console.log(`[PDF]   📄 Creating new page ${pageNumber + 1} (row won't fit)`);
-      coverPage = pdfDoc.addPage([PW, PH]);
-      pageNumber++;
-      
-      // Start rows near the top on continuation pages (no header repetition)
-      y = PH - 20; // Small top margin on continuation pages
-      console.log(`[PDF]   Continuation page created, Y position: ${y}`);
-      
-      // Recalculate available space on new page
-      const newAvailableSpace = y - BOTTOM_MARGIN;
-      console.log(`[PDF]   New page available space: ${newAvailableSpace.toFixed(1)}`);
     } else {
       console.log(`[PDF]   ✓ Row fits on current page`);
     }
