@@ -104,11 +104,11 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
     return lines;
   }
 
-  // Calculate how many wrapped lines a block of text needs - MATCHES ACTUAL RENDERING
+  // Calculate how many wrapped lines a block of text needs - IMPROVED ALGORITHM
   function calcLines(text, colW, fontSize) {
     if (!text) return 1;
     
-    const maxWidth = colW - 12; // Match actual rendering: 12px total padding (6 on each side)
+    const maxWidth = colW - 14; // Match actual rendering: 14px total padding (7 on each side)
     const segments = text.split("\n");
     let totalLines = 0;
     
@@ -118,14 +118,17 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
         return;
       }
       
-      const words = seg.split(" ");
+      // Split on any whitespace and filter empty strings
+      const words = seg.split(/\s+/).filter(w => w);
       let currentLine = "";
       let lineCount = 0;
       
       words.forEach(word => {
-        const testLine = currentLine ? currentLine + " " + word : word;
-        // Use actual font measurement (Times Roman approximation)
-        // Adjust factor based on fontSize for better accuracy
+        const cleanWord = word.trim();
+        if (!cleanWord) return;
+        
+        const testLine = currentLine ? currentLine + " " + cleanWord : cleanWord;
+        // Use actual font measurement with appropriate factor
         const charWidthFactor = fontSize < 10 ? 0.56 : 0.58;
         const testWidth = testLine.length * fontSize * charWidthFactor;
         
@@ -133,16 +136,21 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
           currentLine = testLine;
         } else {
           if (currentLine) lineCount++;
+          
           // Check if single word is too long
-          const wordWidth = word.length * fontSize * charWidthFactor;
+          const wordWidth = cleanWord.length * fontSize * charWidthFactor;
           if (wordWidth > maxWidth) {
-            // Word needs truncation, counts as 1 line
-            currentLine = word.substring(0, Math.floor(maxWidth / (fontSize * charWidthFactor))) + "…";
+            // Long word will be broken across multiple lines
+            const charsPerLine = Math.floor(maxWidth / (fontSize * charWidthFactor));
+            const wordLines = Math.ceil(cleanWord.length / charsPerLine);
+            lineCount += wordLines;
+            currentLine = "";
           } else {
-            currentLine = word;
+            currentLine = cleanWord;
           }
         }
       });
+      
       if (currentLine) lineCount++;
       totalLines += Math.max(1, lineCount);
     });
@@ -657,39 +665,69 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
         return;
       }
 
-      // Regular text cell — Use ACTUAL font width measurement (no estimation)
+      // Regular text cell — Use IMPROVED word wrapping with better spacing
       const textValue = val.v || "";
       const allLines = textValue.split("\n").filter(seg => seg.trim()).flatMap(seg => {
-        // Wrap based on ACTUAL pixel width, not character count
-        const words = seg.split(" ");
+        const words = seg.split(/\s+/).filter(w => w); // Split on any whitespace, remove empty
         const wrappedLines = [];
         let currentLine = "";
         
         const fontToUse = val.bold ? boldFont : timesFont;
-        const maxWidth = col.w - 12; // 12px total padding (6 on each side)
+        const maxWidth = col.w - 14; // Slightly more padding for better appearance (7px each side)
         
-        words.forEach(word => {
-          const testLine = currentLine ? currentLine + " " + word : word;
+        words.forEach((word, wordIdx) => {
+          // Clean up word - remove extra spaces
+          const cleanWord = word.trim();
+          if (!cleanWord) return;
+          
+          const testLine = currentLine ? currentLine + " " + cleanWord : cleanWord;
           const testWidth = fontToUse.widthOfTextAtSize(testLine, FS);
           
           if (testWidth <= maxWidth) {
             currentLine = testLine;
           } else {
-            if (currentLine) wrappedLines.push(currentLine);
-            // If single word is too long, truncate it
-            if (fontToUse.widthOfTextAtSize(word, FS) > maxWidth) {
-              let truncated = word;
-              while (fontToUse.widthOfTextAtSize(truncated, FS) > maxWidth && truncated.length > 1) {
-                truncated = truncated.slice(0, -1);
+            // Current line is full, save it
+            if (currentLine) {
+              wrappedLines.push(currentLine);
+            }
+            
+            // Check if single word is too long
+            const wordWidth = fontToUse.widthOfTextAtSize(cleanWord, FS);
+            if (wordWidth > maxWidth) {
+              // Word too long - break it intelligently
+              // Try to break at punctuation or after reasonable length
+              let remaining = cleanWord;
+              while (remaining.length > 0) {
+                let breakPoint = remaining.length;
+                let testStr = remaining;
+                
+                // Find good break point (hyphen, punctuation, or just length)
+                while (fontToUse.widthOfTextAtSize(testStr, FS) > maxWidth && testStr.length > 1) {
+                  breakPoint--;
+                  testStr = remaining.substring(0, breakPoint);
+                }
+                
+                if (breakPoint > 0) {
+                  // Add hyphen if breaking mid-word
+                  const chunk = remaining.substring(0, breakPoint);
+                  wrappedLines.push(chunk + (breakPoint < remaining.length ? "-" : ""));
+                  remaining = remaining.substring(breakPoint);
+                } else {
+                  // Can't fit even one character (shouldn't happen)
+                  wrappedLines.push(remaining.substring(0, 1));
+                  remaining = remaining.substring(1);
+                }
               }
-              currentLine = truncated;
+              currentLine = "";
             } else {
-              currentLine = word;
+              currentLine = cleanWord;
             }
           }
         });
         
+        // Add last line
         if (currentLine) wrappedLines.push(currentLine);
+        
         return wrappedLines.length > 0 ? wrappedLines : [""];
       });
       
