@@ -465,9 +465,11 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
   const ROW_PADDING = 12;    // Vertical padding within row (top + bottom)
 
   let pageNumber = 1;
+  let isFirstDataRow = true; // Track if this is the first data row
+  
   console.log(`[PDF] ========== Starting Table Rendering ==========`);
   console.log(`[PDF] Total records: ${uniqueReports.length}`);
-  console.log(`[PDF] Initial Y position: ${y}`);
+  console.log(`[PDF] Initial Y position after header: ${y}`);
   console.log(`[PDF] Page dimensions: ${PW}x${PH}, Content width: ${CW}`);
 
   for (let i = 0; i < uniqueReports.length; i++) {
@@ -528,7 +530,10 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
     console.log(`[PDF]   Current Y: ${y.toFixed(1)}, Available: ${availableSpace.toFixed(1)}`);
     
     // Smart pagination: Create new page ONLY when row cannot fit
-    if (totalSpaceNeeded > availableSpace) {
+    // EXCEPTION: Always try to fit first row on first page (don't create blank first page)
+    const shouldCreateNewPage = !isFirstDataRow && (totalSpaceNeeded > availableSpace);
+    
+    if (shouldCreateNewPage) {
       // Check if row is too tall even for a fresh page
       const freshPageSpace = PH - TOP_MARGIN - BOTTOM_MARGIN;
       if (ROW_H > freshPageSpace) {
@@ -550,6 +555,9 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
     } else {
       console.log(`[PDF]   ✓ Row fits on current page`);
     }
+    
+    // Mark that we've processed the first data row
+    isFirstDataRow = false;
 
     // Draw main row border and white background
     rect(coverPage, ML, y - ROW_H, CW, ROW_H, { 
