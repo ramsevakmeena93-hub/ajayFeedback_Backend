@@ -531,21 +531,23 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
     // Smart pagination: Create new page ONLY when row cannot fit
     if (totalSpaceNeeded > availableSpace) {
       // Check if row is too tall even for a fresh page
-      const freshPageSpace = PH - TOP_MARGIN - TH - BOTTOM_MARGIN;
+      const freshPageSpace = PH - TOP_MARGIN - BOTTOM_MARGIN;
       if (ROW_H > freshPageSpace) {
         console.warn(`[PDF]   ⚠️  WARNING: Row height (${ROW_H}) exceeds fresh page capacity (${freshPageSpace})`);
         console.warn(`[PDF]   This row will be truncated to fit. Consider splitting long comments.`);
-        // Cap row height to fit on page (emergency fallback)
-        // This prevents infinite page creation loop
       }
       
       console.log(`[PDF]   📄 Creating new page ${pageNumber + 1} (row won't fit)`);
       coverPage = pdfDoc.addPage([PW, PH]);
       pageNumber++;
-      y = PH - TOP_MARGIN;
       
-      // DO NOT repeat table header on continuation pages (per user request)
+      // Start rows near the top on continuation pages (no header repetition)
+      y = PH - 20; // Small top margin on continuation pages
       console.log(`[PDF]   Continuation page created, Y position: ${y}`);
+      
+      // Recalculate available space on new page
+      const newAvailableSpace = y - BOTTOM_MARGIN;
+      console.log(`[PDF]   New page available space: ${newAvailableSpace.toFixed(1)}`);
     } else {
       console.log(`[PDF]   ✓ Row fits on current page`);
     }
