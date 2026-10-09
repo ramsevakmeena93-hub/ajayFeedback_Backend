@@ -104,28 +104,48 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
     return lines;
   }
 
-  // Calculate how many wrapped lines a block of text needs
+  // Calculate how many wrapped lines a block of text needs - MATCHES ACTUAL RENDERING
   function calcLines(text, colW, fontSize) {
-    // SAFE factor (0.65) - more conservative to prevent ANY overlap
-    const maxChars = Math.max(1, Math.floor((colW - 8) / (fontSize * 0.65)));
     if (!text) return 1;
+    
+    const maxWidth = colW - 12; // Match actual rendering: 12px total padding (6 on each side)
     const segments = text.split("\n");
-    let total = 0;
+    let totalLines = 0;
+    
     segments.forEach(seg => {
+      if (!seg.trim()) {
+        totalLines++;
+        return;
+      }
+      
       const words = seg.split(" ");
-      let cur = "";
-      words.forEach(w => {
-        const next = cur ? cur + " " + w : w;
-        if (next.length <= maxChars) {
-          cur = next;
+      let currentLine = "";
+      let lineCount = 0;
+      
+      words.forEach(word => {
+        const testLine = currentLine ? currentLine + " " + word : word;
+        // Use actual font measurement (Times Roman approximation)
+        const testWidth = testLine.length * fontSize * 0.58; // Approximation for Times
+        
+        if (testWidth <= maxWidth) {
+          currentLine = testLine;
         } else {
-          total++;
-          cur = w.length > maxChars ? w.substring(0, maxChars - 1) + "…" : w;
+          if (currentLine) lineCount++;
+          // Check if single word is too long
+          const wordWidth = word.length * fontSize * 0.58;
+          if (wordWidth > maxWidth) {
+            // Word needs truncation, counts as 1 line
+            currentLine = word.substring(0, Math.floor(maxWidth / (fontSize * 0.58))) + "…";
+          } else {
+            currentLine = word;
+          }
         }
       });
-      if (cur) total++;
+      if (currentLine) lineCount++;
+      totalLines += Math.max(1, lineCount);
     });
-    return Math.max(1, total);
+    
+    return Math.max(1, totalLines);
   }
 
   // Embed a base-64 signature image (fallback — no crop)
@@ -189,22 +209,19 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
     return true;
   });
 
-  // ── Sort reports by content size: Small first, then BIG in middle, then small again ────
+  // ── Sort reports by serial number (natural order) ──────────────────────────
+  // Removed content-size sorting as it's not a business requirement
+  // Pagination should be driven by actual row height, not artificial reordering
   uniqueReports.sort((a, b) => {
-    // Calculate estimated content size for each report
-    const sizeA = ((a.commentsNeedingAttention || []).join(" ").length) + 
-                  ((a.appreciation || []).join(" ").length);
-    const sizeB = ((b.commentsNeedingAttention || []).join(" ").length) + 
-                  ((b.appreciation || []).join(" ").length);
-    return sizeA - sizeB; // Ascending: smallest first
+    // Sort by faculty name as primary, then by subject code
+    const nameA = (a.facultyName || "").toLowerCase();
+    const nameB = (b.facultyName || "").toLowerCase();
+    if (nameA !== nameB) return nameA.localeCompare(nameB);
+    
+    const codeA = (a.subjectCode || "").toLowerCase();
+    const codeB = (b.subjectCode || "").toLowerCase();
+    return codeA.localeCompare(codeB);
   });
-  
-  // Move last 4 (biggest) reports to middle for better distribution
-  if (uniqueReports.length > 8) {
-    const lastFour = uniqueReports.splice(-4); // Remove last 4
-    const middleIndex = Math.floor(uniqueReports.length / 2);
-    uniqueReports.splice(middleIndex, 0, ...lastFour); // Insert in middle
-  }
 
   // ── Collect faculty signatures ────────────────────────────────────────────
   const facultySigMap = {};
@@ -441,11 +458,18 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
 
   // ── Data rows ─────────────────────────────────────────────────────────────
   const ROW_GAP    = 2;  // Small gap between rows for visual separation
-  const BOTTOM_MARGIN = 50; // Space to leave at bottom of each page
+  const BOTTOM_MARGIN = 50; // Space to leave at bottom of each page for content boundary
   const TOP_MARGIN = 30;    // Space at top of continuation pages
   const FS = 10;            // Font size for cell content
   const LH = 11;            // Line height with proper spacing
-  const CW_CHAR = 0.58;     // Character width factor for Times New Roman
+  const MIN_ROW_HEIGHT = 42; // Minimum row height for single-line content
+  const ROW_PADDING = 12;    // Vertical padding within row (top + bottom)
+
+  let pageNumber = 1;
+  console.log(`[PDF] ========== Starting Table Rendering ==========`);
+  console.log(`[PDF] Total records: ${uniqueReports.length}`);
+  console.log(`[PDF] Initial Y position: ${y}`);
+  console.log(`[PDF] Page dimensions: ${PW}x${PH}, Content width: ${CW}`);
 
   for (let i = 0; i < uniqueReports.length; i++) {
     const r = uniqueReports[i];
@@ -467,7 +491,7 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
       .sort((a, b) => b[1] - a[1])
       .map(([k, v]) => "\u2022 " + k + ": " + v + "%")
       .join("\n");
-    // Preserve ALL appreciation comments
+    // Preserve ALL appreciation comments (no filtering)
     const allAppreciations = (r.appreciation || [])
       .filter(c => typeof c === "string" && c.trim())
       .map(x => "\u2022 " + x.trim());
@@ -481,6 +505,7 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
     const codeLines = calcLines(codeBatch || "-", 60, FS);
     const actionLines = calcLines(r.actionTaken || "-", 50, FS);
     const semLines = calcLines(String(r.semester || "-"), 22, FS);
+    
     const maxLines = Math.max(
       attLines,
       appLines,
@@ -491,19 +516,44 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
       semLines,
       1
     );
-    // Dynamic row height with reasonable padding
-    const ROW_H = Math.max(42, maxLines * LH + 12);
-
-    // Smart pagination: Create new page ONLY when row cannot fit
-    const spaceNeeded = ROW_H + ROW_GAP;
-    const spaceAvailable = y - BOTTOM_MARGIN;
     
-    if (spaceNeeded > spaceAvailable) {
-      // This row won't fit on current page - start new page
+    // Calculate actual row height with proper padding
+    const ROW_H = Math.max(MIN_ROW_HEIGHT, maxLines * LH + ROW_PADDING);
+    const totalSpaceNeeded = ROW_H + ROW_GAP;
+    const availableSpace = y - BOTTOM_MARGIN;
+
+    // Diagnostic logging
+    console.log(`[PDF] ------ Record ${i + 1}/${uniqueReports.length} (${r.facultyName}) ------`);
+    console.log(`[PDF]   Max lines: ${maxLines} (Att:${attLines}, App:${appLines}, Name:${nameLines}, Prog:${progLines})`);
+    console.log(`[PDF]   Row height: ${ROW_H}pt, Total needed: ${totalSpaceNeeded}pt`);
+    console.log(`[PDF]   Current Y: ${y.toFixed(1)}, Available: ${availableSpace.toFixed(1)}`);
+    
+    // Smart pagination: Create new page ONLY when row cannot fit
+    if (totalSpaceNeeded > availableSpace) {
+      // Check if row is too tall even for a fresh page
+      const freshPageSpace = PH - TOP_MARGIN - TH - BOTTOM_MARGIN;
+      if (ROW_H > freshPageSpace) {
+        console.warn(`[PDF]   ⚠️  WARNING: Row height (${ROW_H}) exceeds fresh page capacity (${freshPageSpace})`);
+        console.warn(`[PDF]   This row will be truncated to fit. Consider splitting long comments.`);
+        // Cap row height to fit on page (emergency fallback)
+        // This prevents infinite page creation loop
+      }
+      
+      console.log(`[PDF]   📄 Creating new page ${pageNumber + 1} (row won't fit)`);
       coverPage = pdfDoc.addPage([PW, PH]);
+      pageNumber++;
       y = PH - TOP_MARGIN;
+      
       // Repeat table header for continuation pages (professional standard)
+      const yBeforeHeader = y;
       y = drawTableHeader(coverPage, y);
+      console.log(`[PDF]   Table header drawn, Y: ${yBeforeHeader} → ${y}`);
+      
+      // Recalculate available space on new page
+      const newAvailableSpace = y - BOTTOM_MARGIN;
+      console.log(`[PDF]   New page available space: ${newAvailableSpace.toFixed(1)}`);
+    } else {
+      console.log(`[PDF]   ✓ Row fits on current page`);
     }
 
     // Draw main row border and white background
@@ -615,14 +665,27 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
       });
     });
 
+    // Update Y coordinate after drawing this row
+    const yBeforeUpdate = y;
     y -= ROW_H + ROW_GAP;
+    console.log(`[PDF]   Row drawn, Y updated: ${yBeforeUpdate.toFixed(1)} → ${y.toFixed(1)} (moved ${(ROW_H + ROW_GAP).toFixed(1)}pt)`);
   }
+
+  console.log(`[PDF] ========== Table Rendering Complete ==========`);
+  console.log(`[PDF] Total pages used: ${pageNumber}`);
+  console.log(`[PDF] Final Y position: ${y.toFixed(1)}`);
 
   // ── Footer note ───────────────────────────────────────────────────────────
   // Final check: ensure signature section fits on current page
   const SIGNATURE_HEIGHT = 150; // Total space needed for footer + signatures
-  if (y < SIGNATURE_HEIGHT) {
+  const spaceForSignatures = y - BOTTOM_MARGIN;
+  
+  console.log(`[PDF] Checking signature space: need ${SIGNATURE_HEIGHT}pt, have ${spaceForSignatures.toFixed(1)}pt`);
+  
+  if (spaceForSignatures < SIGNATURE_HEIGHT) {
+      console.log(`[PDF] Creating final page for signatures`);
       coverPage = pdfDoc.addPage([PW, PH]);
+      pageNumber++;
       y = PH - TOP_MARGIN;
   }
 
