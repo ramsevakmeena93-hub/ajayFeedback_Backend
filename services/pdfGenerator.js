@@ -280,7 +280,7 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
     { label: "Needs Attention",   x: ML + 366,  w: 155 },    // +44 wider
     { label: "Appreciation",      x: ML + 521,  w: 170 },    // +25 wider
     { label: "Action Taken",      x: ML + 691,  w: 50  },    // Reduced from 85
-    { label: "Faculty Signature", x: ML + 737,  w: 65  },    // 757
+    { label: "Faculty Signature", x: ML + 737,  w: 63  },    // 757
   ];
 
   const TH = 36; // table header height — 2-line for long labels
@@ -466,32 +466,38 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
       .sort((a, b) => b[1] - a[1])
       .map(([k, v]) => "\u2022 " + k + ": " + v + "%")
       .join("\n");
-    const longAppreciations = (r.appreciation || [])
-      .filter(c => c.trim().split(/\s+/).length > 4)
-      .map(x => "\u2022 " + x);
-    const appText = [pctLines, ...longAppreciations].filter(Boolean).join("\n") || "-";
+    // Preserve ALL appreciation comments
+    const allAppreciations = (r.appreciation || [])
+      .filter(c => typeof c === "string" && c.trim())
+      .map(x => "\u2022 " + x.trim());
+    const appText = [pctLines, ...allAppreciations].filter(Boolean).join("\n") || "-";
 
-    // Calculate dynamic row height — use actual column widths
-    const attLines  = calcLines(attText,             155, FS);  // Needs Attention width
-    const appLines  = calcLines(appText,             170, FS);  // Appreciation width
-    const nameLines = calcLines(r.facultyName || "-", 85, FS);  // Faculty Name width
-    const progLines = calcLines(cleanCourseName(r.programme) || "-", 90, FS);  // Course Name width
-    const maxLines  = Math.max(attLines, appLines, nameLines, progLines, 1);
-    // BALANCED: Some breathing space but still compact
-    const ROW_H     = Math.max(48, maxLines * LH + 8);
+    // Calculate row height using actual wrapped text
+    const attLines  = calcLines(attText, 155, FS);
+    const appLines  = calcLines(appText, 170, FS);
+    const nameLines = calcLines(r.facultyName || "-", 85, FS);
+    const progLines = calcLines(cleanCourseName(r.programme) || "-", 90, FS);
+    const codeLines = calcLines(codeBatch || "-", 60, FS);
+    const actionLines = calcLines(r.actionTaken || "-", 50, FS);
+    const semLines = calcLines(String(r.semester || "-"), 22, FS);
+    const maxLines = Math.max(
+      attLines,
+      appLines,
+      nameLines,
+      progLines,
+      codeLines,
+      actionLines,
+      semLines,
+      1
+    );
+    const ROW_H = Math.max(48, maxLines * LH + 16);
 
-    // Check if we need a new page
-    // Dynamic Page break threshold - optimized to reduce blank space
-    const remainingSpace = y - ROW_H;
-    const needsNewPage = remainingSpace < SIG_RESERVE;
-    
-    if (needsNewPage && i < uniqueReports.length - 1) { // Only create new page if not last row
-      const contPage = pdfDoc.addPage([PW, PH]);
-      let cy = PH - 15;
-      // Per user request: Header is NOT repeated on new pages
-      // cy = drawTableHeader(contPage, cy); 
-      coverPage = contPage;
-      y = cy;
+    // Start a new page when the row does not fit
+    if (y - ROW_H < SIG_RESERVE) {
+      coverPage = pdfDoc.addPage([PW, PH]);
+      y = PH - 20;
+      // Repeat the column header on continuation pages
+      y = drawTableHeader(coverPage, y);
     }
 
     // Draw main row border and white background
