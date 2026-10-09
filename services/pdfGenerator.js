@@ -500,13 +500,24 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
       .map(x => "\u2022 " + x.trim());
     const appText = [pctLines, ...allAppreciations].filter(Boolean).join("\n") || "-";
 
+    // Action Taken - check multiple possible field names
+    const actionText = r.actionTaken || r.action_taken || r.hodAction || r.hodActionTaken || "-";
+    
+    if (i === 0) {
+      // Log field availability for first record (diagnostic)
+      console.log(`[PDF] Action field check for first record:`);
+      console.log(`[PDF]   actionTaken: "${r.actionTaken || 'empty'}"`);
+      console.log(`[PDF]   hodRemarks: "${r.hodRemarks || 'empty'}"`);
+      console.log(`[PDF]   Keys available: ${Object.keys(r).filter(k => k.includes('action') || k.includes('Action')).join(', ') || 'none with action'}`);
+    }
+
     // Calculate row height using actual wrapped text for ALL columns
     const attLines  = calcLines(attText, 155, FS);
     const appLines  = calcLines(appText, 170, FS);
     const nameLines = calcLines(r.facultyName || "-", 85, FS);
     const progLines = calcLines(cleanCourseName(r.programme) || "-", 90, FS);
     const codeLines = calcLines(codeBatch || "-", 60, FS);
-    const actionLines = calcLines(r.actionTaken || "-", 50, FS);
+    const actionLines = calcLines(actionText, 50, FS); // Use actionText instead of r.actionTaken
     const semLines = calcLines(String(r.semester || "-"), 22, FS);
     
     const maxLines = Math.max(
@@ -616,7 +627,7 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
       { v: respDisplay,                                    center: true },
       { v: attText },
       { v: appText },
-      { v: r.actionTaken || "-" },
+      { v: actionText }, // Use actionText instead of r.actionTaken
       { v: "",                                             sig: true },
     ];
 
