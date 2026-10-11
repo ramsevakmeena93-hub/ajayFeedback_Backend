@@ -655,27 +655,25 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
     console.log(`[PDF]   Row height: ${ROW_H}pt, Total needed: ${totalSpaceNeeded}pt`);
     console.log(`[PDF]   Current Y: ${y.toFixed(1)}, Available: ${availableSpace.toFixed(1)}`);
     
-    // Smart pagination: Create new page ONLY when row cannot fit
-    // EXCEPTION: Always try to fit first row on first page (don't create blank first page)
-    const shouldCreateNewPage = !isFirstDataRow && (totalSpaceNeeded > availableSpace);
+    // CHANGED STRATEGY: Allow row to START rendering even if it doesn't fully fit
+    // The row will naturally split across pages (content overflow)
+    // NO PAGE BREAK - just render row starting at current position
+    
+    // Only create new page if absolutely NO space left (less than minimum row height)
+    const MINIMUM_SPACE_TO_START_ROW = 50; // Minimum space needed to start a row
+    const shouldCreateNewPage = !isFirstDataRow && (availableSpace < MINIMUM_SPACE_TO_START_ROW);
     
     if (shouldCreateNewPage) {
-      console.log(`[PDF]   📄 Creating new page ${pageNumber + 1} (row won't fit on current)`);
+      console.log(`[PDF]   📄 Creating new page ${pageNumber + 1} (no space to start row)`);
       coverPage = pdfDoc.addPage([PW, PH]);
       pageNumber++;
       y = PH - 20;
       
-      // NO TABLE HEADER - User wants continuous content flow without header repetition
-      
-      const newAvailableSpace = y - BOTTOM_MARGIN;
-      console.log(`[PDF]   New page available space: ${newAvailableSpace.toFixed(1)}`);
-      
-      // Row can continue on new page - content will flow naturally
-      if (ROW_H > newAvailableSpace) {
-        console.log(`[PDF]   ℹ️  Row ${i+1} is very tall (${ROW_H}pt) - content will split across pages naturally`);
-      }
+      console.log(`[PDF]   New page - row will start here`);
+    } else if (totalSpaceNeeded > availableSpace) {
+      console.log(`[PDF]   ℹ️  Row will SPLIT across pages - starting on current page, continuing on next`);
     } else {
-      console.log(`[PDF]   ✓ Row fits on current page`);
+      console.log(`[PDF]   ✓ Row fits completely on current page`);
     }
     
     // Mark that we've processed the first data row
