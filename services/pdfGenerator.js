@@ -640,15 +640,10 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
     );
     
     // Calculate actual row height with proper padding
-    // CAP row height to maximum that fits on a page to prevent cutoff
-    const MAX_ROW_HEIGHT = PH - 40 - BOTTOM_MARGIN; // Max height that fits: 595-40-30 = 525pt
-    const calculatedRowHeight = Math.max(MIN_ROW_HEIGHT, maxLines * LH + ROW_PADDING);
-    const ROW_H = Math.min(calculatedRowHeight, MAX_ROW_HEIGHT);
+    // Allow rows to be as tall as needed - they will naturally split across pages
+    const ROW_H = Math.max(MIN_ROW_HEIGHT, maxLines * LH + ROW_PADDING);
     
-    if (calculatedRowHeight > MAX_ROW_HEIGHT) {
-      console.warn(`[PDF]   ⚠️ Row ${i+1} height capped: ${calculatedRowHeight}pt → ${ROW_H}pt (would be cut off)`);
-      console.warn(`[PDF]   This row has ${maxLines} lines of comments - consider splitting or truncating`);
-    }
+    console.log(`[PDF]   Row height calculated: ${ROW_H}pt for ${maxLines} lines`);
     
     const totalSpaceNeeded = ROW_H + ROW_GAP;
     const availableSpace = y - BOTTOM_MARGIN;
@@ -669,12 +664,10 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
       pageNumber++;
       y = PH - 20;
       
-      // IMPORTANT: Draw table header on new page
-      console.log(`[PDF]   Drawing table header on new page`);
-      y = drawTableHeader(coverPage, y);
+      // NO TABLE HEADER on continuation pages (user request - only show header once)
       
       const newAvailableSpace = y - BOTTOM_MARGIN;
-      console.log(`[PDF]   New page available space after header: ${newAvailableSpace.toFixed(1)}`);
+      console.log(`[PDF]   New page available space: ${newAvailableSpace.toFixed(1)}`);
       
       // Check if row fits even on new page
       if (ROW_H > newAvailableSpace) {
@@ -823,14 +816,8 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
         });
       } // End of wrapping logic (else block)
       
-      // SHOW LINES UP TO ROW HEIGHT LIMIT - No overflow
-      // Calculate max lines that fit in ROW_H
-      const maxLinesInRow = Math.floor((ROW_H - ROW_PADDING) / LH);
-      const visLines = allLines.slice(0, maxLinesInRow); // Limit to what fits
-      
-      if (allLines.length > maxLinesInRow) {
-        console.warn(`[PDF]   ⚠️ Cell truncated: ${allLines.length} lines → ${maxLinesInRow} lines (row height limit)`);
-      }
+      // RENDER ALL LINES - allow natural overflow across pages (like MS Word)
+      const visLines = allLines; // Show all lines, no truncation
       
       visLines.forEach((l, li) => {
         const fontToUse = val.bold ? boldFont : timesFont;
@@ -840,10 +827,8 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
           : col.x + 6; // 6px left padding
         const lineY = y - 12 - li * LH;
         
-        // Only draw if within row bounds
-        if (lineY >= (y - ROW_H + 5)) {
-          txt(coverPage, l, tX, lineY, FS, fontToUse, val.color || black);
-        }
+        // Draw all lines - let them naturally overflow to next page if needed
+        txt(coverPage, l, tX, lineY, FS, fontToUse, val.color || black);
       });
     });
 
