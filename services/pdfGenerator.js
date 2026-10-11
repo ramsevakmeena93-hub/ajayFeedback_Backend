@@ -665,15 +665,17 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
       pageNumber++;
       y = PH - 20;
       
-      // NO TABLE HEADER on continuation pages (user request - only show header once)
+      // ✅ REPEAT TABLE HEADER on continuation pages for readability
+      console.log(`[PDF]   Drawing table header on continuation page`);
+      y = drawTableHeader(coverPage, y);
       
       const newAvailableSpace = y - BOTTOM_MARGIN;
-      console.log(`[PDF]   New page available space: ${newAvailableSpace.toFixed(1)}`);
+      console.log(`[PDF]   New page available space after header: ${newAvailableSpace.toFixed(1)}`);
       
-      // Check if row fits even on new page
+      // Check if row fits even on new page with header
       if (ROW_H > newAvailableSpace) {
         console.warn(`[PDF]   ⚠️  WARNING: Row ${i+1} height (${ROW_H}pt) exceeds fresh page (${newAvailableSpace.toFixed(1)}pt)`);
-        console.warn(`[PDF]   Row will be truncated to fit within page bounds`);
+        console.warn(`[PDF]   Row content may overflow to next page`);
       }
     } else {
       console.log(`[PDF]   ✓ Row fits on current page`);
