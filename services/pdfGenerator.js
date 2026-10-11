@@ -655,19 +655,27 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
     console.log(`[PDF]   Row height: ${ROW_H}pt, Total needed: ${totalSpaceNeeded}pt`);
     console.log(`[PDF]   Current Y: ${y.toFixed(1)}, Available: ${availableSpace.toFixed(1)}`);
     
-    // SIMPLIFIED STRATEGY: If row won't fit, move entire row to next page
-    // NO splitting, NO continuation, ONE CONTINUOUS TABLE
+    // PRACTICAL STRATEGY: Limit row height to prevent page overflow
+    // If row would be too tall, cap it and truncate content
+    // This prevents splitting issues while keeping table clean
     
-    const rowBottomY = y - ROW_H;
+    const MAX_ROW_HEIGHT_PER_PAGE = 500; // Maximum row height to prevent overflow issues
+    const SAFE_ROW_H = Math.min(ROW_H, MAX_ROW_HEIGHT_PER_PAGE);
+    const wasContentTruncated = ROW_H > MAX_ROW_HEIGHT_PER_PAGE;
+    
+    if (wasContentTruncated) {
+      console.log(`[PDF]   ⚠️ Row height capped: ${ROW_H}pt → ${SAFE_ROW_H}pt (content will be truncated)`);
+    }
+    
+    const rowBottomY = y - SAFE_ROW_H;
     const willOverflowPage = rowBottomY < BOTTOM_MARGIN;
     
     if (willOverflowPage && !isFirstDataRow) {
-      // Row won't fit - create new page and draw row there
+      // Row won't fit - move to next page
       console.log(`[PDF]   📄 Row won't fit (would end at ${rowBottomY.toFixed(1)} < ${BOTTOM_MARGIN}) - moving to new page`);
       coverPage = pdfDoc.addPage([PW, PH]);
       pageNumber++;
       y = PH - 20;
-      console.log(`[PDF]   New page ${pageNumber}, starting at Y=${y.toFixed(1)}`);
     } else {
       console.log(`[PDF]   ✓ Row fits on current page (will end at ${rowBottomY.toFixed(1)})`);
     }
@@ -675,15 +683,15 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
     // Mark that we've processed the first data row
     isFirstDataRow = false;
 
-    // Draw main row border and white background (FULL HEIGHT - no partial rendering)
-    rect(coverPage, ML, y - ROW_H, CW, ROW_H, { 
+    // Draw main row border and white background
+    rect(coverPage, ML, y - SAFE_ROW_H, CW, SAFE_ROW_H, { 
       borderColor: black, borderWidth: 0.5 
     });
 
     // Draw vertical cell dividers for each column
     COLS.forEach((col, ci) => {
       if (ci > 0) {
-        line(coverPage, col.x, y, col.x, y - ROW_H, 0.5, black);
+        line(coverPage, col.x, y, col.x, y - SAFE_ROW_H, 0.5, black);
       }
     });
 
@@ -810,26 +818,36 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
         });
       } // End of wrapping logic (else block)
       
-      // RENDER ALL LINES - simple rendering without continuation logic
+      // RENDER LINES - Limit to fit within SAFE_ROW_H
       const visLines = allLines;
+      const maxLinesForRow = Math.floor((SAFE_ROW_H - 20) / LH); // Reserve 20pt for padding
+      const linesToRender = visLines.slice(0, maxLinesForRow);
       
-      visLines.forEach((l, li) => {
+      linesToRender.forEach((l, li) => {
         const fontToUse = val.bold ? boldFont : timesFont;
         const lw = fontToUse.widthOfTextAtSize(l, FS);
-        const tX = val.center
-          ? col.x + (col.w - lw) / 2
-          : col.x + 6;
+        const tX = val.center ? col.x + (col.w - lw) / 2 : col.x + 6;
         const lineY = y - 12 - li * LH;
         
-        // Render all lines normally
-        txt(coverPage, l, tX, lineY, FS, fontToUse, val.color || black);
+        // Only render if within row bounds
+        if (lineY > y - SAFE_ROW_H + 5) {
+          txt(coverPage, l, tX, lineY, FS, fontToUse, val.color || black);
+        }
       });
+      
+      // If content was truncated, show indicator
+      if (wasContentTruncated && visLines.length > maxLinesForRow && ci > 0) {
+        const lastLineY = y - 12 - maxLinesForRow * LH;
+        if (lastLineY > y - SAFE_ROW_H + 5) {
+          txt(coverPage, "...", col.x + 6, lastLineY, FS, timesFont, gray);
+        }
+      }
     });
 
     // Update Y coordinate after drawing this row
     const yBeforeUpdate = y;
-    y -= ROW_H + ROW_GAP;
-    console.log(`[PDF]   Row drawn, Y updated: ${yBeforeUpdate.toFixed(1)} → ${y.toFixed(1)} (moved ${(ROW_H + ROW_GAP).toFixed(1)}pt)`);
+    y -= SAFE_ROW_H + ROW_GAP;
+    console.log(`[PDF]   Row drawn, Y updated: ${yBeforeUpdate.toFixed(1)} → ${y.toFixed(1)} (moved ${(SAFE_ROW_H + ROW_GAP).toFixed(1)}pt)`);
   }
 
   console.log(`[PDF] ========== Table Rendering Complete ==========`);
