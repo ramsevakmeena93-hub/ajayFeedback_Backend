@@ -463,6 +463,10 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
   txt(coverPage, avgRespText, PW - MR - timesBoldFont.widthOfTextAtSize(avgRespText, 11), y, 11, timesBoldFont, black);
   y -= 18;
 
+  // Define pagination constants (needed for comment section check)
+  const TOP_MARGIN = 30;    // Space at top of continuation pages
+  const BOTTOM_MARGIN = 30; // Space at bottom of pages
+
   // ── HOD Comment Section (if exists) ───────────────────────────────────────
   // Show BOTH department-level comment AND individual report remarks
   const hasComments = (hodCommentText && hodCommentText.trim()) || individualComments.length > 0;
@@ -531,8 +535,23 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
       });
     }
     
-    // Calculate total height needed
+    // Calculate total height needed for comment box
     const commentHeight = Math.max(40, allCommentLines.length * 13 + 24);
+    const COMMENT_BOTTOM_MARGIN = 60; // Space needed after comment for at least table header
+    
+    // Check if comment box fits on current page
+    const spaceAvailable = y - COMMENT_BOTTOM_MARGIN;
+    console.log('[PDF] Comment height needed:', commentHeight, 'Space available:', spaceAvailable);
+    
+    if (commentHeight > spaceAvailable) {
+      // Comment is too big for remaining space, create new page
+      console.log('[PDF] ⚠️ Comment too large for current page, creating new page');
+      coverPage = pdfDoc.addPage([PW, PH]);
+      pageNumber++;
+      y = PH - TOP_MARGIN;
+      console.log('[PDF] New page created for comments, Y reset to:', y);
+    }
+    
     const commentBoxY = y;
     
     // Draw light blue background box
@@ -555,6 +574,7 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
     });
     
     y = commentBoxY - commentHeight - 8;
+    console.log('[PDF] Comment rendered, Y position after comment:', y);
   }
 
   // ── Draw initial table header ─────────────────────────────────────────────
@@ -562,8 +582,7 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
 
   // ── Data rows ─────────────────────────────────────────────────────────────
   const ROW_GAP    = 2;  // Small gap between rows for visual separation
-  const BOTTOM_MARGIN = 30; // Reduced to allow maximum rows per page (was 50)
-  const TOP_MARGIN = 30;    // Space at top of continuation pages
+  // BOTTOM_MARGIN and TOP_MARGIN already defined above for comment section
   const FS = 9.5;           // Reduced font size to fit more text (was 10)
   const LH = 10.5;          // Reduced line height (was 11)
   const MIN_ROW_HEIGHT = 38; // Reduced minimum (was 42)
