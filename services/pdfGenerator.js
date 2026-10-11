@@ -568,7 +568,7 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
   y = drawTableHeader(coverPage, y);
 
   // ── Data rows ─────────────────────────────────────────────────────────────
-  const ROW_GAP    = 2;  // Small gap between rows for visual separation
+  const ROW_GAP    = 1;  // Minimal gap between rows (reduced from 2pt)
   // BOTTOM_MARGIN and TOP_MARGIN already defined above for comment section
   const FS = 9.5;           // Reduced font size to fit more text (was 10)
   const LH = 10.5;          // Reduced line height (was 11)
@@ -939,8 +939,8 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
   console.log(`[PDF] Final Y position: ${y.toFixed(1)}`);
 
   // ── Footer note ───────────────────────────────────────────────────────────
-  // Final check: ensure signature section fits on current page
-  const SIGNATURE_HEIGHT = 150; // Total space needed for footer + signatures
+  // Minimize white space - use compact signature section
+  const SIGNATURE_HEIGHT = 90; // Reduced from 150pt - more compact
   const spaceForSignatures = y - BOTTOM_MARGIN;
   
   console.log(`[PDF] Checking signature space: need ${SIGNATURE_HEIGHT}pt, have ${spaceForSignatures.toFixed(1)}pt`);
@@ -952,7 +952,7 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
       y = PH - TOP_MARGIN;
   }
 
-  y -= 10; // Small spacing before footer
+  y -= 5; // Minimal spacing before footer (reduced from 10pt)
 
   rect(coverPage, ML, y - 18, CW, 18, {
     borderColor: black, borderWidth: 0.5
@@ -962,7 +962,7 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
   y -= 18;
 
   // ── Signature section (HOD | PRO-VC) — Signature first, then name, then position ──────
-  const sBH = 60;  // body row height (increased for signature)
+  const sBH = 50;  // Reduced signature row height (was 60pt)
   const sY  = y;
   const c2W = Math.floor(CW / 2);
   const c3W = CW - Math.floor(CW / 2);
