@@ -645,29 +645,91 @@ const handleHODExportPDF = async (req, res) => {
     const vcUser = await User.findOne({ role: 'vc' }).select('name signatureImage');
     const hodUser = await User.findById(req.user.id).select('name email department signatureImage');
     
+    console.log('[HOD Export] ========== EXPORT PDF REQUEST ==========');
+    console.log('[HOD Export] HOD User:', {
+      id: req.user.id,
+      department: hodUser?.department,
+      name: hodUser?.name
+    });
+    
+    // Build query with optional filters
     const query = { hodId: req.user.id };
+    
+    // Filter by specific report IDs (if provided)
     const reportIds = req.body?.reportIds || (req.query?.reportIds ? req.query.reportIds.split(',') : null);
     if (reportIds && reportIds.length > 0) {
       query._id = { $in: reportIds };
     }
+    
+    // Filter by semester (NEW)
+    const semesterFilter = req.body?.semester || req.query?.semester;
+    if (semesterFilter && semesterFilter !== 'all') {
+      query.semester = semesterFilter;
+      console.log('[HOD Export] Filtering by semester:', semesterFilter);
+    }
+    
+    // Filter by academic year (NEW)
+    const academicYearFilter = req.body?.academicYear || req.query?.academicYear;
+    if (academicYearFilter && academicYearFilter !== 'all') {
+      query.academicYear = academicYearFilter;
+      console.log('[HOD Export] Filtering by academic year:', academicYearFilter);
+    }
+    
+    // Filter by session (NEW)
+    const sessionFilter = req.body?.session || req.query?.session;
+    if (sessionFilter && sessionFilter !== 'all') {
+      query.session = sessionFilter;
+      console.log('[HOD Export] Filtering by session:', sessionFilter);
+    }
+
+    console.log('[HOD Export] Query filters:', JSON.stringify(query, null, 2));
 
     let reports = await FacultyReport.find(query).sort({ createdAt: -1 });
     if (reports.length === 0) {
-      // Fallback: check any reports belonging to HOD
+      // Fallback: check any reports belonging to HOD (without filters)
       reports = await FacultyReport.find({ hodId: req.user.id });
+      console.log('[HOD Export] No reports with filters, fallback found:', reports.length);
     }
-    if (reports.length === 0) return res.status(400).json({ error: 'No reports found to export' });
+    if (reports.length === 0) {
+      return res.status(400).json({ 
+        error: 'No reports found to export',
+        filters: { semester: semesterFilter, academicYear: academicYearFilter, session: sessionFilter }
+      });
+    }
+
+    console.log('[HOD Export] Found reports:', reports.length);
+    console.log('[HOD Export] First report details:', {
+      academicYear: reports[0]?.academicYear,
+      session: reports[0]?.session,
+      semester: reports[0]?.semester,
+      facultyName: reports[0]?.facultyName,
+      hasHodRemarks: !!reports[0]?.hodRemarks
+    });
+    
+    // Get unique semesters from filtered reports for display
+    const semesters = [...new Set(reports.map(r => r.semester).filter(Boolean))].sort();
+    
+    const submissionParams = {
+      academicYear: reports[0]?.academicYear || '2026-2027',
+      session: reports[0]?.session || '',  // Add session for HOD comment lookup
+      department: req.user.department || hodUser?.department || '',
+      feedbackFormNo: 'I',
+      submissionDate: new Date(),
+      finalReportDate: new Date(),
+      // Add filter info for display in PDF
+      filterInfo: {
+        semester: semesterFilter && semesterFilter !== 'all' ? semesterFilter : null,
+        semesters: semesters.length > 0 ? semesters.join(', ') : null,
+        totalReports: reports.length
+      }
+    };
+    
+    console.log('[HOD Export] Submission parameters being passed to PDF:', submissionParams);
+    console.log('[HOD Export] ==========================================');
 
     const { generateFeedbackReportPDF } = require('../services/pdfGenerator');
     const pdfBuffer = await generateFeedbackReportPDF({
-      submission: {
-        academicYear: reports[0]?.academicYear || '2026-2027',
-        session: reports[0]?.session || '',  // Add session for HOD comment lookup
-        department: req.user.department || hodUser?.department || '',
-        feedbackFormNo: 'I',
-        submissionDate: new Date(),
-        finalReportDate: new Date()
-      },
+      submission: submissionParams,
       reports,
       hodUser,
       vcUser,
@@ -677,9 +739,19 @@ const handleHODExportPDF = async (req, res) => {
       hideVCSignature: true, // Hide Pro-VC signature in Export PDF (only HOD downloads this)
     });
 
+    // Generate dynamic filename based on filters
+    let filename = 'hod-feedback-report';
+    if (semesterFilter && semesterFilter !== 'all') {
+      filename += `-sem${semesterFilter}`;
+    }
+    if (academicYearFilter && academicYearFilter !== 'all') {
+      filename += `-${academicYearFilter.replace('/', '-')}`;
+    }
+    filename += '.pdf';
+
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Length', Buffer.isBuffer(pdfBuffer) ? pdfBuffer.length : Buffer.from(pdfBuffer).length);
-    res.setHeader('Content-Disposition', 'attachment; filename="hod-feedback-report.pdf"');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.setHeader('Cache-Control', 'no-cache');
     res.end(Buffer.isBuffer(pdfBuffer) ? pdfBuffer : Buffer.from(pdfBuffer));
   } catch (err) {
@@ -691,6 +763,39 @@ const handleHODExportPDF = async (req, res) => {
 router.get('/my/preview-pdf', authMiddleware, requireAnyRole('hod'), handleHODExportPDF);
 router.get('/my/export-pdf', authMiddleware, requireAnyRole('hod'), handleHODExportPDF);
 router.post('/my/export-pdf', authMiddleware, requireAnyRole('hod'), handleHODExportPDF);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HOD: Get available filter options for export
+// ─────────────────────────────────────────────────────────────────────────────
+router.get('/my/export-filters', authMiddleware, requireAnyRole('hod'), async (req, res) => {
+  try {
+    const reports = await FacultyReport.find({ hodId: req.user.id }).lean();
+    
+    if (reports.length === 0) {
+      return res.json({
+        semesters: [],
+        academicYears: [],
+        sessions: [],
+        totalReports: 0
+      });
+    }
+    
+    // Extract unique values
+    const semesters = [...new Set(reports.map(r => r.semester).filter(Boolean))].sort((a, b) => a - b);
+    const academicYears = [...new Set(reports.map(r => r.academicYear).filter(Boolean))].sort();
+    const sessions = [...new Set(reports.map(r => r.session).filter(Boolean))].sort();
+    
+    res.json({
+      semesters,
+      academicYears,
+      sessions,
+      totalReports: reports.length
+    });
+  } catch (err) {
+    console.error('[Export Filters Error]:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // VC: Get submission reports

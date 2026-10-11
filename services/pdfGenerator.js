@@ -16,30 +16,59 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
   const HODComment = require("../models/HODComment");
   const axios = require("axios");
 
-  // Fetch HOD comment for this department
+  // Fetch HOD comment for this department (department-level comment)
   let hodCommentText = null;
   try {
     const HODComment = require('../models/HODComment');
     if (hodUser?.department) {
-      console.log('[PDF] Fetching HOD comment for:', {
+      const queryParams = {
         department: hodUser.department,
         academicYear: submission?.academicYear || '2026-2027',
         session: submission?.session || ''
-      });
-      const commentDoc = await HODComment.findOne({
-        department: hodUser.department,
-        academicYear: submission?.academicYear || '2026-2027',
-        session: submission?.session || ''
-      }).lean();
-      console.log('[PDF] HOD comment found:', commentDoc ? 'YES' : 'NO', commentDoc?.comment?.substring(0, 50));
+      };
+      console.log('[PDF] ========== HOD COMMENT FETCH ==========');
+      console.log('[PDF] Query parameters:', JSON.stringify(queryParams, null, 2));
+      
+      const commentDoc = await HODComment.findOne(queryParams).lean();
+      
+      console.log('[PDF] Department-level HOD comment found:', commentDoc ? 'YES' : 'NO');
+      if (commentDoc) {
+        console.log('[PDF] Comment preview:', commentDoc.comment?.substring(0, 100) + '...');
+        console.log('[PDF] Comment full length:', commentDoc.comment?.length, 'characters');
+        console.log('[PDF] Saved by:', commentDoc.hodName, '(', commentDoc.hodUserId, ')');
+      } else {
+        console.log('[PDF] ❌ No department-level comment found');
+      }
       hodCommentText = commentDoc?.comment || null;
     } else {
-      console.log('[PDF] No hodUser.department, skipping comment fetch');
+      console.log('[PDF] ❌ No hodUser.department provided, skipping comment fetch');
+      console.log('[PDF] hodUser object:', JSON.stringify(hodUser, null, 2));
     }
   } catch (err) {
-    console.warn('[PDF] Failed to fetch HOD comment (non-fatal):', err.message);
+    console.error('[PDF] ❌ Failed to fetch HOD comment:', err.message);
+    console.error('[PDF] Error stack:', err.stack);
     hodCommentText = null; // Continue without comment
   }
+
+  // ALSO collect all individual report comments (hodRemarks field)
+  const individualComments = [];
+  reports.forEach((r, idx) => {
+    if (r.hodRemarks && r.hodRemarks.trim()) {
+      individualComments.push({
+        facultyName: r.facultyName || 'Unknown',
+        subjectCode: r.subjectCode || '',
+        remark: r.hodRemarks.trim()
+      });
+    }
+  });
+  console.log('[PDF] Individual report comments found:', individualComments.length);
+  if (individualComments.length > 0) {
+    console.log('[PDF] Sample individual comments:');
+    individualComments.slice(0, 3).forEach((c, i) => {
+      console.log(`[PDF]   ${i+1}. ${c.facultyName} (${c.subjectCode}): ${c.remark.substring(0, 60)}...`);
+    });
+  }
+  console.log('[PDF] ========================================');
 
   // ── PDF document & fonts ──────────────────────────────────────────────────
   const pdfDoc = await PDFDocument.create();
@@ -399,6 +428,17 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
   txt(coverPage, repGenText, PW - MR - timesFont.widthOfTextAtSize(repGenText, 11), y, 11, timesFont, black);
   y -= 15;
 
+  // Line 5.5: Filter info (if filtered by semester)
+  if (submission.filterInfo?.semester) {
+    const filterText = "Semester Filter: Semester " + submission.filterInfo.semester;
+    txt(coverPage, filterText, ML, y, 10, timesFont, rgb(0.4, 0.4, 0.4));
+    y -= 13;
+  } else if (submission.filterInfo?.semesters) {
+    const filterText = "Included Semesters: " + submission.filterInfo.semesters;
+    txt(coverPage, filterText, ML, y, 10, timesFont, rgb(0.4, 0.4, 0.4));
+    y -= 13;
+  }
+
   // Line 6: Average FFI (left) | Average Response (right)
   const allFFIs  = uniqueReports.map(r => r.ffiScore).filter(v => v != null);
   const avgFFI   = allFFIs.length
@@ -418,28 +458,75 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
   y -= 18;
 
   // ── HOD Comment Section (if exists) ───────────────────────────────────────
-  if (hodCommentText && hodCommentText.trim()) {
+  // Show BOTH department-level comment AND individual report remarks
+  const hasComments = (hodCommentText && hodCommentText.trim()) || individualComments.length > 0;
+  
+  console.log('[PDF] ========== COMMENT RENDERING CHECK ==========');
+  console.log('[PDF] hasComments:', hasComments);
+  console.log('[PDF] hodCommentText exists:', !!hodCommentText);
+  console.log('[PDF] individualComments count:', individualComments.length);
+  console.log('[PDF] ===============================================');
+  
+  if (hasComments) {
+    console.log('[PDF] ✅ Rendering HOD comments section...');
     // Add some spacing
     y -= 6;
     
-    // Draw a subtle box for the comment
-    const commentLines = [];
-    const maxCharsPerLine = Math.floor(CW / (10 * 0.58)); // ~138 chars per line
-    const words = hodCommentText.trim().split(' ');
-    let currentLine = '';
+    // Prepare all comment lines to display
+    const allCommentLines = [];
     
-    words.forEach(word => {
-      const testLine = currentLine ? currentLine + ' ' + word : word;
-      if (testLine.length <= maxCharsPerLine) {
-        currentLine = testLine;
-      } else {
-        if (currentLine) commentLines.push(currentLine);
-        currentLine = word;
+    // 1. Department-level comment (if exists)
+    if (hodCommentText && hodCommentText.trim()) {
+      allCommentLines.push({ text: 'Department-level Remarks:', bold: true });
+      const deptWords = hodCommentText.trim().split(' ');
+      let currentLine = '';
+      const maxCharsPerLine = Math.floor(CW / (10 * 0.58)); // ~138 chars per line
+      
+      deptWords.forEach(word => {
+        const testLine = currentLine ? currentLine + ' ' + word : word;
+        if (testLine.length <= maxCharsPerLine) {
+          currentLine = testLine;
+        } else {
+          if (currentLine) allCommentLines.push({ text: currentLine, bold: false });
+          currentLine = word;
+        }
+      });
+      if (currentLine) allCommentLines.push({ text: currentLine, bold: false });
+      
+      // Add spacing between department comment and individual comments
+      if (individualComments.length > 0) {
+        allCommentLines.push({ text: '', bold: false }); // blank line
       }
-    });
-    if (currentLine) commentLines.push(currentLine);
+    }
     
-    const commentHeight = Math.max(30, commentLines.length * 13 + 20);
+    // 2. Individual report remarks (if exist)
+    if (individualComments.length > 0) {
+      if (hodCommentText && hodCommentText.trim()) {
+        // Already added department comment above
+      }
+      allCommentLines.push({ text: 'Faculty-specific Remarks:', bold: true });
+      
+      individualComments.forEach((comment, idx) => {
+        const prefix = `${idx + 1}. ${comment.facultyName} (${comment.subjectCode}): `;
+        const remarkWords = comment.remark.split(' ');
+        let currentLine = prefix;
+        const maxCharsPerLine = Math.floor(CW / (10 * 0.58)) - 4; // Slightly less for indentation
+        
+        remarkWords.forEach(word => {
+          const testLine = currentLine + ' ' + word;
+          if (testLine.length <= maxCharsPerLine) {
+            currentLine = testLine;
+          } else {
+            if (currentLine) allCommentLines.push({ text: currentLine, bold: false, indent: true });
+            currentLine = '   ' + word; // indent continuation lines
+          }
+        });
+        if (currentLine) allCommentLines.push({ text: currentLine, bold: false, indent: true });
+      });
+    }
+    
+    // Calculate total height needed
+    const commentHeight = Math.max(40, allCommentLines.length * 13 + 24);
     const commentBoxY = y;
     
     // Draw light blue background box
@@ -452,10 +539,12 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
     // Title
     txt(coverPage, "HOD Remarks:", ML + 10, commentBoxY - 14, 10, boldFont, darkBlue);
     
-    // Comment text
+    // Render all comment lines
     let commentY = commentBoxY - 28;
-    commentLines.forEach(line => {
-      txt(coverPage, line, ML + 10, commentY, 10, timesFont, black);
+    allCommentLines.forEach(line => {
+      const useFont = line.bold ? boldFont : timesFont;
+      const xPos = line.indent ? ML + 14 : ML + 10;
+      txt(coverPage, line.text, xPos, commentY, 10, useFont, black);
       commentY -= 13;
     });
     
@@ -626,17 +715,17 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
       : '%';  // Show just % symbol if no percentage data available
 
     const cellValues = [
-      { v: String(i + 1),                                  bold: true,  center: true },
+      { v: String(i + 1), bold: true, center: true, noWrap: true }, // S.No - never wrap
       { v: r.facultyName || "-" },
       { v: codeBatch },
       { v: cleanCourseName(r.programme)  || "-" },  // Clean course name (remove "submitted answer" garbage)
-      { v: r.semester   || "-",                            center: true },
-      { v: ffi != null ? ffi.toFixed(2) : "-",            color: ffiColor, bold: true, center: true },
-      { v: respDisplay,                                    center: true },
+      { v: r.semester   || "-", center: true, noWrap: true }, // Semester - never wrap
+      { v: ffi != null ? ffi.toFixed(2) : "-", color: ffiColor, bold: true, center: true, noWrap: true }, // FFI - never wrap
+      { v: respDisplay, center: true, noWrap: true }, // Response % - never wrap
       { v: attText },
       { v: appText },
       { v: actionText }, // Use actionText instead of r.actionTaken
-      { v: "",                                             sig: true },
+      { v: "", sig: true },
     ];
 
     cellValues.forEach((val, ci) => {
@@ -667,13 +756,21 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
 
       // Regular text cell — Use IMPROVED word wrapping with better spacing
       const textValue = val.v || "";
-      const allLines = textValue.split("\n").filter(seg => seg.trim()).flatMap(seg => {
-        const words = seg.split(/\s+/).filter(w => w); // Split on any whitespace, remove empty
-        const wrappedLines = [];
-        let currentLine = "";
-        
-        const fontToUse = val.bold ? boldFont : timesFont;
-        const maxWidth = col.w - 14; // Slightly more padding for better appearance (7px each side)
+      
+      // CHECK FOR noWrap FLAG - render as single line without splitting
+      let allLines;
+      if (val.noWrap) {
+        // Don't wrap - render as single line (for S.No, Semester, FFI, Response %)
+        allLines = [textValue];
+      } else {
+        // Apply word wrapping logic
+        allLines = textValue.split("\n").filter(seg => seg.trim()).flatMap(seg => {
+          const words = seg.split(/\s+/).filter(w => w); // Split on any whitespace, remove empty
+          const wrappedLines = [];
+          let currentLine = "";
+          
+          const fontToUse = val.bold ? boldFont : timesFont;
+          const maxWidth = col.w - 14; // Slightly more padding for better appearance (7px each side)
         
         words.forEach((word, wordIdx) => {
           // Clean up word - remove extra spaces
@@ -729,7 +826,8 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
         if (currentLine) wrappedLines.push(currentLine);
         
         return wrappedLines.length > 0 ? wrappedLines : [""];
-      });
+        });
+      } // End of wrapping logic (else block)
       
       // SHOW LINES UP TO ROW HEIGHT LIMIT - No overflow
       // Calculate max lines that fit in ROW_H
