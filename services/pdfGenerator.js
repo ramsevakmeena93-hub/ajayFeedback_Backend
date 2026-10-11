@@ -733,28 +733,13 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
       const col = COLS[ci];
 
       if (val.sig) {
-        // Faculty signature cell
-        if (!withoutSignatures && !needsContinuation) {
-          // Only show signature if row fits completely (not on split rows)
-          const sigImg = facultySigMap[(r.facultyName || "").toLowerCase().trim()];
-          if (sigImg) {
-            const sW = 50, sH = 25;
-            const sigX = col.x + (col.w - sW) / 2;
-            const sigY = y - partialRowHeight + 22;
-            coverPage.drawImage(sigImg, { x: sigX, y: sigY, width: sW, height: sH });
-          } else {
-            line(coverPage, col.x + 4, y - partialRowHeight + 24, col.x + col.w - 4, y - partialRowHeight + 24, 0.5, gray);
-          }
-        } else {
-          line(coverPage, col.x + 4, y - partialRowHeight + 24, col.x + col.w - 4, y - partialRowHeight + 24, 0.5, gray);
-        }
-        // Faculty name below signature
-        const nameStr = r.facultyName || "";
-        const nameW = nameStr.length * 7 * 0.52;
-        const nameX = col.x + Math.max(1, (col.w - nameW) / 2);
-        txt(coverPage, nameStr, nameX, y - partialRowHeight + 8, 7, timesFont, gray);
-        
-        cellContinuationData.push({ lines: [], startLine: 0 }); // No continuation for signature
+        // Faculty signature cell - DON'T render yet, will render after continuation completes
+        cellContinuationData.push({ 
+          lines: [], 
+          isSig: true, 
+          facultyName: r.facultyName,
+          col: col 
+        });
         return;
       }
 
@@ -905,32 +890,35 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
           console.log(`[PDF]     Cell ${ci}: Rendered ${lines.length} continuation lines`);
         });
         
-        // Add signature on continuation page if row was split
-        const sigCol = COLS[COLS.length - 1];
-        if (!withoutSignatures) {
-          const sigImg = facultySigMap[(r.facultyName || "").toLowerCase().trim()];
-          if (sigImg) {
-            const sW = 50, sH = 25;
-            const sigX = sigCol.x + (sigCol.w - sW) / 2;
-            const sigY = y - continuationHeight + 22;
-            coverPage.drawImage(sigImg, { x: sigX, y: sigY, width: sW, height: sH });
-          } else {
-            line(coverPage, sigCol.x + 4, y - continuationHeight + 24, sigCol.x + sigCol.w - 4, y - continuationHeight + 24, 0.5, gray);
-          }
-        } else {
-          line(coverPage, sigCol.x + 4, y - continuationHeight + 24, sigCol.x + sigCol.w - 4, y - continuationHeight + 24, 0.5, gray);
-        }
-        
-        // Faculty name below signature
-        const nameStr = r.facultyName || "";
-        const nameW = nameStr.length * 7 * 0.52;
-        const nameX = sigCol.x + Math.max(1, (sigCol.w - nameW) / 2);
-        txt(coverPage, nameStr, nameX, y - continuationHeight + 8, 7, timesFont, gray);
+        // Signature is rendered AFTER continuation completes (see below)
         
         // Update Y after continuation
         y -= continuationHeight + ROW_GAP;
         console.log(`[PDF]   Continuation complete, Y now: ${y.toFixed(1)}`);
       }
+    }
+    
+    // NOW render signature - AFTER all content (including continuation) is complete
+    const sigCol = COLS[COLS.length - 1];
+    const sigData = cellContinuationData.find(cd => cd && cd.isSig);
+    
+    if (sigData && !withoutSignatures) {
+      const sigImg = facultySigMap[(sigData.facultyName || "").toLowerCase().trim()];
+      if (sigImg) {
+        const sW = 50, sH = 25;
+        const sigX = sigData.col.x + (sigData.col.w - sW) / 2;
+        const sigY = y - (needsContinuation ? 0 : partialRowHeight) + 22;
+        coverPage.drawImage(sigImg, { x: sigX, y: sigY, width: sW, height: sH });
+      } else {
+        line(coverPage, sigData.col.x + 4, y - (needsContinuation ? 0 : partialRowHeight) + 24, 
+             sigData.col.x + sigData.col.w - 4, y - (needsContinuation ? 0 : partialRowHeight) + 24, 0.5, gray);
+      }
+      
+      // Faculty name below signature
+      const nameStr = sigData.facultyName || "";
+      const nameW = nameStr.length * 7 * 0.52;
+      const nameX = sigData.col.x + Math.max(1, (sigData.col.w - nameW) / 2);
+      txt(coverPage, nameStr, nameX, y - (needsContinuation ? 0 : partialRowHeight) + 8, 7, timesFont, gray);
     }
   }
 
