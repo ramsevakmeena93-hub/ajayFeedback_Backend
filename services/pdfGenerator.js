@@ -660,7 +660,7 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
     
     const rowBottomY = y - ROW_H;
     const willOverflowPage = rowBottomY < BOTTOM_MARGIN;
-    const availableSpace = y - BOTTOM_MARGIN;
+    // availableSpace already declared above, reuse it
     
     let partialRowHeight = ROW_H;  // Height to render on current page
     let needsContinuation = false;
