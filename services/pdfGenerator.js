@@ -666,19 +666,24 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
     let needsContinuation = false;
     let continuationHeight = 0;     // Height for continuation page
     
-    if (willOverflowPage && !isFirstDataRow) {
-      if (availableSpace > 60) {
+    // FIXED: Apply split logic to ALL rows including first row
+    if (willOverflowPage) {
+      // Increase minimum space threshold for better splitting
+      const MIN_SPACE_FOR_MEANINGFUL_SPLIT = 100; // Need at least 100pt to show meaningful content
+      
+      if (availableSpace > MIN_SPACE_FOR_MEANINGFUL_SPLIT) {
         // Enough space to start row on this page - will continue on next
         needsContinuation = true;
         partialRowHeight = availableSpace - ROW_GAP; // Use available space
         continuationHeight = ROW_H - partialRowHeight;
         console.log(`[PDF]   📄 Row SPLITS: ${partialRowHeight.toFixed(1)}pt on page ${pageNumber}, ${continuationHeight.toFixed(1)}pt on page ${pageNumber + 1}`);
       } else {
-        // Not enough space - move entire row to next page
-        console.log(`[PDF]   📄 Insufficient space (${availableSpace.toFixed(1)}pt) - moving row to new page`);
+        // Not enough space for meaningful content - move entire row to next page
+        console.log(`[PDF]   📄 Insufficient space (${availableSpace.toFixed(1)}pt) - moving entire row to new page`);
         coverPage = pdfDoc.addPage([PW, PH]);
         pageNumber++;
         y = PH - 20;
+        console.log(`[PDF]   New page created, Y reset to: ${y.toFixed(1)}`);
       }
     } else {
       console.log(`[PDF]   ✓ Row fits completely (ends at ${rowBottomY.toFixed(1)})`);
