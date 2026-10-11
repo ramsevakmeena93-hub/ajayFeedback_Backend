@@ -855,72 +855,82 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
     
     // CONTINUATION LOGIC - Render remaining content on next page
     if (needsContinuation) {
-      console.log(`[PDF]   📄 Creating continuation page for remaining ${continuationHeight.toFixed(1)}pt`);
+      // Check if there's ANY actual content to continue (not just empty cells)
+      const hasContinuationContent = cellContinuationData.some(
+        cellData => cellData && cellData.lines && cellData.lines.length > 0
+      );
       
-      // Create new page for continuation
-      coverPage = pdfDoc.addPage([PW, PH]);
-      pageNumber++;
-      y = PH - 20;
-      
-      // Draw continuation row structure (seamlessly continues from previous page)
-      rect(coverPage, ML, y - continuationHeight, CW, continuationHeight, { 
-        borderColor: black, borderWidth: 0.5 
-      });
-      
-      // Draw vertical dividers
-      COLS.forEach((col, ci) => {
-        if (ci > 0) {
-          line(coverPage, col.x, y, col.x, y - continuationHeight, 0.5, black);
-        }
-      });
-      
-      // Render continuation content for each cell
-      cellContinuationData.forEach((cellData, ci) => {
-        if (!cellData || cellData.lines.length === 0) {
-          // No continuation needed for this cell (e.g., signature, short text)
-          return;
-        }
+      if (!hasContinuationContent) {
+        console.log(`[PDF]   ⚠️  No continuation content needed - skipping continuation page`);
+        needsContinuation = false; // Cancel continuation
+      } else {
+        console.log(`[PDF]   📄 Creating continuation page for remaining ${continuationHeight.toFixed(1)}pt`);
         
-        const { lines, val, col } = cellData;
+        // Create new page for continuation
+        coverPage = pdfDoc.addPage([PW, PH]);
+        pageNumber++;
+        y = PH - 20;
         
-        // Render remaining lines
-        lines.forEach((l, li) => {
-          const fontToUse = val.bold ? boldFont : timesFont;
-          const lw = fontToUse.widthOfTextAtSize(l, FS);
-          const tX = val.center ? col.x + (col.w - lw) / 2 : col.x + 6;
-          const lineY = y - 12 - li * LH;
-          
-          txt(coverPage, l, tX, lineY, FS, fontToUse, val.color || black);
+        // Draw continuation row structure (seamlessly continues from previous page)
+        rect(coverPage, ML, y - continuationHeight, CW, continuationHeight, { 
+          borderColor: black, borderWidth: 0.5 
         });
         
-        console.log(`[PDF]     Cell ${ci}: Rendered ${lines.length} continuation lines`);
-      });
-      
-      // Add signature on continuation page if row was split
-      const sigCol = COLS[COLS.length - 1];
-      if (!withoutSignatures) {
-        const sigImg = facultySigMap[(r.facultyName || "").toLowerCase().trim()];
-        if (sigImg) {
-          const sW = 50, sH = 25;
-          const sigX = sigCol.x + (sigCol.w - sW) / 2;
-          const sigY = y - continuationHeight + 22;
-          coverPage.drawImage(sigImg, { x: sigX, y: sigY, width: sW, height: sH });
+        // Draw vertical dividers
+        COLS.forEach((col, ci) => {
+          if (ci > 0) {
+            line(coverPage, col.x, y, col.x, y - continuationHeight, 0.5, black);
+          }
+        });
+        
+        // Render continuation content for each cell
+        cellContinuationData.forEach((cellData, ci) => {
+          if (!cellData || cellData.lines.length === 0) {
+            // No continuation needed for this cell (e.g., signature, short text)
+            return;
+          }
+          
+          const { lines, val, col } = cellData;
+          
+          // Render remaining lines
+          lines.forEach((l, li) => {
+            const fontToUse = val.bold ? boldFont : timesFont;
+            const lw = fontToUse.widthOfTextAtSize(l, FS);
+            const tX = val.center ? col.x + (col.w - lw) / 2 : col.x + 6;
+            const lineY = y - 12 - li * LH;
+            
+            txt(coverPage, l, tX, lineY, FS, fontToUse, val.color || black);
+          });
+          
+          console.log(`[PDF]     Cell ${ci}: Rendered ${lines.length} continuation lines`);
+        });
+        
+        // Add signature on continuation page if row was split
+        const sigCol = COLS[COLS.length - 1];
+        if (!withoutSignatures) {
+          const sigImg = facultySigMap[(r.facultyName || "").toLowerCase().trim()];
+          if (sigImg) {
+            const sW = 50, sH = 25;
+            const sigX = sigCol.x + (sigCol.w - sW) / 2;
+            const sigY = y - continuationHeight + 22;
+            coverPage.drawImage(sigImg, { x: sigX, y: sigY, width: sW, height: sH });
+          } else {
+            line(coverPage, sigCol.x + 4, y - continuationHeight + 24, sigCol.x + sigCol.w - 4, y - continuationHeight + 24, 0.5, gray);
+          }
         } else {
           line(coverPage, sigCol.x + 4, y - continuationHeight + 24, sigCol.x + sigCol.w - 4, y - continuationHeight + 24, 0.5, gray);
         }
-      } else {
-        line(coverPage, sigCol.x + 4, y - continuationHeight + 24, sigCol.x + sigCol.w - 4, y - continuationHeight + 24, 0.5, gray);
+        
+        // Faculty name below signature
+        const nameStr = r.facultyName || "";
+        const nameW = nameStr.length * 7 * 0.52;
+        const nameX = sigCol.x + Math.max(1, (sigCol.w - nameW) / 2);
+        txt(coverPage, nameStr, nameX, y - continuationHeight + 8, 7, timesFont, gray);
+        
+        // Update Y after continuation
+        y -= continuationHeight + ROW_GAP;
+        console.log(`[PDF]   Continuation complete, Y now: ${y.toFixed(1)}`);
       }
-      
-      // Faculty name below signature
-      const nameStr = r.facultyName || "";
-      const nameW = nameStr.length * 7 * 0.52;
-      const nameX = sigCol.x + Math.max(1, (sigCol.w - nameW) / 2);
-      txt(coverPage, nameStr, nameX, y - continuationHeight + 8, 7, timesFont, gray);
-      
-      // Update Y after continuation
-      y -= continuationHeight + ROW_GAP;
-      console.log(`[PDF]   Continuation complete, Y now: ${y.toFixed(1)}`);
     }
   }
 
