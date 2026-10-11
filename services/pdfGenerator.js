@@ -428,22 +428,8 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
   txt(coverPage, repGenText, PW - MR - timesFont.widthOfTextAtSize(repGenText, 11), y, 11, timesFont, black);
   y -= 15;
 
-  // Line 5.5: Filter info (if filtered by semester)
-  console.log('[PDF] Checking filter info:', JSON.stringify(submission.filterInfo, null, 2));
-  
-  if (submission.filterInfo?.semester) {
-    console.log('[PDF] ✅ Displaying specific semester filter:', submission.filterInfo.semester);
-    const filterText = "Semester Filter: Semester " + submission.filterInfo.semester;
-    txt(coverPage, filterText, ML, y, 11, timesBoldFont, rgb(0.1, 0.1, 0.7)); // Darker blue color, bold, larger font
-    y -= 14;
-  } else if (submission.filterInfo?.semesters) {
-    console.log('[PDF] ✅ Displaying multiple semesters:', submission.filterInfo.semesters);
-    const filterText = "Included Semesters: " + submission.filterInfo.semesters;
-    txt(coverPage, filterText, ML, y, 11, timesBoldFont, rgb(0.1, 0.1, 0.7)); // Darker blue, bold, larger font
-    y -= 14;
-  } else {
-    console.log('[PDF] ℹ️ No filter info to display');
-  }
+  // Line 5.5: Filter info (if filtered by semester) - REMOVED
+  // User requested to remove the semester display line completely
 
   // Line 6: Average FFI (left) | Average Response (right)
   const allFFIs  = uniqueReports.map(r => r.ffiScore).filter(v => v != null);
@@ -678,39 +664,22 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
     const shouldCreateNewPage = !isFirstDataRow && (totalSpaceNeeded > availableSpace);
     
     if (shouldCreateNewPage) {
-      // Check if row is too tall even for a fresh page
-      const freshPageSpace = PH - 20 - BOTTOM_MARGIN; // Space on new page
+      console.log(`[PDF]   📄 Creating new page ${pageNumber + 1} (row won't fit on current)`);
+      coverPage = pdfDoc.addPage([PW, PH]);
+      pageNumber++;
+      y = PH - 20;
       
-      if (ROW_H > freshPageSpace) {
-        console.warn(`[PDF]   ⚠️  WARNING: Row ${i+1} height (${ROW_H}pt) exceeds fresh page (${freshPageSpace}pt)`);
-        console.warn(`[PDF]   Will attempt to split row across pages`);
-        
-        // Strategy: Split the row rendering across multiple pages
-        // We'll render as much as fits on current page, then continue on next page
-        // This is complex, so for now, cap the row height and truncate
-        // TODO: Implement proper row splitting in future
-        
-        // For now: Force render on new page and let it overflow (better than hiding)
-        console.log(`[PDF]   📄 Creating new page ${pageNumber + 1} for oversized row`);
-        coverPage = pdfDoc.addPage([PW, PH]);
-        pageNumber++;
-        y = PH - 20;
-        
-        // Recalculate available space on new page
-        const newAvailableSpace = y - BOTTOM_MARGIN;
-        console.log(`[PDF]   New page available space: ${newAvailableSpace.toFixed(1)}`);
-        
-        // Row will be rendered with full height even if it overflows bottom
-        // This is temporary - proper splitting would be better
-      } else {
-        // Normal case: Row fits on fresh page
-        console.log(`[PDF]   📄 Creating new page ${pageNumber + 1} (row won't fit on current)`);
-        coverPage = pdfDoc.addPage([PW, PH]);
-        pageNumber++;
-        y = PH - 20;
-        
-        const newAvailableSpace = y - BOTTOM_MARGIN;
-        console.log(`[PDF]   New page available space: ${newAvailableSpace.toFixed(1)}`);
+      // IMPORTANT: Draw table header on new page
+      console.log(`[PDF]   Drawing table header on new page`);
+      y = drawTableHeader(coverPage, y);
+      
+      const newAvailableSpace = y - BOTTOM_MARGIN;
+      console.log(`[PDF]   New page available space after header: ${newAvailableSpace.toFixed(1)}`);
+      
+      // Check if row fits even on new page
+      if (ROW_H > newAvailableSpace) {
+        console.warn(`[PDF]   ⚠️  WARNING: Row ${i+1} height (${ROW_H}pt) exceeds fresh page (${newAvailableSpace.toFixed(1)}pt)`);
+        console.warn(`[PDF]   Row will be truncated to fit within page bounds`);
       }
     } else {
       console.log(`[PDF]   ✓ Row fits on current page`);
