@@ -434,13 +434,13 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
   if (submission.filterInfo?.semester) {
     console.log('[PDF] ✅ Displaying specific semester filter:', submission.filterInfo.semester);
     const filterText = "Semester Filter: Semester " + submission.filterInfo.semester;
-    txt(coverPage, filterText, ML, y, 10, timesBoldFont, rgb(0.2, 0.2, 0.8)); // Blue color, bold
-    y -= 13;
+    txt(coverPage, filterText, ML, y, 11, timesBoldFont, rgb(0.1, 0.1, 0.7)); // Darker blue color, bold, larger font
+    y -= 14;
   } else if (submission.filterInfo?.semesters) {
     console.log('[PDF] ✅ Displaying multiple semesters:', submission.filterInfo.semesters);
     const filterText = "Included Semesters: " + submission.filterInfo.semesters;
-    txt(coverPage, filterText, ML, y, 10, timesFont, rgb(0.4, 0.4, 0.4));
-    y -= 13;
+    txt(coverPage, filterText, ML, y, 11, timesBoldFont, rgb(0.1, 0.1, 0.7)); // Darker blue, bold, larger font
+    y -= 14;
   } else {
     console.log('[PDF] ℹ️ No filter info to display');
   }
@@ -537,7 +537,7 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
     
     // Calculate total height needed for comment box
     const commentHeight = Math.max(40, allCommentLines.length * 13 + 24);
-    const COMMENT_BOTTOM_MARGIN = 60; // Space needed after comment for at least table header
+    const COMMENT_BOTTOM_MARGIN = 100; // Increased to ensure enough space for table header + first row
     
     // Check if comment box fits on current page
     const spaceAvailable = y - COMMENT_BOTTOM_MARGIN;
