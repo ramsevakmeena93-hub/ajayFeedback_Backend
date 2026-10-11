@@ -335,8 +335,8 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
     { label: "Resp. %",           x: ML + 302,  w: 48  },    // -2 from 50
     { label: "Needs Attention",   x: ML + 350,  w: 145 },    // -10 from 155
     { label: "Appreciation",      x: ML + 495,  w: 160 },    // -10 from 170
-    { label: "Action Taken",      x: ML + 655,  w: 100 },    // +50 from 50 ✓ MAJOR FIX
-    { label: "Faculty Signature", x: ML + 755,  w: 62  },    // Adjusted position (total: 817 - within bounds)
+    { label: "Action Taken",      x: ML + 655,  w: 50  },    // Reduced from 100pt to 50pt
+    { label: "Faculty Signature", x: ML + 705,  w: 112 },    // Adjusted position + increased width
   ];
 
   const TH = 36; // table header height — 2-line for long labels
@@ -626,7 +626,7 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
     const nameLines = calcLines(r.facultyName || "-", 78, FS);  // Faculty Name (78pt)
     const progLines = calcLines(cleanCourseName(r.programme) || "-", 85, FS); // Course Name (85pt)
     const codeLines = calcLines(codeBatch || "-", 58, FS);      // Code/Batch (58pt)
-    const actionLines = calcLines(actionText, 100, FS);  // ✓ FIX: Action Taken (100pt) - was missing proper calculation
+    const actionLines = calcLines(actionText, 50, FS);  // ✓ Action Taken (50pt) - reduced width
     const semLines = calcLines(String(r.semester || "-"), 22, FS);  // Semester (22pt)
     
     const maxLines = Math.max(
@@ -905,27 +905,8 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
           console.log(`[PDF]     Cell ${ci}: Rendered ${lines.length} continuation lines`);
         });
         
-        // Add signature on continuation page if row was split
-        const sigCol = COLS[COLS.length - 1];
-        if (!withoutSignatures) {
-          const sigImg = facultySigMap[(r.facultyName || "").toLowerCase().trim()];
-          if (sigImg) {
-            const sW = 50, sH = 25;
-            const sigX = sigCol.x + (sigCol.w - sW) / 2;
-            const sigY = y - continuationHeight + 22;
-            coverPage.drawImage(sigImg, { x: sigX, y: sigY, width: sW, height: sH });
-          } else {
-            line(coverPage, sigCol.x + 4, y - continuationHeight + 24, sigCol.x + sigCol.w - 4, y - continuationHeight + 24, 0.5, gray);
-          }
-        } else {
-          line(coverPage, sigCol.x + 4, y - continuationHeight + 24, sigCol.x + sigCol.w - 4, y - continuationHeight + 24, 0.5, gray);
-        }
-        
-        // Faculty name below signature
-        const nameStr = r.facultyName || "";
-        const nameW = nameStr.length * 7 * 0.52;
-        const nameX = sigCol.x + Math.max(1, (sigCol.w - nameW) / 2);
-        txt(coverPage, nameStr, nameX, y - continuationHeight + 8, 7, timesFont, gray);
+        // NOTE: Signature removed from continuation page to prevent duplicates
+        // Signature already shown on first page of split row
         
         // Update Y after continuation
         y -= continuationHeight + ROW_GAP;
