@@ -655,43 +655,47 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
     console.log(`[PDF]   Row height: ${ROW_H}pt, Total needed: ${totalSpaceNeeded}pt`);
     console.log(`[PDF]   Current Y: ${y.toFixed(1)}, Available: ${availableSpace.toFixed(1)}`);
     
-    // PRACTICAL STRATEGY: Limit row height to prevent page overflow
-    // If row would be too tall, cap it and truncate content
-    // This prevents splitting issues while keeping table clean
+    // FULL ROW CONTINUATION LOGIC - Option B Implementation
+    // Seamlessly split row content across pages when needed
     
-    const MAX_ROW_HEIGHT_PER_PAGE = 500; // Maximum row height to prevent overflow issues
-    const SAFE_ROW_H = Math.min(ROW_H, MAX_ROW_HEIGHT_PER_PAGE);
-    const wasContentTruncated = ROW_H > MAX_ROW_HEIGHT_PER_PAGE;
-    
-    if (wasContentTruncated) {
-      console.log(`[PDF]   ⚠️ Row height capped: ${ROW_H}pt → ${SAFE_ROW_H}pt (content will be truncated)`);
-    }
-    
-    const rowBottomY = y - SAFE_ROW_H;
+    const rowBottomY = y - ROW_H;
     const willOverflowPage = rowBottomY < BOTTOM_MARGIN;
+    const availableSpace = y - BOTTOM_MARGIN;
+    
+    let partialRowHeight = ROW_H;  // Height to render on current page
+    let needsContinuation = false;
+    let continuationHeight = 0;     // Height for continuation page
     
     if (willOverflowPage && !isFirstDataRow) {
-      // Row won't fit - move to next page
-      console.log(`[PDF]   📄 Row won't fit (would end at ${rowBottomY.toFixed(1)} < ${BOTTOM_MARGIN}) - moving to new page`);
-      coverPage = pdfDoc.addPage([PW, PH]);
-      pageNumber++;
-      y = PH - 20;
+      if (availableSpace > 60) {
+        // Enough space to start row on this page - will continue on next
+        needsContinuation = true;
+        partialRowHeight = availableSpace - ROW_GAP; // Use available space
+        continuationHeight = ROW_H - partialRowHeight;
+        console.log(`[PDF]   📄 Row SPLITS: ${partialRowHeight.toFixed(1)}pt on page ${pageNumber}, ${continuationHeight.toFixed(1)}pt on page ${pageNumber + 1}`);
+      } else {
+        // Not enough space - move entire row to next page
+        console.log(`[PDF]   📄 Insufficient space (${availableSpace.toFixed(1)}pt) - moving row to new page`);
+        coverPage = pdfDoc.addPage([PW, PH]);
+        pageNumber++;
+        y = PH - 20;
+      }
     } else {
-      console.log(`[PDF]   ✓ Row fits on current page (will end at ${rowBottomY.toFixed(1)})`);
+      console.log(`[PDF]   ✓ Row fits completely (ends at ${rowBottomY.toFixed(1)})`);
     }
     
     // Mark that we've processed the first data row
     isFirstDataRow = false;
 
-    // Draw main row border and white background
-    rect(coverPage, ML, y - SAFE_ROW_H, CW, SAFE_ROW_H, { 
+    // Draw main row border and white background (partial if splitting)
+    rect(coverPage, ML, y - partialRowHeight, CW, partialRowHeight, { 
       borderColor: black, borderWidth: 0.5 
     });
 
     // Draw vertical cell dividers for each column
     COLS.forEach((col, ci) => {
       if (ci > 0) {
-        line(coverPage, col.x, y, col.x, y - SAFE_ROW_H, 0.5, black);
+        line(coverPage, col.x, y, col.x, y - partialRowHeight, 0.5, black);
       }
     });
 
@@ -717,137 +721,202 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
       { v: "", sig: true },
     ];
 
+    // Store continuation data for each cell if row splits
+    const cellContinuationData = [];
+
     cellValues.forEach((val, ci) => {
       const col = COLS[ci];
 
       if (val.sig) {
-        // Faculty signature cell — fits within 62pt column
-        if (!withoutSignatures) {
+        // Faculty signature cell
+        if (!withoutSignatures && !needsContinuation) {
+          // Only show signature if row fits completely (not on split rows)
           const sigImg = facultySigMap[(r.facultyName || "").toLowerCase().trim()];
           if (sigImg) {
             const sW = 50, sH = 25;
             const sigX = col.x + (col.w - sW) / 2;
-            const sigY = y - ROW_H + 22;
+            const sigY = y - partialRowHeight + 22;
             coverPage.drawImage(sigImg, { x: sigX, y: sigY, width: sW, height: sH });
           } else {
-            line(coverPage, col.x + 4, y - ROW_H + 24, col.x + col.w - 4, y - ROW_H + 24, 0.5, gray);
+            line(coverPage, col.x + 4, y - partialRowHeight + 24, col.x + col.w - 4, y - partialRowHeight + 24, 0.5, gray);
           }
         } else {
-          line(coverPage, col.x + 4, y - ROW_H + 24, col.x + col.w - 4, y - ROW_H + 24, 0.5, gray);
+          line(coverPage, col.x + 4, y - partialRowHeight + 24, col.x + col.w - 4, y - partialRowHeight + 24, 0.5, gray);
         }
-        // Faculty name below signature — small, centred
+        // Faculty name below signature
         const nameStr = r.facultyName || "";
-        const nameW   = nameStr.length * 7 * 0.52;
-        const nameX   = col.x + Math.max(1, (col.w - nameW) / 2);
-        txt(coverPage, nameStr, nameX, y - ROW_H + 8, 7, timesFont, gray);
+        const nameW = nameStr.length * 7 * 0.52;
+        const nameX = col.x + Math.max(1, (col.w - nameW) / 2);
+        txt(coverPage, nameStr, nameX, y - partialRowHeight + 8, 7, timesFont, gray);
+        
+        cellContinuationData.push({ lines: [], startLine: 0 }); // No continuation for signature
         return;
       }
 
-      // Regular text cell — Use IMPROVED word wrapping with better spacing
+      // Regular text cell - word wrapping
       const textValue = val.v || "";
       
-      // CHECK FOR noWrap FLAG - render as single line without splitting
       let allLines;
       if (val.noWrap) {
-        // Don't wrap - render as single line (for S.No, Semester, FFI, Response %)
         allLines = [textValue];
       } else {
-        // Apply word wrapping logic
+        // Apply word wrapping
         allLines = textValue.split("\n").filter(seg => seg.trim()).flatMap(seg => {
-          const words = seg.split(/\s+/).filter(w => w); // Split on any whitespace, remove empty
+          const words = seg.split(/\s+/).filter(w => w);
           const wrappedLines = [];
           let currentLine = "";
           
           const fontToUse = val.bold ? boldFont : timesFont;
-          const maxWidth = col.w - 14; // Slightly more padding for better appearance (7px each side)
+          const maxWidth = col.w - 14;
         
-        words.forEach((word, wordIdx) => {
-          // Clean up word - remove extra spaces
-          const cleanWord = word.trim();
-          if (!cleanWord) return;
-          
-          const testLine = currentLine ? currentLine + " " + cleanWord : cleanWord;
-          const testWidth = fontToUse.widthOfTextAtSize(testLine, FS);
-          
-          if (testWidth <= maxWidth) {
-            currentLine = testLine;
-          } else {
-            // Current line is full, save it
-            if (currentLine) {
-              wrappedLines.push(currentLine);
-            }
+          words.forEach((word) => {
+            const cleanWord = word.trim();
+            if (!cleanWord) return;
             
-            // Check if single word is too long
-            const wordWidth = fontToUse.widthOfTextAtSize(cleanWord, FS);
-            if (wordWidth > maxWidth) {
-              // Word too long - break it intelligently
-              // Try to break at punctuation or after reasonable length
-              let remaining = cleanWord;
-              while (remaining.length > 0) {
-                let breakPoint = remaining.length;
-                let testStr = remaining;
-                
-                // Find good break point (hyphen, punctuation, or just length)
-                while (fontToUse.widthOfTextAtSize(testStr, FS) > maxWidth && testStr.length > 1) {
-                  breakPoint--;
-                  testStr = remaining.substring(0, breakPoint);
-                }
-                
-                if (breakPoint > 0) {
-                  // Add hyphen if breaking mid-word
-                  const chunk = remaining.substring(0, breakPoint);
-                  wrappedLines.push(chunk + (breakPoint < remaining.length ? "-" : ""));
-                  remaining = remaining.substring(breakPoint);
-                } else {
-                  // Can't fit even one character (shouldn't happen)
-                  wrappedLines.push(remaining.substring(0, 1));
-                  remaining = remaining.substring(1);
-                }
-              }
-              currentLine = "";
+            const testLine = currentLine ? currentLine + " " + cleanWord : cleanWord;
+            const testWidth = fontToUse.widthOfTextAtSize(testLine, FS);
+            
+            if (testWidth <= maxWidth) {
+              currentLine = testLine;
             } else {
-              currentLine = cleanWord;
+              if (currentLine) {
+                wrappedLines.push(currentLine);
+              }
+              
+              // Check if single word is too long
+              const wordWidth = fontToUse.widthOfTextAtSize(cleanWord, FS);
+              if (wordWidth > maxWidth) {
+                // Break long word
+                let remaining = cleanWord;
+                while (remaining.length > 0) {
+                  let breakPoint = remaining.length;
+                  let testStr = remaining;
+                  
+                  while (fontToUse.widthOfTextAtSize(testStr, FS) > maxWidth && testStr.length > 1) {
+                    breakPoint--;
+                    testStr = remaining.substring(0, breakPoint);
+                  }
+                  
+                  if (breakPoint > 0) {
+                    const chunk = remaining.substring(0, breakPoint);
+                    wrappedLines.push(chunk + (breakPoint < remaining.length ? "-" : ""));
+                    remaining = remaining.substring(breakPoint);
+                  } else {
+                    wrappedLines.push(remaining.substring(0, 1));
+                    remaining = remaining.substring(1);
+                  }
+                }
+                currentLine = "";
+              } else {
+                currentLine = cleanWord;
+              }
             }
-          }
+          });
+          
+          if (currentLine) wrappedLines.push(currentLine);
+          return wrappedLines.length > 0 ? wrappedLines : [""];
         });
-        
-        // Add last line
-        if (currentLine) wrappedLines.push(currentLine);
-        
-        return wrappedLines.length > 0 ? wrappedLines : [""];
-        });
-      } // End of wrapping logic (else block)
+      }
       
-      // RENDER LINES - Limit to fit within SAFE_ROW_H
-      const visLines = allLines;
-      const maxLinesForRow = Math.floor((SAFE_ROW_H - 20) / LH); // Reserve 20pt for padding
-      const linesToRender = visLines.slice(0, maxLinesForRow);
+      // Calculate how many lines fit in partialRowHeight
+      const maxLinesOnPage = Math.floor((partialRowHeight - 20) / LH);
+      const linesToRenderNow = needsContinuation ? Math.min(allLines.length, maxLinesOnPage) : allLines.length;
+      const remainingLines = needsContinuation ? allLines.slice(linesToRenderNow) : [];
       
-      linesToRender.forEach((l, li) => {
+      // Render lines on current page
+      for (let li = 0; li < linesToRenderNow; li++) {
+        const l = allLines[li];
         const fontToUse = val.bold ? boldFont : timesFont;
         const lw = fontToUse.widthOfTextAtSize(l, FS);
         const tX = val.center ? col.x + (col.w - lw) / 2 : col.x + 6;
         const lineY = y - 12 - li * LH;
         
-        // Only render if within row bounds
-        if (lineY > y - SAFE_ROW_H + 5) {
-          txt(coverPage, l, tX, lineY, FS, fontToUse, val.color || black);
-        }
-      });
-      
-      // If content was truncated, show indicator
-      if (wasContentTruncated && visLines.length > maxLinesForRow && ci > 0) {
-        const lastLineY = y - 12 - maxLinesForRow * LH;
-        if (lastLineY > y - SAFE_ROW_H + 5) {
-          txt(coverPage, "...", col.x + 6, lastLineY, FS, timesFont, gray);
-        }
+        txt(coverPage, l, tX, lineY, FS, fontToUse, val.color || black);
       }
+      
+      // Store continuation data
+      cellContinuationData.push({
+        lines: remainingLines,
+        val: val,
+        col: col,
+        colIndex: ci
+      });
     });
 
     // Update Y coordinate after drawing this row
     const yBeforeUpdate = y;
-    y -= SAFE_ROW_H + ROW_GAP;
-    console.log(`[PDF]   Row drawn, Y updated: ${yBeforeUpdate.toFixed(1)} → ${y.toFixed(1)} (moved ${(SAFE_ROW_H + ROW_GAP).toFixed(1)}pt)`);
+    y -= partialRowHeight + ROW_GAP;
+    console.log(`[PDF]   Row drawn, Y updated: ${yBeforeUpdate.toFixed(1)} → ${y.toFixed(1)} (moved ${(partialRowHeight + ROW_GAP).toFixed(1)}pt)`);
+    
+    // CONTINUATION LOGIC - Render remaining content on next page
+    if (needsContinuation) {
+      console.log(`[PDF]   📄 Creating continuation page for remaining ${continuationHeight.toFixed(1)}pt`);
+      
+      // Create new page for continuation
+      coverPage = pdfDoc.addPage([PW, PH]);
+      pageNumber++;
+      y = PH - 20;
+      
+      // Draw continuation row structure (seamlessly continues from previous page)
+      rect(coverPage, ML, y - continuationHeight, CW, continuationHeight, { 
+        borderColor: black, borderWidth: 0.5 
+      });
+      
+      // Draw vertical dividers
+      COLS.forEach((col, ci) => {
+        if (ci > 0) {
+          line(coverPage, col.x, y, col.x, y - continuationHeight, 0.5, black);
+        }
+      });
+      
+      // Render continuation content for each cell
+      cellContinuationData.forEach((cellData, ci) => {
+        if (!cellData || cellData.lines.length === 0) {
+          // No continuation needed for this cell (e.g., signature, short text)
+          return;
+        }
+        
+        const { lines, val, col } = cellData;
+        
+        // Render remaining lines
+        lines.forEach((l, li) => {
+          const fontToUse = val.bold ? boldFont : timesFont;
+          const lw = fontToUse.widthOfTextAtSize(l, FS);
+          const tX = val.center ? col.x + (col.w - lw) / 2 : col.x + 6;
+          const lineY = y - 12 - li * LH;
+          
+          txt(coverPage, l, tX, lineY, FS, fontToUse, val.color || black);
+        });
+        
+        console.log(`[PDF]     Cell ${ci}: Rendered ${lines.length} continuation lines`);
+      });
+      
+      // Add signature on continuation page if row was split
+      const sigCol = COLS[COLS.length - 1];
+      if (!withoutSignatures) {
+        const sigImg = facultySigMap[(r.facultyName || "").toLowerCase().trim()];
+        if (sigImg) {
+          const sW = 50, sH = 25;
+          const sigX = sigCol.x + (sigCol.w - sW) / 2;
+          const sigY = y - continuationHeight + 22;
+          coverPage.drawImage(sigImg, { x: sigX, y: sigY, width: sW, height: sH });
+        } else {
+          line(coverPage, sigCol.x + 4, y - continuationHeight + 24, sigCol.x + sigCol.w - 4, y - continuationHeight + 24, 0.5, gray);
+        }
+      } else {
+        line(coverPage, sigCol.x + 4, y - continuationHeight + 24, sigCol.x + sigCol.w - 4, y - continuationHeight + 24, 0.5, gray);
+      }
+      
+      // Faculty name below signature
+      const nameStr = r.facultyName || "";
+      const nameW = nameStr.length * 7 * 0.52;
+      const nameX = sigCol.x + Math.max(1, (sigCol.w - nameW) / 2);
+      txt(coverPage, nameStr, nameX, y - continuationHeight + 8, 7, timesFont, gray);
+      
+      // Update Y after continuation
+      y -= continuationHeight + ROW_GAP;
+      console.log(`[PDF]   Continuation complete, Y now: ${y.toFixed(1)}`);
+    }
   }
 
   console.log(`[PDF] ========== Table Rendering Complete ==========`);
