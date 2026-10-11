@@ -429,14 +429,20 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
   y -= 15;
 
   // Line 5.5: Filter info (if filtered by semester)
+  console.log('[PDF] Checking filter info:', JSON.stringify(submission.filterInfo, null, 2));
+  
   if (submission.filterInfo?.semester) {
+    console.log('[PDF] ✅ Displaying specific semester filter:', submission.filterInfo.semester);
     const filterText = "Semester Filter: Semester " + submission.filterInfo.semester;
-    txt(coverPage, filterText, ML, y, 10, timesFont, rgb(0.4, 0.4, 0.4));
+    txt(coverPage, filterText, ML, y, 10, timesBoldFont, rgb(0.2, 0.2, 0.8)); // Blue color, bold
     y -= 13;
   } else if (submission.filterInfo?.semesters) {
+    console.log('[PDF] ✅ Displaying multiple semesters:', submission.filterInfo.semesters);
     const filterText = "Included Semesters: " + submission.filterInfo.semesters;
     txt(coverPage, filterText, ML, y, 10, timesFont, rgb(0.4, 0.4, 0.4));
     y -= 13;
+  } else {
+    console.log('[PDF] ℹ️ No filter info to display');
   }
 
   // Line 6: Average FFI (left) | Average Response (right)
