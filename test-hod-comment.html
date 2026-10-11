@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test HOD Comment</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        textarea {
+            min-height: 100px;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        .btn-secondary {
+            background: #008CBA;
+        }
+        .btn-secondary:hover {
+            background: #007399;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f0f0f0;
+            border-radius: 4px;
+            white-space: pre-wrap;
+        }
+        .error {
+            background: #ffebee;
+            color: #c62828;
+        }
+        .success {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+    </style>
+</head>
+<body>
+    <h1>HOD Department Comment - Test Page</h1>
+    <p>Use this page to save and test department-level HOD comments that will appear in the PDF export.</p>
+
+    <div class="form-group">
+        <label for="token">Your HOD Token:</label>
+        <input type="text" id="token" placeholder="Paste your HOD auth token here">
+        <small>Get this from your browser's Application > Local Storage > token</small>
+    </div>
+
+    <div class="form-group">
+        <label for="department">Department:</label>
+        <input type="text" id="department" placeholder="e.g., Computer Science" value="Humanities">
+    </div>
+
+    <div class="form-group">
+        <label for="academicYear">Academic Year:</label>
+        <input type="text" id="academicYear" placeholder="e.g., 2026-2027" value="2026-2027">
+    </div>
+
+    <div class="form-group">
+        <label for="session">Session:</label>
+        <select id="session">
+            <option value="">Not specified</option>
+            <option value="jan-may">January - May</option>
+            <option value="july-dec">July - December</option>
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label for="comment">Department Comment:</label>
+        <textarea id="comment" placeholder="Enter your general instructions/message for the entire department...">All faculty members are requested to improve their interaction with students and focus on practical demonstrations during lab sessions.</textarea>
+    </div>
+
+    <button onclick="saveComment()">Save Comment</button>
+    <button class="btn-secondary" onclick="getComment()">Get Saved Comment</button>
+    <button class="btn-secondary" onclick="getFilters()">Get Available Filters</button>
+    <button class="btn-secondary" onclick="testExportPDF()">Export All Reports</button>
+
+    <h2 style="margin-top: 30px;">Export with Filters</h2>
+    <div class="form-group">
+        <label for="filterSemester">Filter by Semester:</label>
+        <select id="filterSemester">
+            <option value="all">All Semesters</option>
+            <option value="1">Semester 1</option>
+            <option value="2">Semester 2</option>
+            <option value="3">Semester 3</option>
+            <option value="4">Semester 4</option>
+            <option value="5">Semester 5</option>
+            <option value="6">Semester 6</option>
+            <option value="7">Semester 7</option>
+            <option value="8">Semester 8</option>
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label for="filterAcademicYear">Filter by Academic Year:</label>
+        <select id="filterAcademicYear">
+            <option value="all">All Years</option>
+            <option value="2026-2027">2026-2027</option>
+            <option value="2025-2026">2025-2026</option>
+            <option value="2024-2025">2024-2025</option>
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label for="filterSession">Filter by Session:</label>
+        <select id="filterSession">
+            <option value="all">All Sessions</option>
+            <option value="jan-may">January - May</option>
+            <option value="july-dec">July - December</option>
+        </select>
+    </div>
+
+    <button class="btn-secondary" onclick="testExportFiltered()">Export Filtered Reports</button>
+
+    <div id="result"></div>
+
+    <script>
+        const API_BASE = 'http://localhost:3000/api'; // Change if your backend is on different URL
+
+        function showResult(message, isError = false) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.textContent = message;
+            resultDiv.className = 'result ' + (isError ? 'error' : 'success');
+        }
+
+        async function saveComment() {
+            const token = document.getElementById('token').value.trim();
+            const department = document.getElementById('department').value.trim();
+            const academicYear = document.getElementById('academicYear').value.trim();
+            const session = document.getElementById('session').value;
+            const comment = document.getElementById('comment').value.trim();
+
+            if (!token) {
+                showResult('Please enter your HOD token!', true);
+                return;
+            }
+
+            if (!department || !comment) {
+                showResult('Department and comment are required!', true);
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/reports/hod-comment`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        department,
+                        academicYear,
+                        session,
+                        comment
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showResult(`✅ Comment saved successfully!\n\n${JSON.stringify(data, null, 2)}`);
+                } else {
+                    showResult(`❌ Error: ${data.error || 'Failed to save comment'}`, true);
+                }
+            } catch (err) {
+                showResult(`❌ Network error: ${err.message}`, true);
+            }
+        }
+
+        async function getComment() {
+            const token = document.getElementById('token').value.trim();
+            const department = document.getElementById('department').value.trim();
+            const academicYear = document.getElementById('academicYear').value.trim();
+            const session = document.getElementById('session').value;
+
+            if (!token) {
+                showResult('Please enter your HOD token!', true);
+                return;
+            }
+
+            try {
+                const params = new URLSearchParams();
+                if (department) params.append('department', department);
+                if (academicYear) params.append('academicYear', academicYear);
+                if (session) params.append('session', session);
+
+                const response = await fetch(`${API_BASE}/reports/hod-comment?${params.toString()}`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.comment) {
+                    showResult(`✅ Comment found:\n\n${JSON.stringify(data.comment, null, 2)}`);
+                } else {
+                    showResult(`❌ No comment found for these parameters\n\n${JSON.stringify(data, null, 2)}`, true);
+                }
+            } catch (err) {
+                showResult(`❌ Network error: ${err.message}`, true);
+            }
+        }
+
+        async function testExportPDF() {
+            const token = document.getElementById('token').value.trim();
+
+            if (!token) {
+                showResult('Please enter your HOD token!', true);
+                return;
+            }
+
+            showResult('Generating PDF with ALL reports... This may take a few seconds...');
+
+            try {
+                const response = await fetch(`${API_BASE}/reports/my/export-pdf`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'hod-report-all-' + Date.now() + '.pdf';
+                    a.click();
+                    showResult('✅ PDF generated successfully! Check your downloads.');
+                } else {
+                    const text = await response.text();
+                    showResult(`❌ Error generating PDF:\n${text}`, true);
+                }
+            } catch (err) {
+                showResult(`❌ Network error: ${err.message}`, true);
+            }
+        }
+
+        async function getFilters() {
+            const token = document.getElementById('token').value.trim();
+
+            if (!token) {
+                showResult('Please enter your HOD token!', true);
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/reports/my/export-filters`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showResult(`✅ Available Filters:\n\n${JSON.stringify(data, null, 2)}`);
+                    
+                    // Update semester dropdown
+                    const semSelect = document.getElementById('filterSemester');
+                    semSelect.innerHTML = '<option value="all">All Semesters</option>';
+                    data.semesters.forEach(sem => {
+                        semSelect.innerHTML += `<option value="${sem}">Semester ${sem}</option>`;
+                    });
+
+                    // Update academic year dropdown
+                    const yearSelect = document.getElementById('filterAcademicYear');
+                    yearSelect.innerHTML = '<option value="all">All Years</option>';
+                    data.academicYears.forEach(year => {
+                        yearSelect.innerHTML += `<option value="${year}">${year}</option>`;
+                    });
+
+                    // Update session dropdown
+                    const sessSelect = document.getElementById('filterSession');
+                    sessSelect.innerHTML = '<option value="all">All Sessions</option>';
+                    data.sessions.forEach(sess => {
+                        const label = sess === 'jan-may' ? 'January - May' : 'July - December';
+                        sessSelect.innerHTML += `<option value="${sess}">${label}</option>`;
+                    });
+                } else {
+                    showResult(`❌ Error: ${data.error || 'Failed to get filters'}`, true);
+                }
+            } catch (err) {
+                showResult(`❌ Network error: ${err.message}`, true);
+            }
+        }
+
+        async function testExportFiltered() {
+            const token = document.getElementById('token').value.trim();
+            const semester = document.getElementById('filterSemester').value;
+            const academicYear = document.getElementById('filterAcademicYear').value;
+            const session = document.getElementById('filterSession').value;
+
+            if (!token) {
+                showResult('Please enter your HOD token!', true);
+                return;
+            }
+
+            const filters = {};
+            if (semester !== 'all') filters.semester = semester;
+            if (academicYear !== 'all') filters.academicYear = academicYear;
+            if (session !== 'all') filters.session = session;
+
+            const filterDesc = Object.keys(filters).length > 0 
+                ? `Filters: ${JSON.stringify(filters)}` 
+                : 'No filters (all reports)';
+            
+            showResult(`Generating PDF... ${filterDesc}\nThis may take a few seconds...`);
+
+            try {
+                const response = await fetch(`${API_BASE}/reports/my/export-pdf`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(filters)
+                });
+
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    
+                    // Get filename from response header
+                    const disposition = response.headers.get('Content-Disposition');
+                    const filenameMatch = disposition && disposition.match(/filename="(.+)"/);
+                    const filename = filenameMatch ? filenameMatch[1] : 'hod-report-filtered-' + Date.now() + '.pdf';
+                    
+                    a.download = filename;
+                    a.click();
+                    showResult(`✅ PDF generated successfully!\nFilename: ${filename}\nCheck your downloads.`);
+                } else {
+                    const text = await response.text();
+                    showResult(`❌ Error generating PDF:\n${text}`, true);
+                }
+            } catch (err) {
+                showResult(`❌ Network error: ${err.message}`, true);
+            }
+        }
+    </script>
+</body>
+</html>
