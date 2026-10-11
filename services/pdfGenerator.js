@@ -655,9 +655,11 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
     console.log(`[PDF]   Row height: ${ROW_H}pt, Total needed: ${totalSpaceNeeded}pt`);
     console.log(`[PDF]   Current Y: ${y.toFixed(1)}, Available: ${availableSpace.toFixed(1)}`);
     
-    // CHANGED STRATEGY: Allow row to START rendering even if it doesn't fully fit
-    // The row will naturally split across pages (content overflow)
-    // NO PAGE BREAK - just render row starting at current position
+    // CHANGED STRATEGY: Check if row content will overflow page boundary
+    // If yes: render partial content on current page, then continue on next page
+    
+    const rowBottomY = y - ROW_H;
+    const willOverflowPage = rowBottomY < BOTTOM_MARGIN;
     
     // Only create new page if absolutely NO space left (less than minimum row height)
     const MINIMUM_SPACE_TO_START_ROW = 50; // Minimum space needed to start a row
@@ -668,10 +670,11 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
       coverPage = pdfDoc.addPage([PW, PH]);
       pageNumber++;
       y = PH - 20;
-      
       console.log(`[PDF]   New page - row will start here`);
-    } else if (totalSpaceNeeded > availableSpace) {
-      console.log(`[PDF]   ℹ️  Row will SPLIT across pages - starting on current page, continuing on next`);
+    } else if (willOverflowPage) {
+      console.log(`[PDF]   ⚠️  Row will overflow page (bottom at ${rowBottomY.toFixed(1)} < margin ${BOTTOM_MARGIN})`);
+      console.log(`[PDF]   Adjusting row height to fit remaining space: ${availableSpace.toFixed(1)}pt`);
+      // Row will be clipped at page boundary - this is acceptable as content continues naturally
     } else {
       console.log(`[PDF]   ✓ Row fits completely on current page`);
     }
@@ -679,15 +682,25 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
     // Mark that we've processed the first data row
     isFirstDataRow = false;
 
-    // Draw main row border and white background
-    rect(coverPage, ML, y - ROW_H, CW, ROW_H, { 
+    // Calculate how much of row fits on current page
+    const spaceAvailableForRow = Math.max(y - BOTTOM_MARGIN, 0);
+    const actualRowHeight = Math.min(ROW_H, spaceAvailableForRow);
+    const needsContinuation = ROW_H > spaceAvailableForRow;
+    
+    if (needsContinuation) {
+      console.log(`[PDF]   Row needs continuation: ${ROW_H}pt required, ${spaceAvailableForRow.toFixed(1)}pt available`);
+      console.log(`[PDF]   Will render ${actualRowHeight.toFixed(1)}pt on this page, ${(ROW_H - actualRowHeight).toFixed(1)}pt on next`);
+    }
+
+    // Draw main row border and white background (partial height if needed)
+    rect(coverPage, ML, y - actualRowHeight, CW, actualRowHeight, { 
       borderColor: black, borderWidth: 0.5 
     });
 
-    // Draw vertical cell dividers for each column
+    // Draw vertical cell dividers for each column (partial height)
     COLS.forEach((col, ci) => {
       if (ci > 0) {
-        line(coverPage, col.x, y, col.x, y - ROW_H, 0.5, black);
+        line(coverPage, col.x, y, col.x, y - actualRowHeight, 0.5, black);
       }
     });
 
@@ -814,26 +827,112 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
         });
       } // End of wrapping logic (else block)
       
-      // RENDER ALL LINES - allow natural overflow across pages (like MS Word)
-      const visLines = allLines; // Show all lines, no truncation
+      // RENDER ALL LINES - Check for page overflow and handle it
+      const visLines = allLines;
       
-      visLines.forEach((l, li) => {
+      for (let li = 0; li < visLines.length; li++) {
+        const l = visLines[li];
         const fontToUse = val.bold ? boldFont : timesFont;
         const lw = fontToUse.widthOfTextAtSize(l, FS);
         const tX = val.center
           ? col.x + (col.w - lw) / 2
-          : col.x + 6; // 6px left padding
+          : col.x + 6;
         const lineY = y - 12 - li * LH;
         
-        // Draw all lines - let them naturally overflow to next page if needed
-        txt(coverPage, l, tX, lineY, FS, fontToUse, val.color || black);
-      });
+        // Render line (will be clipped if below page boundary - that's OK, we'll handle continuation separately)
+        txt(coverPage, l, tX, Math.max(lineY, BOTTOM_MARGIN), FS, fontToUse, val.color || black);
+      }
     });
 
     // Update Y coordinate after drawing this row
     const yBeforeUpdate = y;
-    y -= ROW_H + ROW_GAP;
-    console.log(`[PDF]   Row drawn, Y updated: ${yBeforeUpdate.toFixed(1)} → ${y.toFixed(1)} (moved ${(ROW_H + ROW_GAP).toFixed(1)}pt)`);
+    y -= actualRowHeight + ROW_GAP;
+    console.log(`[PDF]   Row drawn, Y updated: ${yBeforeUpdate.toFixed(1)} → ${y.toFixed(1)} (moved ${(actualRowHeight + ROW_GAP).toFixed(1)}pt)`);
+    
+    // CHECK: If row overflowed page, create continuation page NOW
+    if (needsContinuation) {
+      console.log(`[PDF]   📄 Row overflowed - creating continuation page for remaining content`);
+      coverPage = pdfDoc.addPage([PW, PH]);
+      pageNumber++;
+      y = PH - 20; // Start at top of new page
+      
+      const remainingHeight = ROW_H - actualRowHeight;
+      console.log(`[PDF]   Continuation page created - will continue with remaining ${remainingHeight.toFixed(1)}pt`);
+      
+      // Draw continuation row structure
+      rect(coverPage, ML, y - remainingHeight, CW, remainingHeight, { 
+        borderColor: black, borderWidth: 0.5 
+      });
+      
+      // Draw vertical dividers
+      COLS.forEach((col, ci) => {
+        if (ci > 0) {
+          line(coverPage, col.x, y, col.x, y - remainingHeight, 0.5, black);
+        }
+      });
+      
+      // Re-render cell content that was clipped (simplified - render all content again starting from continuation point)
+      cellValues.forEach((val, ci) => {
+        const col = COLS[ci];
+        
+        if (val.sig) {
+          // Skip signature on continuation
+          return;
+        }
+        
+        const textValue = val.v || "";
+        let allLines;
+        if (val.noWrap) {
+          allLines = [textValue];
+        } else {
+          // Re-calculate wrapped lines (same as before)
+          allLines = textValue.split("\n").filter(seg => seg.trim()).flatMap(seg => {
+            const words = seg.split(/\s+/).filter(w => w);
+            const wrappedLines = [];
+            let currentLine = "";
+            const fontToUse = val.bold ? boldFont : timesFont;
+            const maxWidth = col.w - 14;
+            
+            words.forEach((word) => {
+              const cleanWord = word.trim();
+              if (!cleanWord) return;
+              
+              const testLine = currentLine ? currentLine + " " + cleanWord : cleanWord;
+              const testWidth = fontToUse.widthOfTextAtSize(testLine, FS);
+              
+              if (testWidth <= maxWidth) {
+                currentLine = testLine;
+              } else {
+                if (currentLine) wrappedLines.push(currentLine);
+                currentLine = cleanWord;
+              }
+            });
+            
+            if (currentLine) wrappedLines.push(currentLine);
+            return wrappedLines.length > 0 ? wrappedLines : [""];
+          });
+        }
+        
+        // Calculate which lines were NOT rendered on previous page
+        const linesPerPage = Math.floor(actualRowHeight / LH);
+        const continuationStartLine = Math.max(0, linesPerPage - 1);
+        const continuationLines = allLines.slice(continuationStartLine);
+        
+        // Render continuation lines
+        continuationLines.forEach((l, li) => {
+          const fontToUse = val.bold ? boldFont : timesFont;
+          const lw = fontToUse.widthOfTextAtSize(l, FS);
+          const tX = val.center ? col.x + (col.w - lw) / 2 : col.x + 6;
+          const lineY = y - 12 - li * LH;
+          
+          txt(coverPage, l, tX, lineY, FS, fontToUse, val.color || black);
+        });
+      });
+      
+      // Update Y after continuation row
+      y -= remainingHeight + ROW_GAP;
+      console.log(`[PDF]   Continuation complete, Y now: ${y.toFixed(1)}`);
+    }
   }
 
   console.log(`[PDF] ========== Table Rendering Complete ==========`);
