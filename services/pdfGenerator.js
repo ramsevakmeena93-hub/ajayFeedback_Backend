@@ -808,21 +808,31 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
         });
       }
       
-      // Calculate how many lines fit in partialRowHeight
-      const maxLinesOnPage = Math.floor((partialRowHeight - 20) / LH);
-      const linesToRenderNow = needsContinuation ? Math.min(allLines.length, maxLinesOnPage) : allLines.length;
-      const remainingLines = needsContinuation ? allLines.slice(linesToRenderNow) : [];
+      // Render ALL lines for this cell (no truncation)
+      // If continuation is needed, lines will naturally continue on next page
+      const visibleLines = allLines;
       
       // Render lines on current page
-      for (let li = 0; li < linesToRenderNow; li++) {
-        const l = allLines[li];
+      for (let li = 0; li < visibleLines.length; li++) {
+        const l = visibleLines[li];
         const fontToUse = val.bold ? boldFont : timesFont;
         const lw = fontToUse.widthOfTextAtSize(l, FS);
         const tX = val.center ? col.x + (col.w - lw) / 2 : col.x + 6;
         const lineY = y - 12 - li * LH;
         
-        txt(coverPage, l, tX, lineY, FS, fontToUse, val.color || black);
+        // Only render if line is within current row bounds (not below page bottom)
+        const lineBottomY = lineY - LH;
+        if (lineY >= BOTTOM_MARGIN) {
+          txt(coverPage, l, tX, lineY, FS, fontToUse, val.color || black);
+        } else if (needsContinuation && lineY < BOTTOM_MARGIN) {
+          // This line goes to continuation - don't render now
+          break;
+        }
       }
+      
+      // Calculate which lines need continuation (lines that didn't fit)
+      const linesRendered = Math.floor((y - BOTTOM_MARGIN + 12) / LH);
+      const remainingLines = needsContinuation ? visibleLines.slice(linesRendered) : [];
       
       // Store continuation data
       cellContinuationData.push({
@@ -899,26 +909,38 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
     }
     
     // NOW render signature - AFTER all content (including continuation) is complete
+    // FIX: Calculate correct position inside the signature column box
     const sigCol = COLS[COLS.length - 1];
     const sigData = cellContinuationData.find(cd => cd && cd.isSig);
     
     if (sigData && !withoutSignatures) {
+      // Determine which page and row the signature should be on
+      let sigY;
+      if (needsContinuation) {
+        // Signature goes on continuation page at bottom of continuation row
+        sigY = y + continuationHeight - 12; // Near bottom of continuation row
+      } else {
+        // Signature goes on current page at bottom of current row
+        sigY = y + partialRowHeight - 12; // Near bottom of current row
+      }
+      
       const sigImg = facultySigMap[(sigData.facultyName || "").toLowerCase().trim()];
       if (sigImg) {
         const sW = 50, sH = 25;
         const sigX = sigData.col.x + (sigData.col.w - sW) / 2;
-        const sigY = y - (needsContinuation ? 0 : partialRowHeight) + 22;
-        coverPage.drawImage(sigImg, { x: sigX, y: sigY, width: sW, height: sH });
+        const sigImageY = sigY - sH;
+        coverPage.drawImage(sigImg, { x: sigX, y: sigImageY, width: sW, height: sH });
       } else {
-        line(coverPage, sigData.col.x + 4, y - (needsContinuation ? 0 : partialRowHeight) + 24, 
-             sigData.col.x + sigData.col.w - 4, y - (needsContinuation ? 0 : partialRowHeight) + 24, 0.5, gray);
+        // Draw placeholder line
+        line(coverPage, sigData.col.x + 4, sigY, 
+             sigData.col.x + sigData.col.w - 4, sigY, 0.5, gray);
       }
       
       // Faculty name below signature
       const nameStr = sigData.facultyName || "";
       const nameW = nameStr.length * 7 * 0.52;
       const nameX = sigData.col.x + Math.max(1, (sigData.col.w - nameW) / 2);
-      txt(coverPage, nameStr, nameX, y - (needsContinuation ? 0 : partialRowHeight) + 8, 7, timesFont, gray);
+      txt(coverPage, nameStr, nameX, sigY - 30, 7, timesFont, gray);
     }
   }
 
