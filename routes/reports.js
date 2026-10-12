@@ -15,7 +15,11 @@ async function getFacultyFirstName(userId) {
   try {
     const User = require('../models/User');
     const user = await User.findById(userId).select('name');
-    return user ? user.name.split(' ')[0] : null;
+    if (!user || !user.name) return null;
+    
+    // Remove title prefixes (Dr., Prof., Mr., Ms., Mrs., etc.)
+    const nameWithoutTitle = user.name.replace(/^(Dr\.?|Prof\.?|Mr\.?|Ms\.?|Mrs\.?)\s+/i, '').trim();
+    return nameWithoutTitle.split(' ')[0]; // Now get the actual first name
   } catch { return null; }
 }
 
@@ -37,7 +41,10 @@ async function getFacultyFirstName(userId) {
 async function buildFacultyQuery(userId, extraFilters = {}, useAssignments = true) {
   const User = require('../models/User');
   const user = await User.findById(userId).select('name email');
-  const firstName = user?.name ? user.name.split(' ')[0] : null;
+  
+  // Remove title prefixes before extracting first name
+  const nameWithoutTitle = user?.name ? user.name.replace(/^(Dr\.?|Prof\.?|Mr\.?|Ms\.?|Mrs\.?)\s+/i, '').trim() : '';
+  const firstName = nameWithoutTitle ? nameWithoutTitle.split(' ')[0] : null;
   const fullName = user?.name || null;
   
   console.log('[buildFacultyQuery] userId:', userId, 'fullName:', fullName, 'firstName:', firstName);
@@ -308,7 +315,7 @@ router.patch('/:id/edit', authMiddleware, requireAnyRole('hod'), async (req, res
         let fid = report.facultyUserId;
         if (!fid && report.facultyName) {
           const User = require('../models/User');
-          const fu   = await User.findOne({ name: { $regex: report.facultyName.split(' ')[0], $options: 'i' } });
+          const fu   = await User.findOne({ name: { $regex: report.facultyName.replace(/^(Dr\.?|Prof\.?|Mr\.?|Ms\.?|Mrs\.?)\s+/i, '').trim().split(' ')[0], $options: 'i' } });
           if (fu) fid = fu._id;
         }
         if (fid) {
@@ -606,7 +613,7 @@ router.get('/:id', authMiddleware, async (req, res) => {
       if (!isHOD && !isFaculty) {
         // Last chance: name regex
         const firstName = await getFacultyFirstName(req.user.id);
-        const nameMatch = firstName && new RegExp(firstName, 'i').test(report.facultyName?.split(' ')[0]);
+        const nameMatch = firstName && new RegExp(firstName, 'i').test(report.facultyName?.replace(/^(Dr\.?|Prof\.?|Mr\.?|Ms\.?|Mrs\.?)\s+/i, '').trim().split(' ')[0]);
         if (!nameMatch) return res.status(403).json({ error: 'Access denied' });
       }
     }
