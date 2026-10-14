@@ -174,8 +174,12 @@ async function checkSelfApprovalConflict(submission, hodUserId) {
     const hodUser = await User.findById(hodUserId).select('name').lean();
     if (!hodUser) return { conflict: false };
 
-    const firstName = hodUser.name.split(' ')[0];
-    const nameRegex = new RegExp(firstName, 'i');
+    // Strip title prefix and use full name for matching (prevents cross-faculty bleed)
+    const hodFullNameClean = hodUser.name.replace(/^(Dr\.?|Prof\.?|Mr\.?|Ms\.?|Mrs\.?)\s+/i, '').trim();
+    const nameRegex = new RegExp(
+      `^(Dr\\.?|Prof\\.?|Mr\\.?|Ms\\.?|Mrs\\.?\\s+)?${hodFullNameClean.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`,
+      'i'
+    );
 
     // Check each report in the submission
     const reportIds = submission.reports || [];
@@ -185,7 +189,11 @@ async function checkSelfApprovalConflict(submission, hodUserId) {
 
     const conflictingReports = reports.filter(r => {
       const matchesId   = r.facultyUserId?.toString() === hodUserId.toString();
-      const matchesName = r.facultyName && nameRegex.test(r.facultyName.split(' ')[0]);
+      // Strip title from report name before matching full name
+      const reportNameClean = r.facultyName
+        ? r.facultyName.replace(/^(Dr\.?|Prof\.?|Mr\.?|Ms\.?|Mrs\.?)\s+/i, '').trim()
+        : null;
+      const matchesName = reportNameClean && nameRegex.test(reportNameClean);
       return matchesId || matchesName;
     });
 
