@@ -261,6 +261,20 @@ router.patch('/:id/status', authMiddleware, async (req, res) => {
 
     if (!submission) return res.status(404).json({ error: 'Submission not found' });
 
+    // ── Propagate vcComment → each report's actionTaken ─────────────────────
+    // So faculty see the Pro-VC action in their dashboard and it appears in PDFs
+    if (vcComment && submission.reports && submission.reports.length > 0) {
+      try {
+        await FacultyReport.updateMany(
+          { _id: { $in: submission.reports } },
+          { $set: { actionTaken: vcComment } }
+        );
+        console.log(`[Submissions] Propagated vcComment to ${submission.reports.length} report(s) as actionTaken`);
+      } catch (propagateErr) {
+        console.error('[Submissions] Failed to propagate actionTaken to reports:', propagateErr.message);
+      }
+    }
+
     // ── Audit ───────────────────────────────────────────────────────────────
     const eventMap = {
       approved:  'submission_approved',
@@ -362,6 +376,50 @@ router.patch('/:id/status', authMiddleware, async (req, res) => {
 
     res.json(submission);
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Pro-VC: Save action taken comment and propagate to all reports in submission
+// ─────────────────────────────────────────────────────────────────────────────
+
+router.patch('/:id/action-taken', authMiddleware, async (req, res) => {
+  try {
+    const callerRoles = new Set([
+      ...(req.user?.roles || []),
+      ...(req.user?.role ? [req.user.role] : []),
+    ]);
+    const isVC    = callerRoles.has('provc') || callerRoles.has('vc');
+    const isAdmin = callerRoles.has('admin');
+    if (!isVC && !isAdmin) {
+      return res.status(403).json({ error: 'Access denied — only Pro-VC or admin can save action taken' });
+    }
+
+    const { actionTaken } = req.body;
+    if (!actionTaken || !actionTaken.trim()) {
+      return res.status(400).json({ error: 'actionTaken text is required' });
+    }
+
+    const submission = await Submission.findByIdAndUpdate(
+      req.params.id,
+      { vcComment: actionTaken },
+      { new: true }
+    );
+    if (!submission) return res.status(404).json({ error: 'Submission not found' });
+
+    // Propagate to every FacultyReport in this submission
+    if (submission.reports && submission.reports.length > 0) {
+      await FacultyReport.updateMany(
+        { _id: { $in: submission.reports } },
+        { $set: { actionTaken: actionTaken } }
+      );
+      console.log(`[Action Taken] Written to ${submission.reports.length} report(s) for submission ${submission._id}`);
+    }
+
+    res.json({ success: true, message: `Action taken saved and propagated to ${submission.reports.length} report(s)` });
+  } catch (err) {
+    console.error('[Action Taken Error]', err);
     res.status(500).json({ error: err.message });
   }
 });
