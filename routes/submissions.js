@@ -151,8 +151,13 @@ router.get('/faculty', authMiddleware, requireAnyRole('faculty'), async (req, re
   try {
     const User = require('../models/User');
     const user = await User.findById(req.user.id).select('name').lean();
-    const firstName = user ? user.name.split(' ')[0] : null;
-    const nameRegex = firstName ? new RegExp(firstName, 'i') : null;
+    // Strip title prefix and match full name (not just first name)
+    const fullNameClean = user
+      ? user.name.replace(/^(Dr\.?|Prof\.?|Mr\.?|Ms\.?|Mrs\.?)\s+/i, '').trim()
+      : null;
+    const nameRegex = fullNameClean
+      ? new RegExp(`^(Dr\\.?|Prof\\.?|Mr\\.?|Ms\\.?|Mrs\\.?\\s+)?${fullNameClean.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i')
+      : null;
 
     const submissions = await Submission.find({ status: 'approved' })
       .populate('hodId', 'name email department')
@@ -167,7 +172,11 @@ router.get('/faculty', authMiddleware, requireAnyRole('faculty'), async (req, re
       obj.reports = (obj.reports || []).filter(r => {
         if (!r) return false;
         const byId   = r.facultyUserId?.toString() === req.user.id.toString();
-        const byName = nameRegex && r.facultyName && nameRegex.test(r.facultyName.split(' ')[0]);
+        // Full name match (strips title prefix from report name too)
+        const reportNameClean = r.facultyName
+          ? r.facultyName.replace(/^(Dr\.?|Prof\.?|Mr\.?|Ms\.?|Mrs\.?)\s+/i, '').trim()
+          : null;
+        const byName = nameRegex && reportNameClean && nameRegex.test(reportNameClean);
         return byId || byName;
       });
       return obj;
@@ -457,11 +466,16 @@ router.get('/:id/download-pdf', authMiddleware, async (req, res) => {
     ]);
     if (!callerRoles.has('vc') && !callerRoles.has('admin') && !callerRoles.has('hod')) {
       const u = await User.findById(req.user.id).select('name');
-      const fn = u ? u.name.split(' ')[0] : null;
-      const rx = fn ? new RegExp(fn, 'i') : null;
+      const fullNameClean = u
+        ? u.name.replace(/^(Dr\.?|Prof\.?|Mr\.?|Ms\.?|Mrs\.?)\s+/i, '').trim()
+        : null;
+      const rx = fullNameClean
+        ? new RegExp(`^(Dr\\.?|Prof\\.?|Mr\\.?|Ms\\.?|Mrs\\.?\\s+)?${fullNameClean.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i')
+        : null;
       reportDocs = reportDocs.filter(r => {
         if (!r) return false;
-        return r.facultyUserId?.toString() === req.user.id || (rx && rx.test(r.facultyName?.split(' ')[0]));
+        const reportNameClean = r.facultyName?.replace(/^(Dr\.?|Prof\.?|Mr\.?|Ms\.?|Mrs\.?)\s+/i, '').trim();
+        return r.facultyUserId?.toString() === req.user.id || (rx && reportNameClean && rx.test(reportNameClean));
       });
       if (reportDocs.length === 0) {
         return res.status(403).json({ error: 'You are not authorized to download this report' });

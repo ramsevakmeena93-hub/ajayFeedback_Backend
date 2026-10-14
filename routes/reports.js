@@ -10,16 +10,14 @@ const { log } = require('../services/logger');
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Get the first name of a user (for fallback name-regex matching) */
-async function getFacultyFirstName(userId) {
+/** Get the full name of a user (without title prefix) for fallback name-regex matching */
+async function getFacultyFullName(userId) {
   try {
     const User = require('../models/User');
     const user = await User.findById(userId).select('name');
     if (!user || !user.name) return null;
-    
     // Remove title prefixes (Dr., Prof., Mr., Ms., Mrs., etc.)
-    const nameWithoutTitle = user.name.replace(/^(Dr\.?|Prof\.?|Mr\.?|Ms\.?|Mrs\.?)\s+/i, '').trim();
-    return nameWithoutTitle.split(' ')[0]; // Now get the actual first name
+    return user.name.replace(/^(Dr\.?|Prof\.?|Mr\.?|Ms\.?|Mrs\.?)\s+/i, '').trim();
   } catch { return null; }
 }
 
@@ -41,31 +39,22 @@ async function getFacultyFirstName(userId) {
 async function buildFacultyQuery(userId, extraFilters = {}, useAssignments = true) {
   const User = require('../models/User');
   const user = await User.findById(userId).select('name email');
-  
-  // Remove title prefixes before extracting first name
-  const nameWithoutTitle = user?.name ? user.name.replace(/^(Dr\.?|Prof\.?|Mr\.?|Ms\.?|Mrs\.?)\s+/i, '').trim() : '';
-  const firstName = nameWithoutTitle ? nameWithoutTitle.split(' ')[0] : null;
-  const fullName = user?.name || null;
-  
-  console.log('[buildFacultyQuery] userId:', userId, 'fullName:', fullName, 'firstName:', firstName);
 
-  // Base: match by exact userId OR by name (backward compat)
-  // Try multiple name matching strategies for robustness
+  // Strip title prefix to get the clean full name (e.g. "Dr. Ajay Meena" → "Ajay Meena")
+  const fullNameClean = user?.name
+    ? user.name.replace(/^(Dr\.?|Prof\.?|Mr\.?|Ms\.?|Mrs\.?)\s+/i, '').trim()
+    : null;
+
+  console.log('[buildFacultyQuery] userId:', userId, 'fullNameClean:', fullNameClean);
+
+  // Primary: exact userId match
+  // Fallback: full name match (case-insensitive) — covers old reports without userId link
   const orClauses = [{ facultyUserId: userId }];
-  
-  if (fullName) {
-    // Exact full name match (case-insensitive)
-    orClauses.push({ 
-      facultyName: new RegExp(`^${fullName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i'),
-      status: { $in: ['sent_to_faculty', 'faculty_approved'] } 
-    });
-  }
-  
-  if (firstName) {
-    // First name match (backward compat for old reports)
-    orClauses.push({ 
-      facultyName: new RegExp(firstName, 'i'),
-      status: { $in: ['sent_to_faculty', 'faculty_approved'] } 
+
+  if (fullNameClean) {
+    orClauses.push({
+      facultyName: new RegExp(`^(Dr\\.?|Prof\\.?|Mr\\.?|Ms\\.?|Mrs\\.?\\s+)?${fullNameClean.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i'),
+      status: { $in: ['sent_to_faculty', 'faculty_approved'] },
     });
   }
 
@@ -315,7 +304,8 @@ router.patch('/:id/edit', authMiddleware, requireAnyRole('hod'), async (req, res
         let fid = report.facultyUserId;
         if (!fid && report.facultyName) {
           const User = require('../models/User');
-          const fu   = await User.findOne({ name: { $regex: report.facultyName.replace(/^(Dr\.?|Prof\.?|Mr\.?|Ms\.?|Mrs\.?)\s+/i, '').trim().split(' ')[0], $options: 'i' } });
+          const reportNameClean = report.facultyName.replace(/^(Dr\.?|Prof\.?|Mr\.?|Ms\.?|Mrs\.?)\s+/i, '').trim();
+          const fu   = await User.findOne({ name: new RegExp(`^(Dr\\.?|Prof\\.?|Mr\\.?|Ms\\.?|Mrs\\.?\\s+)?${reportNameClean.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') });
           if (fu) fid = fu._id;
         }
         if (fid) {
@@ -611,9 +601,11 @@ router.get('/:id', authMiddleware, async (req, res) => {
       const isHOD     = report.hodId?.toString() === req.user.id;
       const isFaculty = report.facultyUserId?.toString() === req.user.id;
       if (!isHOD && !isFaculty) {
-        // Last chance: name regex
-        const firstName = await getFacultyFirstName(req.user.id);
-        const nameMatch = firstName && new RegExp(firstName, 'i').test(report.facultyName?.replace(/^(Dr\.?|Prof\.?|Mr\.?|Ms\.?|Mrs\.?)\s+/i, '').trim().split(' ')[0]);
+        // Last chance: full name match (strips title prefix)
+        const fullName = await getFacultyFullName(req.user.id);
+        const reportNameClean = report.facultyName?.replace(/^(Dr\.?|Prof\.?|Mr\.?|Ms\.?|Mrs\.?)\s+/i, '').trim();
+        const nameMatch = fullName && reportNameClean &&
+          fullName.toLowerCase() === reportNameClean.toLowerCase();
         if (!nameMatch) return res.status(403).json({ error: 'Access denied' });
       }
     }
@@ -1094,17 +1086,17 @@ router.get('/debug/faculty-view/:facultyEmail', authMiddleware, requireAnyRole('
       return res.status(404).json({ error: 'Faculty not found' });
     }
 
-    const firstName = faculty.name.split(' ')[0];
+    const fullNameClean = faculty.name.replace(/^(Dr\.?|Prof\.?|Mr\.?|Ms\.?|Mrs\.?)\s+/i, '').trim();
     
     // Try different query methods
     const byUserId = await FacultyReport.find({ facultyUserId: faculty._id }).select('facultyName subjectCode status').lean();
-    const byName = await FacultyReport.find({ facultyName: new RegExp(firstName, 'i'), status: { $in: ['sent_to_faculty', 'faculty_approved'] } }).select('facultyName subjectCode status').lean();
+    const byName = await FacultyReport.find({ facultyName: new RegExp(`^(Dr\\.?|Prof\\.?|Mr\\.?|Ms\\.?|Mrs\\.?\\s+)?${fullNameClean.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i'), status: { $in: ['sent_to_faculty', 'faculty_approved'] } }).select('facultyName subjectCode status').lean();
     
     res.json({
       facultyEmail: req.params.facultyEmail,
       facultyId: faculty._id,
       facultyName: faculty.name,
-      firstName: firstName,
+      fullNameClean: fullNameClean,
       foundByUserId: {
         count: byUserId.length,
         reports: byUserId.slice(0, 5),
@@ -1150,9 +1142,9 @@ router.post('/admin/fix-faculty-userids', authMiddleware, requireAnyRole('admin'
         let facultyUser = await User.findOne({ name: report.facultyName });
         
         if (!facultyUser) {
-          // Try first name match
-          const firstName = report.facultyName.split(' ')[0];
-          facultyUser = await User.findOne({ name: new RegExp(`^${firstName}`, 'i') });
+          // Try full name match (strips title prefix)
+          const reportNameClean = report.facultyName.replace(/^(Dr\.?|Prof\.?|Mr\.?|Ms\.?|Mrs\.?)\s+/i, '').trim();
+          facultyUser = await User.findOne({ name: new RegExp(`^(Dr\\.?|Prof\\.?|Mr\\.?|Ms\\.?|Mrs\\.?\\s+)?${reportNameClean.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') });
         }
         
         if (!facultyUser) {
@@ -1316,11 +1308,11 @@ router.post('/:id/send-to-faculty', authMiddleware, requireAnyRole('hod'), async
       name: new RegExp(`^${facultyName.trim()}$`, 'i')
     });
     
-    // If not found, try first name match
+    // If not found, try full name match (strips title prefix)
     if (!facultyUser) {
-      const firstName = facultyName.split(' ')[0];
+      const facultyNameClean = facultyName.replace(/^(Dr\.?|Prof\.?|Mr\.?|Ms\.?|Mrs\.?)\s+/i, '').trim();
       facultyUser = await User.findOne({ 
-        name: new RegExp(firstName, 'i'),
+        name: new RegExp(`^(Dr\\.?|Prof\\.?|Mr\\.?|Ms\\.?|Mrs\\.?\\s+)?${facultyNameClean.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i'),
         roles: { $in: ['faculty', 'hod'] }
       });
     }
@@ -1435,9 +1427,9 @@ router.post('/bulk-send-to-faculty', authMiddleware, requireAnyRole('hod'), asyn
         });
 
         if (!facultyUser) {
-          const firstName = facultyName.split(' ')[0];
+          const facultyNameClean2 = facultyName.replace(/^(Dr\.?|Prof\.?|Mr\.?|Ms\.?|Mrs\.?)\s+/i, '').trim();
           facultyUser = await User.findOne({ 
-            name: new RegExp(firstName, 'i'),
+            name: new RegExp(`^(Dr\\.?|Prof\\.?|Mr\\.?|Ms\\.?|Mrs\\.?\\s+)?${facultyNameClean2.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i'),
             roles: { $in: ['faculty', 'hod'] }
           });
         }
