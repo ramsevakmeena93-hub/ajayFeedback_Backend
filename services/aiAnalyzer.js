@@ -1,72 +1,121 @@
 // ============================================================
-// FINAL COMMENT ANALYZER
+// FINAL COMMENT ANALYZER — v2 (Precise Patterns)
 // ============================================================
-// IMPORTANT:
-// - NEVER split the original student comment.
-// - Positive + actionable negative = NEED ATTENTION.
-// - Preserve the complete original comment.
-// - Do not silently delete unknown comments.
-// - English + Hinglish patterns from the existing classifier
-//   are still used.
+// KEY RULES:
+// - NEGATIVE has priority over POSITIVE (mixed = attention)
+// - Patterns must be SPECIFIC — no loose single words
+// - "but/however" alone is NOT enough — needs actual criticism
+// - "improve" alone is NOT enough — needs context
+// - Hinglish patterns preserved
 // ============================================================
 
 let pipeline = null;
 let pipelineLoading = false;
 
-// Sentiment patterns
+// ── POSITIVE PATTERNS (only genuinely positive signals) ──────────────────────
 const POSITIVE_PATTERNS = [
-  // Very strong positive only
-  /\b(excellent|outstanding|amazing|wonderful|fantastic|superb|brilliant|perfect|exceptional|extraordinary)\b/i,
-  
-  // Strong appreciation
-  /\b(love|loved|enjoyed|appreciate|grateful|thank|thanks|thankful)\b/i,
-  
-  // Specific positive teaching qualities
-  /\b(very\s+(?:good|helpful|clear|patient|knowledgeable|experienced|dedicated))\b/i,
-  /\b(extremely\s+(?:good|helpful|supportive|knowledgeable))\b/i,
-  /\b(best\s+(?:teacher|faculty|professor|explanation|teaching))\b/i,
-  
-  // Strong Hindi positive
-  /\b(bahut\s+(?:accha|achha|badhiya)|zabardast|kamaal|behtareen)\b/i,
-  
-  // Well + strong verb
-  /\b(very\s+well\s+(?:explained|taught|organized|structured))\b/i,
-  /\b(extremely\s+well\s+(?:explained|taught))\b/i
+  // Superlatives and strong praise
+  /\b(excellent|outstanding|amazing|wonderful|fantastic|superb|brilliant|perfect|exceptional|extraordinary|tremendous|marvelous|splendid)\b/i,
+
+  // Appreciation verbs
+  /\b(love|loved|enjoy|enjoyed|appreciate|appreciated|grateful|thankful|thank\s+you|thanks\s+for)\b/i,
+
+  // Very/extremely + positive quality
+  /\bvery\s+(good|helpful|clear|patient|knowledgeable|experienced|dedicated|supportive|effective|interactive|engaging|understanding|cooperative)\b/i,
+  /\bextremely\s+(good|helpful|supportive|knowledgeable|clear|effective)\b/i,
+  /\bhighly\s+(recommend|knowledgeable|effective|skilled|experienced)\b/i,
+
+  // Best teacher / best faculty
+  /\bbest\s+(teacher|faculty|professor|sir|ma'?am|lecturer|mentor)\b/i,
+
+  // Well explained / well taught (strong form)
+  /\bvery\s+well\s+(explained|taught|organized|structured|presented|communicated)\b/i,
+  /\bextremely\s+well\s+(explained|taught|presented)\b/i,
+  /\bperfectly\s+(explained|taught|clear)\b/i,
+
+  // Great/good teaching qualities (strong adjective required)
+  /\b(great|good|nice)\s+(teacher|teaching|explanation|faculty|professor|sir|ma'?am|mentor)\b/i,
+  /\b(clear|effective|interactive|engaging|inspiring|motivating)\s+(teaching|explanation|style|method|approach|lecture)\b/i,
+
+  // Specific positive outcomes
+  /\b(understood|understand)\s+(everything|all|concepts|well|clearly|easily|perfectly)\b/i,
+  /\b(learned|learnt)\s+(a\s+lot|so\s+much|very\s+much|greatly)\b/i,
+  /\b(satisfied|happy|impressed|pleased)\s+(with|by)?\s*(the|this|his|her|their)?\s*(teaching|explanation|faculty|class|lecture)?\b/i,
+
+  // Hinglish strong positive
+  /\b(bahut\s+(accha|achha|badhiya|badia)|zabardast|kamaal|behtareen|mast\s+padhate|shandar)\b/i,
+
+  // Simple strong positive phrases
+  /\b(no\s+(complaints?|issues?|problems?)|everything\s+(is\s+)?(good|fine|great|excellent|perfect))\b/i,
+  /\b(keep\s+(it\s+up|up\s+the\s+good\s+work)|well\s+done|good\s+job|great\s+job)\b/i,
 ];
 
+// ── NEGATIVE PATTERNS (specific, not single loose words) ─────────────────────
 const NEGATIVE_PATTERNS = [
-  // Direct criticism
-  /\b(improve|need|should|must|better|lack|lacking|insufficient|inadequate)\b/i,
-  
-  // Quality issues
-  /\b(poor|bad|worst|terrible|horrible|useless|waste|boring|dull|monotonous)\b/i,
-  
-  // Speed/pace issues
-  /\b(too\s+(?:fast|slow|quick|rushed)|very\s+(?:fast|slow)|so\s+(?:fast|slow))\b/i,
-  
-  // Understanding issues
-  /\b(difficult|hard|confusing|unclear|complicated|not\s+clear|doesn'?t\s+explain|can'?t\s+understand)\b/i,
-  
-  // Quantity issues
-  /\b(more\s+(?:time|examples|practice|attention|explanation|details|classes)|less\s+(?:time|attention)|not\s+enough)\b/i,
-  
-  // Negative comparisons
-  /\b(not\s+(?:good|helpful|available|punctual|organized|satisfied|happy))\b/i,
-  /\b(doesn'?t\s+(?:explain|teach|provide|help|come|attend|give))\b/i,
-  /\b(didn'?t\s+(?:understand|cover|explain|teach|give|provide))\b/i,
-  
+  // Direct improvement requests
+  /\b(should\s+improve|need[s]?\s+to\s+improve|must\s+improve|needs?\s+improvement|please\s+improve)\b/i,
+  /\b(should\s+(focus|give|provide|increase|explain|teach|cover|be|come|start|stop))\b/i,
+  /\b(must\s+(explain|cover|provide|give|attend|be|come))\b/i,
+  /\b(need[s]?\s+(more|to\s+give|to\s+explain|to\s+cover|to\s+provide|to\s+focus|to\s+be))\b/i,
+  /\b(please\s+(explain|provide|give|cover|focus|teach|speak|slow|improve|increase))\b/i,
+
+  // Bad quality descriptors
+  /\b(poor|bad|worst|terrible|horrible|useless|waste|boring|dull|monotonous|pathetic)\s+(teaching|explanation|class|lecture|method|faculty|teacher|performance|style|approach)\b/i,
+  /\b(very\s+(poor|bad|boring|dull|slow|fast|unclear|rough|rude|strict|harsh))\b/i,
+  /\b(not\s+(good|clear|helpful|available|punctual|organized|effective|satisfactory|understandable|interactive|engaging))\b/i,
+
+  // Speed problems (specific)
+  /\b(too\s+(fast|slow|quick|rushed|rapid))\s*(in\s+(teaching|explaining|speaking|class))?\b/i,
+  /\b(speaks?\s+too\s+(fast|slow|quickly|slowly))\b/i,
+  /\b(teaching\s+(speed|pace)\s+is\s+(too\s+)?(fast|slow|high|low))\b/i,
+  /\b(very\s+(fast|slow)\s+(teaching|explanation|speaking|pace|speed))\b/i,
+
+  // Clarity problems
+  /\b(not\s+clear|unclear|confusing|confused|hard\s+to\s+understand|difficult\s+to\s+understand|difficult\s+to\s+follow)\b/i,
+  /\b(doesn'?t\s+(explain|teach|make\s+it\s+clear|help\s+understand))\b/i,
+  /\b(didn'?t\s+(explain|understand|cover|teach|give|provide))\b/i,
+  /\b(can'?t\s+(understand|follow|hear|grasp|comprehend))\b/i,
+  /\b(unable\s+to\s+(understand|follow|comprehend|grasp))\b/i,
+
+  // More examples / practice requests (specific phrasing)
+  /\b(more\s+(practical|examples?|practice|exercises?|problems?|attention|interaction|activities|case\s+studies))\b/i,
+  /\b(give\s+(more|enough)\s+(examples?|time|attention|explanation|practice|problems?))\b/i,
+  /\b(need\s+(more\s+)?(examples?|practice|exercises?|interaction|attention|explanations?))\b/i,
+  /\b(less\s+(theory|theory\s+and|lecture))\b/i,
+  /\b(not\s+enough\s+(examples?|practice|time|explanation|interaction))\b/i,
+
+  // Availability/punctuality issues
+  /\b(absent|irregular|late|not\s+punctual|never\s+on\s+time|always\s+late|often\s+absent)\b/i,
+  /\b(never\s+(available|present|comes?|helps?|explains?|answers?))\b/i,
+  /\b(rarely\s+(available|present|comes?|helps?|explains?))\b/i,
+  /\b(hardly\s+(available|present|comes?|explains?|helps?))\b/i,
+  /\b(not\s+(available|present|accessible)\s+(for\s+)?(doubts?|questions?|help|students?))\b/i,
+
   // Behavioral issues
-  /\b(rude|arrogant|biased|unfair|partial|angry|harsh|strict|mean)\b/i,
-  /\b(absent|late|irregular|unavailable|never\s+available|rarely\s+available)\b/i,
-  
-  // Hindi negative patterns
-  /\b(nahi|nahin|bahut\s+kam|thoda|improve\s+karo|samajh\s+nahi\s+aaya|accha\s+nahi)\b/i,
-  
-  // Suggestions (even polite ones = need attention)
-  /\b(could\s+(?:improve|do|give|provide)|would\s+be\s+better|might\s+want\s+to|try\s+to)\b/i,
-  
-  // Mixed sentiment markers (good BUT...)
-  /\b(but|however|although|though)\b/i
+  /\b(rude|arrogant|biased|unfair|partial|harsh|disrespectful|condescending)\b/i,
+  /\b(doesn'?t\s+(help|answer|respond|listen|attend|come|give\s+attention))\b/i,
+  /\b(ignores?\s+(students?|questions?|doubts?))\b/i,
+
+  // Syllabus/coverage issues
+  /\b(didn'?t\s+(complete|finish|cover)\s+(the\s+)?(syllabus|course|topics?|curriculum))\b/i,
+  /\b(syllabus\s+(not\s+completed?|incomplete|not\s+covered|pending))\b/i,
+  /\b(topics?\s+(not\s+covered|skipped|incomplete|left\s+out|not\s+taught))\b/i,
+
+  // Notes/materials issues
+  /\b(no\s+(notes?|material|resources?|slides?|study\s+material))\b/i,
+  /\b(doesn'?t\s+(provide|share|give)\s+(notes?|material|slides?|resources?))\b/i,
+  /\b(need[s]?\s+(notes?|study\s+material|slides?|resources?))\b/i,
+
+  // Hinglish negative (specific phrases)
+  /\b(samajh\s+(nahi|nahin)\s+(aaya|aati|aata)|samajh\s+nahi\s+aaya)\b/i,
+  /\b(bahut\s+(fast|slow|mushkil|bura|bori|boring)|bahut\s+tez\s+padhate)\b/i,
+  /\b(improve\s+karo|theek\s+nahi|accha\s+nahi|bilkul\s+nahi\s+samjha)\b/i,
+  /\b(padhana\s+(theek\s+nahi|accha\s+nahi|bahut\s+fast|bahut\s+slow))\b/i,
+
+  // Explicit dissatisfaction
+  /\b(not\s+satisfied|unsatisfied|dissatisfied|unhappy\s+with)\b/i,
+  /\b(could\s+be\s+better|room\s+for\s+improvement|much\s+to\s+improve)\b/i,
+  /\b(below\s+(average|expectation|standard)|below\s+par)\b/i,
 ];
 
 const SKIP_PATTERNS = [
@@ -75,15 +124,15 @@ const SKIP_PATTERNS = [
 ];
 
 const NEUTRAL_SKIP_PATTERNS = [
-  /^(ok|okay|fine|average|normal|moderate|alright|decent)$/i
+  /^(ok|okay|fine|average|normal|moderate|alright|decent|good)$/i,
 ];
 
 const CATEGORY_PATTERNS = {
-  Teaching: /\b(teach|explain|lecture|class|concept)\b/i,
-  Communication: /\b(communicate|talk|speak|language)\b/i,
-  Availability: /\b(available|accessible|office|hours)\b/i,
-  Materials: /\b(notes|slides|material|book|resource)\b/i,
-  Assessment: /\b(exam|test|quiz|grade|mark|assignment)\b/i,
+  Teaching: /\b(teach|explain|lecture|class|concept|syllabus|cover|topic)\b/i,
+  Communication: /\b(communicate|talk|speak|language|speed|pace|fast|slow|clear)\b/i,
+  Availability: /\b(available|accessible|office|hours|present|absent|punctual|regular)\b/i,
+  Materials: /\b(notes?|slides?|material|book|resource|pdf|study\s+material)\b/i,
+  Assessment: /\b(exam|test|quiz|grade|mark|assignment|project)\b/i,
   General: /.*/
 };
 
@@ -309,19 +358,24 @@ async function classifyComments(rawComments) {
 
 
   // ==========================================================
-  // GENERIC NEGATIVE / ACTIONABLE CHECK
+  // GENERIC NEGATIVE / ACTIONABLE CHECK (extra safety net)
   // ==========================================================
 
   function hasGenericNegative(text) {
     const negativeIndicators = [
-      /\bnot\s+(good|clear|helpful|enough|available|punctual|organized)\b/i,
-      /\bdoesn'?t\s+(explain|teach|provide|help|come|attend)\b/i,
-      /\bdidn'?t\s+(understand|cover|explain|teach|give|provide)\b/i,
-      /\bcan'?t\s+(understand|follow|hear|see)\b/i,
-      /\bwon'?t\s+(help|explain|answer|respond)\b/i,
-      /\b(never|hardly|rarely|barely|seldom)\s+(available|present|comes|helps|explains)\b/i,
-      /\b(too\s+fast|too\s+slow|too\s+difficult|too\s+easy|too\s+much|too\s+less)\b/i,
-      /\b(less|poor|lack|insufficient|inadequate|absent|late|rude|biased|unfair|boring|waste)\b/i
+      // Specific negation + quality word
+      /\bnot\s+(good|clear|helpful|available|punctual|organized|effective|understandable|satisfactory)\b/i,
+      /\bdoesn'?t\s+(explain|teach|provide|help|come|attend|listen|respond|answer)\b/i,
+      /\bdidn'?t\s+(understand|cover|explain|teach|give|provide|complete|finish)\b/i,
+      /\bcan'?t\s+(understand|follow|hear|grasp|comprehend)\b/i,
+      /\b(never|hardly|rarely|barely)\s+(available|present|comes?|helps?|explains?|answers?)\b/i,
+      // Specific speed complaints
+      /\btoo\s+(fast|slow|quick|rushed)\b/i,
+      /\bspeaks?\s+very\s+(fast|slow|quickly|slowly)\b/i,
+      // Explicit dissatisfaction (not standalone loose words)
+      /\b(not\s+satisfied|dissatisfied|unsatisfied)\b/i,
+      /\b(very\s+poor|very\s+bad|very\s+boring|very\s+dull|very\s+rude|very\s+harsh)\b/i,
+      /\b(absent|irregular|late\s+to\s+class|not\s+punctual)\b/i,
     ];
     return negativeIndicators.some(pattern => pattern.test(text));
   }
