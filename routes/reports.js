@@ -96,6 +96,27 @@ router.get('/ai/test', authMiddleware, async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// HOD: AI suggest action taken — analyses commentsNeedingAttention
+// ─────────────────────────────────────────────────────────────────────────────
+
+router.post('/:id/suggest-action', authMiddleware, requireAnyRole('hod'), async (req, res) => {
+  try {
+    const { generateActionSuggestion } = require('../services/aiAnalyzer');
+    const report = await FacultyReport.findOne({ _id: req.params.id, hodId: req.user.id });
+    if (!report) return res.status(404).json({ error: 'Report not found' });
+
+    const suggestion = generateActionSuggestion(
+      report.commentsNeedingAttention || [],
+      report.facultyName
+    );
+
+    res.json({ suggestion });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Re-analyze report using AI (HOD workspace)
 // ─────────────────────────────────────────────────────────────────────────────
 

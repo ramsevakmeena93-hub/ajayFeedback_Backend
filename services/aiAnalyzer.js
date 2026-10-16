@@ -668,6 +668,88 @@ async function classifyComments(rawComments) {
 module.exports = {
   classifyComments,
   analyzeCommentsWithAI: classifyComments,
+
+  // ── AI-POWERED ACTION TAKEN SUGGESTION ──────────────────────────────────
+  // Analyzes commentsNeedingAttention and generates a professional
+  // "Action Taken by HOD" paragraph the HOD can use or edit.
+  generateActionSuggestion: function(commentsNeedingAttention, facultyName) {
+    const comments = (commentsNeedingAttention || []).filter(Boolean);
+    const name = facultyName || 'the faculty member';
+
+    // Default when no attention comments exist
+    if (comments.length === 0) {
+      return `Teaching performance of ${name} is satisfactory. Students have responded positively. Encouraged to continue maintaining current standards and keep growing in pedagogical innovation.`;
+    }
+
+    // Categorize each comment
+    const issues = {
+      pace:        [],
+      clarity:     [],
+      lab:         [],
+      notes:       [],
+      doubts:      [],
+      assessment:  [],
+      engagement:  [],
+      facilities:  [],
+      planning:    [],
+      support:     [],
+    };
+
+    const RX = {
+      pace:       /\b(fast|slow|pace|speed|rushed|time|notes?\s+(not\s+)?complete|topics?\s+jaldi|syllabus.*(rushed|fast)|slides\s+change|lengthy\s+code)\b/i,
+      clarity:    /\b(unclear|confus|not\s+clear|explain|basics?|advanced|steps?\s+skip|concept|understand|samajh|slides?\s+read|terminology|connections?\s+between)\b/i,
+      lab:        /\b(lab|practical|code|copy.?paste|debug|hands.?on|experiment|program|run|implement)\b/i,
+      notes:      /\b(notes?|slides?|material|formula|definition|missing|incomplete|late|share|upload|pdf|diagrams?|errors?\s+in)\b/i,
+      doubts:     /\b(doubt|question|hesitat|ignored|unanswer|session|time\s+for\s+(doubt|question)|samajh\s+nahi|clear.*doubt)\b/i,
+      assessment: /\b(quiz|marks?|assessment|marking|criteria|answer\s+key|evaluation|transparent|syllabus.*quiz|test\s+time)\b/i,
+      engagement: /\b(interact|boring|monoton|engage|participat|discussion|real.world|examples?|voice|microphone|slides?\s+without)\b/i,
+      facilities: /\b(computer|internet|software|projector|equipment|system|network|lab\s+systems?|hardware)\b/i,
+      planning:   /\b(plan|schedul|syllabus.*complet|revision|prerequisit|objectives?|timetable|units?\s+left|practice\s+sessions?)\b/i,
+      support:    /\b(support|guidance|deadline|assignment.*instruct|disrespect|impatient|respond|feedback.*ignor|submission)\b/i,
+    };
+
+    comments.forEach(c => {
+      let matched = false;
+      for (const [key, rx] of Object.entries(RX)) {
+        if (rx.test(c)) { issues[key].push(c); matched = true; }
+      }
+      if (!matched) issues.clarity.push(c);
+    });
+
+    // Build action sentences per category
+    const actions = [];
+
+    if (issues.pace.length)
+      actions.push('Counselled the faculty to moderate teaching pace and ensure adequate time for note-taking and student comprehension.');
+    if (issues.clarity.length)
+      actions.push('Advised the faculty to begin each topic from foundational concepts, use step-by-step explanations, and verify student understanding before advancing.');
+    if (issues.lab.length)
+      actions.push('Directed the faculty to restructure lab sessions so students independently write and execute code rather than copying; debugging techniques must be demonstrated explicitly.');
+    if (issues.notes.length)
+      actions.push('Instructed the faculty to share complete, well-organized study material, unit-wise notes with diagrams, and solved examples well before examinations.');
+    if (issues.doubts.length)
+      actions.push('Assigned dedicated doubt-clearing sessions; faculty is advised to pause and check understanding during lectures and encourage student questions without hesitation.');
+    if (issues.assessment.length)
+      actions.push('Reminded the faculty to explain assessment criteria clearly in advance, discuss answer keys after quizzes, and ensure test coverage aligns with the announced syllabus.');
+    if (issues.engagement.length)
+      actions.push('Recommended the faculty to incorporate real-world examples, board work, interactive discussions, and varied teaching methods to improve classroom engagement.');
+    if (issues.facilities.length)
+      actions.push('Reported equipment and infrastructure issues to the department; steps initiated to ensure lab systems, software, and internet connectivity are maintained properly.');
+    if (issues.planning.length)
+      actions.push('Reviewed the course teaching plan with the faculty; advised completing syllabus well ahead of assessments and scheduling regular revision sessions.');
+    if (issues.support.length)
+      actions.push('Counselled the faculty on maintaining a respectful, approachable classroom environment; clear assignment instructions and timely feedback must be provided to students.');
+
+    if (actions.length === 0)
+      return `Feedback for ${name} has been reviewed. A discussion was held with the faculty regarding student concerns. The faculty has been advised to address the mentioned issues and continuously improve teaching quality.`;
+
+    const intro = `Following a review of student feedback for ${name}, the following actions have been taken:`;
+    const numbered = actions.map((a, i) => `${i + 1}. ${a}`).join('\n');
+    const closing = `The faculty has been informed of these observations and is expected to implement improvements in the upcoming sessions.`;
+
+    return `${intro}\n\n${numbered}\n\n${closing}`;
+  },
+
   testGeminiConnection: async () => ({
     ok: true,
     engine: 'Rule-Based v5 — Trained on 2100 labeled college feedback comments',
