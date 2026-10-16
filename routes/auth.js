@@ -35,7 +35,7 @@ function isAllowedDomain(email) {
 // -----------------------------------------------------------------------------
 
 const DESIGNATED_ADMIN_EMAIL =
-  '25tc1aj7@mitsgwl.ac.in';
+  'admin@mits.ac.in'; // changed — 25tc1aj7 is now HOD of IP
 
 const DESIGNATED_HOD_EMAIL =
   '25mc1sh132@mitsgwl.ac.in';
@@ -210,20 +210,21 @@ router.post('/register', async (req, res) => {
     let safeDepartment = department || '';
 
     // Designated admin.
-    if (
-      cleanEmail === DESIGNATED_ADMIN_EMAIL
-    ) {
+    if (cleanEmail === DESIGNATED_ADMIN_EMAIL) {
       safeRole = 'admin';
       safeDepartment = '';
     }
 
-    // Designated HOD.
-    if (
-      cleanEmail === DESIGNATED_HOD_EMAIL
-    ) {
+    // Ajay Meena — HOD of Industrial Production
+    if (cleanEmail === '25tc1aj7@mitsgwl.ac.in') {
       safeRole = 'hod';
-      safeDepartment =
-        DESIGNATED_HOD_DEPARTMENT;
+      safeDepartment = 'Industrial Production';
+    }
+
+    // Designated HOD.
+    if (cleanEmail === DESIGNATED_HOD_EMAIL) {
+      safeRole = 'hod';
+      safeDepartment = DESIGNATED_HOD_DEPARTMENT;
     }
 
     const user = await User.create({
@@ -410,6 +411,30 @@ router.post('/login', async (req, res) => {
       user.roles = ['admin'];
       user.activeWorkspace = 'admin';
       user.department = '';
+    }
+
+    // ---------------------------------------------------------
+    // Ajay Meena — HOD of Industrial Production
+    // ---------------------------------------------------------
+
+    if (cleanEmail === '25tc1aj7@mitsgwl.ac.in') {
+      await User.findByIdAndUpdate(user._id, {
+        role:            'hod',
+        roles:           ['hod', 'faculty'],
+        activeWorkspace: 'hod',
+        department:      'Industrial Production',
+      });
+
+      await UserRole.deleteMany({ userId: user._id });
+      await UserRole.create([
+        { userId: user._id, role: 'hod',     departmentScope: 'Industrial Production', active: true },
+        { userId: user._id, role: 'faculty', departmentScope: 'Industrial Production', active: true },
+      ]);
+
+      user.role            = 'hod';
+      user.roles           = ['hod', 'faculty'];
+      user.activeWorkspace = 'hod';
+      user.department      = 'Industrial Production';
     }
 
     // ---------------------------------------------------------
