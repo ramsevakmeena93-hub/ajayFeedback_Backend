@@ -38,6 +38,67 @@ function isGarbage(text) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// POSITIVE OVERRIDE PATTERNS
+// These fire when a word LOOKS negative but is used in a POSITIVE context.
+// If ANY of these match → the comment is treated as APPRECIATION regardless
+// of what generic patterns also match.
+// Examples:
+//   "not writing in notebook but applying at system" → praise
+//   "not difficult to understand at all" → praise
+//   "we do not just copy paste, we actually write and understand" → praise
+//   "not boring at all" → praise
+// ─────────────────────────────────────────────────────────────────────────────
+const POSITIVE_OVERRIDE_PATTERNS = [
+  // "not X but Y" where Y is positive action
+  /\bnot\s+(writing\s+in\s+notebook|just\s+copy[\s-]?past(e|ing)|copy[\s-]?past(e|ing)\s+but|memoriz|boring\s+(at\s+all|anymore)|wasting\s+time|sitting\s+idle)\b/i,
+  /\bnot\s+(just\s+copy|blindly\s+copy|only\s+copy)\b/i,
+
+  // "not difficult/hard to understand" (negating the difficulty = praise)
+  /\bnot\s+(difficult|hard|tough|confusing|boring|dull|monotonous)\s+(to\s+understand|to\s+follow|at\s+all|anymore)\b/i,
+  /\b(easy|simple|clear|understandable)\s+to\s+(understand|follow|grasp)\b/i,
+
+  // "do not just copy paste, we actually write/understand/apply"
+  /\b(do\s+not|don'?t)\s+just\s+(copy|write|sit|watch|memorize)\b.*\b(actually|really|ourselves?|ourselves?|understand|apply|write|code|practice)\b/i,
+
+  // Comparative praise: "unlike other X, this is good"
+  /\bunlike\s+(other|boring|normal|typical|most)\s+(labs?|classes?|courses?|lectures?|sessions?)\b/i,
+
+  // "applying/practising at the same time" = praise
+  /\b(applying|practising|practicing|coding|writing\s+code|running\s+code)\s+(concepts?\s+)?at\s+the\s+same\s+time\b/i,
+  /\bpractically\s+applying\s+concepts?\b/i,
+
+  // "every X should be like this" = strong praise
+  /\bevery\s+(lab|class|course|lecture|session)\s+(should\s+be|must\s+be|needs?\s+to\s+be)\s+like\s+this\b/i,
+
+  // "love this" / "loving this" = strong praise
+  /\b(love|loving)\s+(this\s+)?(lab|class|course|lecture|teaching|style|method|session|approach)\b/i,
+
+  // "not boring" / "never boring"
+  /\b(not|never|hardly|rarely)\s+(boring|dull|monotonous|boring\s+at\s+all)\b/i,
+
+  // "no complaints at all" / "no issues at all"
+  /\bno\s+(complaints?|issues?|problems?|doubts?)\s+(at\s+all|whatsoever)\b/i,
+
+  // Contrastive: "instead of X, we Y" where Y is positive
+  /\b(instead\s+of\s+(just\s+)?(writing\s+in\s+notebook|copying|memorizing|sitting))[,\s]+(we|students?)\s+(apply|practice|code|write|understand|learn)\b/i,
+
+  // "we actually write/understand/apply" = positive context
+  /\bwe\s+actually\s+(write|understand|code|apply|practice|learn|develop|run|implement)\b/i,
+
+  // "does not waste time" as praise
+  /\b(does\s+not|doesn'?t)\s+waste\s+(our\s+)?(time|lab\s+time)\b/i,
+
+  // "not boring at all" standalone
+  /\bnot\s+boring\s+at\s+all\b/i,
+
+  // "great/good class not boring"
+  /\b(great|good|excellent|amazing)\s+(class|lab|course|session|lecture)[,\s].*(not|never)\s+(boring|dull)\b/i,
+
+  // "not just theory, actually practice"
+  /\bnot\s+just\s+(theory|reading|watching|listening)[,\s].*(actually|also|but)\s+(practic|apply|code|hands[\s-]on|do)\b/i,
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
 // ATTENTION OPENERS — sentence starters that always indicate a problem
 // Covers ALL openers found in v1 + v2 + mixed datasets
 // ─────────────────────────────────────────────────────────────────────────────
@@ -457,6 +518,18 @@ const APPRECIATION_PATTERNS = [
   /\b(keep\s+(it\s+up|up\s+the\s+good\s+work)|well\s+done|good\s+job|great\s+job|excellent\s+work)\b/i,
   /\b(makes?\s+(difficult|complex|hard|tough)\s+(topics?|concepts?|subjects?)\s+(easy|simple|clear|understandable|interesting))\b/i,
   /\b(no\s+(complaints?|issues?|problems?)|everything\s+(is\s+)?(good|fine|great|excellent|perfect))\b/i,
+
+  // Praise through positive contrast / experience
+  /\bwe\s+actually\s+(write|understand|code|apply|practice|learn|develop|run|implement)\b/i,
+  /\bnot\s+boring\s+(at\s+all)?\b/i,
+  /\b(great|good|excellent|amazing|wonderful)\s+(class|lab|course|session|lecture)\b/i,
+  /\bunlike\s+(other|boring|normal|typical|most)\s+(labs?|classes?|courses?|lectures?|sessions?)\b/i,
+  /\b(does\s+not|doesn'?t)\s+waste\s+(our\s+)?(time|lab\s+time)\b/i,
+  /\bnot\s+just\s+(theory|reading|watching|listening)[,\s].*(actually|but\s+also|also)\s+(practic|apply|code|hands[\s-]on)\b/i,
+  /\b(love|loving)\s+(this\s+)?(lab|class|course|lecture|teaching|style|method|session)\b/i,
+  /\bevery\s+(lab|class|course|lecture|session)\s+(should\s+be|must\s+be)\s+like\s+this\b/i,
+  /\bpractically\s+applying\s+concepts?\b/i,
+  /\b(applying|practising|practicing)\s+(concepts?\s+)?at\s+the\s+same\s+time\b/i,
 ];
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -543,8 +616,12 @@ async function classifyComments(rawComments) {
     const hasGeneric  = GENERIC_ATTENTION_PATTERNS.some(p => p.test(lower));
     const hasApprec   = APPRECIATION_PATTERNS.some(p => p.test(lower));
 
-    // ATTENTION wins always
-    if (hasOpener || hasIssue || hasGeneric) {
+    // STEP 3b: Check positive override — negates generic attention only
+    // (specific issue phrases and openers still win even with override)
+    const hasPositiveOverride = POSITIVE_OVERRIDE_PATTERNS.some(p => p.test(lower));
+
+    // ATTENTION wins — but override blocks generic patterns (not specific issues/openers)
+    if (hasOpener || hasIssue || (hasGeneric && !hasPositiveOverride)) {
       addAttention(text);
       result.statistics.attention++;
       result.classifiedComments.push({
