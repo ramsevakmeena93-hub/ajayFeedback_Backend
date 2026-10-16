@@ -32,7 +32,7 @@ const systemAccounts = [
 
 // These emails are given special roles by the system — exclude them from the HOD demotion sweep
 const protectedEmails = [
-  '25tc1aj7@mitsgwl.ac.in',    // VC account
+  '25tc1aj7@mitsgwl.ac.in',    // HOD of Industrial Production
   '25mc1sh132@mitsgwl.ac.in',  // HOD account
 ];
 
