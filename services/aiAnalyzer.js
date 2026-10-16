@@ -1,903 +1,424 @@
 // ============================================================
-// FINAL COMMENT ANALYZER — v2 (Precise Patterns)
+// COLLEGE FEEDBACK INTELLIGENCE — v3
+// Built from real student comment analysis
 // ============================================================
-// KEY RULES:
-// - NEGATIVE has priority over POSITIVE (mixed = attention)
-// - Patterns must be SPECIFIC — no loose single words
-// - "but/however" alone is NOT enough — needs actual criticism
-// - "improve" alone is NOT enough — needs context
-// - Hinglish patterns preserved
+//
+// CLASSIFICATION LOGIC:
+//
+//  1. SKIP   — garbage, random chars, too short, pure filler
+//  2. ATTENTION — anything requesting change, improvement,
+//                 expressing dissatisfaction, mixed praise+issue
+//  3. APPRECIATION — purely positive, no suggestion/issue at all
+//  4. NEUTRAL — uncertain, short neutral, left unclassified
+//
+// PRIORITY: ATTENTION > APPRECIATION > NEUTRAL
+//
+// KEY INSIGHT from real data:
+//   Students write long polite suggestions like:
+//   "It would be helpful if..." / "Could you please..."
+//   "More examples should be included..."
+//   "I think this should be taught slowly..."
+//   These MUST go to ATTENTION — they are improvement requests
+//   even when phrased politely.
 // ============================================================
 
-let pipeline = null;
-let pipelineLoading = false;
-
-// ── POSITIVE PATTERNS (only genuinely positive signals) ──────────────────────
-const POSITIVE_PATTERNS = [
-  // Superlatives and strong praise
-  /\b(excellent|outstanding|amazing|wonderful|fantastic|superb|brilliant|perfect|exceptional|extraordinary|tremendous|marvelous|splendid)\b/i,
-
-  // Appreciation verbs
-  /\b(love|loved|enjoy|enjoyed|appreciate|appreciated|grateful|thankful|thank\s+you|thanks\s+for)\b/i,
-
-  // Very/extremely + positive quality
-  /\bvery\s+(good|helpful|clear|patient|knowledgeable|experienced|dedicated|supportive|effective|interactive|engaging|understanding|cooperative)\b/i,
-  /\bextremely\s+(good|helpful|supportive|knowledgeable|clear|effective)\b/i,
-  /\bhighly\s+(recommend|knowledgeable|effective|skilled|experienced)\b/i,
-
-  // Best teacher / best faculty
-  /\bbest\s+(teacher|faculty|professor|sir|ma'?am|lecturer|mentor)\b/i,
-
-  // Well explained / well taught (strong form)
-  /\bvery\s+well\s+(explained|taught|organized|structured|presented|communicated)\b/i,
-  /\bextremely\s+well\s+(explained|taught|presented)\b/i,
-  /\bperfectly\s+(explained|taught|clear)\b/i,
-
-  // Great/good teaching qualities (strong adjective required)
-  /\b(great|good|nice)\s+(teacher|teaching|explanation|faculty|professor|sir|ma'?am|mentor)\b/i,
-  /\b(clear|effective|interactive|engaging|inspiring|motivating)\s+(teaching|explanation|style|method|approach|lecture)\b/i,
-
-  // Specific positive outcomes
-  /\b(understood|understand)\s+(everything|all|concepts|well|clearly|easily|perfectly)\b/i,
-  /\b(learned|learnt)\s+(a\s+lot|so\s+much|very\s+much|greatly)\b/i,
-  /\b(satisfied|happy|impressed|pleased)\s+(with|by)?\s*(the|this|his|her|their)?\s*(teaching|explanation|faculty|class|lecture)?\b/i,
-
-  // Hinglish strong positive
-  /\b(bahut\s+(accha|achha|badhiya|badia)|zabardast|kamaal|behtareen|mast\s+padhate|shandar)\b/i,
-
-  // Simple strong positive phrases
-  /\b(no\s+(complaints?|issues?|problems?)|everything\s+(is\s+)?(good|fine|great|excellent|perfect))\b/i,
-  /\b(keep\s+(it\s+up|up\s+the\s+good\s+work)|well\s+done|good\s+job|great\s+job)\b/i,
+// ── SKIP PATTERNS — garbage / meaningless input ──────────────────────────────
+const SKIP_PATTERNS = [
+  /^[^a-zA-Z\u0900-\u097F]{0,10}$/,          // no real letters at all
+  /^(.)\1{3,}$/,                               // repeated single char: "aaaa"
+  /^[a-zA-Z]{1,3}$/,                          // 1-3 random letters: "jb", "ok"
+  /^(no|none|na|nahi|nil|n\.?a\.?|nothing|no\s+comment|no\s+remark|no\s+suggestion)s?\.?$/i,
+  /^(\.{2,}|-{2,}|_{2,}|\*{2,}|#{2,})$/,     // dots/dashes only
+  /^[^a-zA-Z\u0900-\u097F\s]{1,20}$/,         // symbols/numbers only
 ];
 
-// ── NEGATIVE PATTERNS (specific, not single loose words) ─────────────────────
-const NEGATIVE_PATTERNS = [
-  // Direct improvement requests
-  /\b(should\s+improve|need[s]?\s+to\s+improve|must\s+improve|needs?\s+improvement|please\s+improve)\b/i,
-  /\b(should\s+(focus|give|provide|increase|explain|teach|cover|be|come|start|stop))\b/i,
-  /\b(must\s+(explain|cover|provide|give|attend|be|come))\b/i,
-  /\b(need[s]?\s+(more|to\s+give|to\s+explain|to\s+cover|to\s+provide|to\s+focus|to\s+be))\b/i,
-  /\b(please\s+(explain|provide|give|cover|focus|teach|speak|slow|improve|increase))\b/i,
+// ── PURE NEUTRAL SKIP — very short generic fillers ───────────────────────────
+const NEUTRAL_FILLER_PATTERNS = [
+  /^(ok|okay|fine|average|normal|moderate|alright|decent|good|nice|great|well)\.?$/i,
+  /^(everything\s+(is\s+)?(fine|good|ok|okay|great|nice|well|perfect))\.?$/i,
+  /^(no\s+(need|problem|issue|complaint|remark|change))s?\.?$/i,
+  /^(all\s+(good|fine|ok|okay|great|nice|is\s+well))\.?$/i,
+  /^(satisfactory|satisfied|content|happy)\.?$/i,
+];
 
-  // Bad quality descriptors
-  /\b(poor|bad|worst|terrible|horrible|useless|waste|boring|dull|monotonous|pathetic)\s+(teaching|explanation|class|lecture|method|faculty|teacher|performance|style|approach)\b/i,
-  /\b(very\s+(poor|bad|boring|dull|slow|fast|unclear|rough|rude|strict|harsh))\b/i,
-  /\b(not\s+(good|clear|helpful|available|punctual|organized|effective|satisfactory|understandable|interactive|engaging))\b/i,
+// ── STRONG ATTENTION SIGNALS ─────────────────────────────────────────────────
+// These ALWAYS classify as ATTENTION regardless of positive context around them
 
-  // Speed problems (specific)
-  /\b(too\s+(fast|slow|quick|rushed|rapid))\s*(in\s+(teaching|explaining|speaking|class))?\b/i,
-  /\b(speaks?\s+too\s+(fast|slow|quickly|slowly))\b/i,
-  /\b(teaching\s+(speed|pace)\s+is\s+(too\s+)?(fast|slow|high|low))\b/i,
-  /\b(very\s+(fast|slow)\s+(teaching|explanation|speaking|pace|speed))\b/i,
+const ATTENTION_PATTERNS = [
 
-  // Clarity problems
-  /\b(not\s+clear|unclear|confusing|confused|hard\s+to\s+understand|difficult\s+to\s+understand|difficult\s+to\s+follow)\b/i,
-  /\b(doesn'?t\s+(explain|teach|make\s+it\s+clear|help\s+understand))\b/i,
-  /\b(didn'?t\s+(explain|understand|cover|teach|give|provide))\b/i,
-  /\b(can'?t\s+(understand|follow|hear|grasp|comprehend))\b/i,
-  /\b(unable\s+to\s+(understand|follow|comprehend|grasp))\b/i,
+  // ── 1. POLITE REQUESTS & SUGGESTIONS (most common in real data) ──
+  /\b(could\s+you\s+(please\s+)?(explain|teach|provide|give|cover|focus|try|start|improve|speak|slow|be))\b/i,
+  /\b(please\s+(explain|provide|give|cover|focus|teach|speak|slow\s+down|improve|try|be\s+more|increase|add|include|change|assign|upload|check))\b/i,
+  /\b(it\s+would\s+(be\s+)?(helpful|great|better|nice|good)\s+(if|to|for))\b/i,
+  /\b(would\s+be\s+(helpful|better|great|nice|good|more\s+effective)\s+(if|to|for))\b/i,
+  /\b(if\s+(possible|maam?|sir|you\s+can|you\s+could),?\s+please)\b/i,
+  /\b(i\s+(think|feel|believe|suggest|request|hope)\s+(this|it|the|that|we|sir|maam?))/i,
+  /\b(in\s+my\s+opinion|according\s+to\s+me)\b/i,
+  /\b(explained\s+in\s+a\s+more\s+(unique|engaging|interactive|interesting|creative|different|better)\s+way)\b/i,
+  /\b(topics?\s+(were?|are|could\s+be|should\s+be)\s+(explained|taught|covered)\s+(in\s+a\s+more|more|better|differently))\b/i,
+  /\b(make\s+(the\s+)?(classes?|lectures?|topics?|concepts?|subject)\s+more\s+(interesting|engaging|interactive|effective))\b/i,
 
-  // More examples / practice requests (specific phrasing)
-  /\b(more\s+(practical|examples?|practice|exercises?|problems?|attention|interaction|activities|case\s+studies))\b/i,
-  /\b(give\s+(more|enough)\s+(examples?|time|attention|explanation|practice|problems?))\b/i,
-  /\b(need\s+(more\s+)?(examples?|practice|exercises?|interaction|attention|explanations?))\b/i,
-  /\b(less\s+(theory|theory\s+and|lecture))\b/i,
-  /\b(not\s+enough\s+(examples?|practice|time|explanation|interaction))\b/i,
+  // ── 2. IMPROVEMENT REQUESTS ──
+  /\b(need[s]?\s+(to\s+)?(improve|be\s+improved|more|better|to\s+cover|to\s+explain|to\s+focus))\b/i,
+  /\b(should\s+(improve|be\s+improved|focus|give|provide|explain|cover|try|use|include|change|start|teach|conduct|assign|add))\b/i,
+  /\b(must\s+(improve|explain|cover|provide|give|attend|focus|include|add))\b/i,
+  /\b(can\s+be\s+(improved|better|more\s+(clear|effective|interactive|engaging|organized)))\b/i,
+  /\b(scope\s+for\s+improvement|room\s+for\s+improvement|could\s+be\s+(better|improved|more))\b/i,
+  /\b(needs?\s+improvement|needs?\s+to\s+be\s+(improved|better|more|changed))\b/i,
+  /\b(improve\s+(the|their|his|her|teaching|explanation|notes|material|lab|class|interaction|method|speed|style))\b/i,
+  /\b(improve\s+karo|sudhar|better\s+karo)\b/i,
 
-  // Availability/punctuality issues
-  /\b(absent|irregular|late|not\s+punctual|never\s+on\s+time|always\s+late|often\s+absent)\b/i,
-  /\b(never\s+(available|present|comes?|helps?|explains?|answers?))\b/i,
-  /\b(rarely\s+(available|present|comes?|helps?|explains?))\b/i,
-  /\b(hardly\s+(available|present|comes?|explains?|helps?))\b/i,
-  /\b(not\s+(available|present|accessible)\s+(for\s+)?(doubts?|questions?|help|students?))\b/i,
+  // ── 3. "MORE" REQUESTS — students asking for more of something ──
+  /\b(more\s+(examples?|practice|exercises?|problems?|interaction|real[\s-]world|practical|hands[\s-]on|time|attention|explanation|clarity|details?|topics?|coverage|activities|discussion|problem[\s-]solving|coding|case[\s-]studies?))\b/i,
+  /\b(should\s+(include|add|give|provide|use)\s+(more|enough|additional|some)\s+(examples?|practice|interaction|time|details?|exercises?))\b/i,
+  /\b(give\s+(more|enough|additional|some)\s+(time|examples?|attention|practice|explanation|problems?|exercises?))\b/i,
+  /\b(add\s+(more|some|additional)\s+(examples?|practice|problems?|diagrams?|visuals?|real[\s-]world))\b/i,
 
-  // Behavioral issues
-  /\b(rude|arrogant|biased|unfair|partial|harsh|disrespectful|condescending)\b/i,
-  /\b(doesn'?t\s+(help|answer|respond|listen|attend|come|give\s+attention))\b/i,
+  // ── 4. CONCISE/EASY REQUEST — notes, material issues ──
+  /\b(keep\s+(the\s+)?(notes?|material|content|ppt|explanation)\s+(concise|short|simple|easy|clear|brief))\b/i,
+  /\b(notes?\s+(are|is|contain|has|have)\s+(too\s+(long|much|difficult)|a\s+lot|very\s+(hard|difficult|long)))\b/i,
+  /\b(material\s+(is|are)\s+(not\s+)?(good|clear|enough|provided|available|helpful))\b/i,
+  /\b(no\s+(notes?|material|resources?|slides?|study\s+material|pdf))\b/i,
+  /\b(doesn'?t\s+(provide|share|give|upload)\s+(notes?|material|slides?|resources?|pdf))\b/i,
+  /\b(notes?\s+(not\s+)?(provided|available|uploaded|shared|given|complete))\b/i,
+  /\b(include\s+(diagrams?|flowcharts?|visuals?|examples?|relevant|practical)\s+(in\s+)?(the\s+)?(ppt|notes?|slides?|material))\b/i,
+
+  // ── 5. PACE / SPEED ISSUES ──
+  /\b(too\s+(fast|slow|quick|rushed|rapid|brief|detailed))\b/i,
+  /\b(speaks?\s+(too\s+)?(very\s+)?(fast|slow|quickly|slowly|rapidly))\b/i,
+  /\b(teaches?\s+(too\s+)?(fast|slow|quickly|slowly|rapidly|at\s+a\s+(quick|fast|slow)\s+pace))\b/i,
+  /\b(pace\s+is\s+(too\s+)?(fast|slow|high|low|very\s+(fast|slow)))\b/i,
+  /\b(quick\s+pace|fast\s+pace|slow\s+pace)\b/i,
+  /\b(things?\s+(goes?|go)\s+out\s+of\s+head)\b/i,
+  /\b(taught\s+(slowly|clearly|properly|step\s+by\s+step))\b/i, // "must be taught slowly" = issue
+
+  // ── 6. CLARITY / UNDERSTANDING ISSUES ──
+  /\b(not\s+(clear|easy\s+to\s+understand|understandable|helpful|satisfactory|effective|interactive|engaging|organized|available))\b/i,
+  /\b(difficult\s+to\s+(understand|follow|grasp|comprehend|remember|read))\b/i,
+  /\b(hard\s+to\s+(understand|follow|grasp|comprehend|read))\b/i,
+  /\b(can'?t\s+(understand|follow|hear|grasp|comprehend|read|see))\b/i,
+  /\b(unable\s+to\s+(understand|follow|grasp|comprehend))\b/i,
+  /\b(didn'?t\s+(understand|cover|explain|teach|complete|finish|give|provide))\b/i,
+  /\b(doesn'?t\s+(explain|teach|help|provide|give|come|attend|answer|listen|respond|make\s+it\s+clear))\b/i,
+  /\b(concepts?\s+(are|is)\s+(not\s+)?(clear|easy|understandable|well\s+explained))\b/i,
+  /\b(explain\s+(from\s+)?(the\s+)?(basics?|scratch|beginning|fundamentals?)\b)/i,
+  /\b(explained\s+(in\s+a\s+)?(more\s+)?(unique|engaging|better|interactive|different|creative)\s+way)\b/i,
+  /\b(easier\s+to\s+(understand|follow|grasp|remember|study))\b/i,
+  /\b(make\s+(the\s+)?(concepts?|topics?|subject|class|lecture)\s+(easier|clearer|more\s+(interesting|engaging|interactive|effective)))\b/i,
+
+  // ── 7. BAD QUALITY DESCRIPTORS ──
+  /\b(poor|bad|worst|terrible|horrible|useless|waste|boring|dull|monotonous|pathetic|average|below\s+average)\s+(teaching|explanation|class|lecture|method|faculty|teacher|performance|style|approach|lab|session|notes?|material)\b/i,
+  /\b(very\s+(poor|bad|boring|dull|slow|fast|unclear|rough|rude|strict|harsh|average))\b/i,
+  /\b(not\s+(good|satisf|effective|helpful|engaging|interactive|organized|punctual|available)\w*)\b/i,
+  /\b(overall\s+(bad|poor|average|below\s+average|not\s+good|unsatisf\w*))\b/i,
+  /\b(just\s+(copy\s+paste|copying|mugging)\b)/i,
+  /\b(learn\s+nothing|nothing\s+(new|learned|learnt))\b/i,
+  /\b(students?\s+(just\s+)?(copy|paste|copy[\s-]paste))\b/i,
+
+  // ── 8. AVAILABILITY / PUNCTUALITY ISSUES ──
+  /\b(absent|irregular|not\s+punctual|always\s+late|often\s+absent|frequently\s+absent)\b/i,
+  /\b(never\s+(available|present|comes?|helps?|explains?|answers?|attends?))\b/i,
+  /\b(rarely\s+(available|present|comes?|helps?|explains?|attends?))\b/i,
+  /\b(hardly\s+(available|present|comes?|explains?|helps?|attends?))\b/i,
+
+  // ── 9. BEHAVIORAL / FAIRNESS ISSUES ──
+  /\b(rude|arrogant|biased|unfair|partial|harsh|disrespectful|condescending|strict\s+with)\b/i,
+  /\b(very\s+partial|very\s+biased|always\s+partial)\b/i,
+  /\b(pls?\s+(don'?t\s+assign|change|remove|replace)\s+(her|him|this|the)\s+(faculty|teacher|ma'?am|sir))\b/i,
+  /\b(change\s+(the\s+)?(faculty|teacher|ma'?am|sir))\b/i,
   /\b(ignores?\s+(students?|questions?|doubts?))\b/i,
 
-  // Syllabus/coverage issues
+  // ── 10. SYLLABUS / COVERAGE ISSUES ──
+  /\b(syllabus\s+(not\s+)?(complete[d]?|covered|finished|done|pending|incomplete))\b/i,
+  /\b(topics?\s+(not\s+)?(covered|taught|explained|completed|finished|skipped|left\s+out))\b/i,
   /\b(didn'?t\s+(complete|finish|cover)\s+(the\s+)?(syllabus|course|topics?|curriculum))\b/i,
-  /\b(syllabus\s+(not\s+completed?|incomplete|not\s+covered|pending))\b/i,
-  /\b(topics?\s+(not\s+covered|skipped|incomplete|left\s+out|not\s+taught))\b/i,
+  /\b(complete\s+(the\s+)?(syllabus|course|topics?|curriculum))\b/i,
 
-  // Notes/materials issues
-  /\b(no\s+(notes?|material|resources?|slides?|study\s+material))\b/i,
-  /\b(doesn'?t\s+(provide|share|give)\s+(notes?|material|slides?|resources?))\b/i,
-  /\b(need[s]?\s+(notes?|study\s+material|slides?|resources?))\b/i,
+  // ── 11. LAB / PRACTICAL ISSUES ──
+  /\b(lab\s+(is|are|sessions?\s+(are|is))\s+(not\s+)?(interactive|engaging|helpful|effective|organized|well[\s-]explained|average|boring))\b/i,
+  /\b(no\s+(discussion|explanation|guidance|help)\s+(on|during|in|for)\s+(lab|practical|problem|solution|experiment))\b/i,
+  /\b(lab\s+(not\s+)?(interactive|engaging|helpful|well[\s-]conducted|properly\s+explained))\b/i,
+  /\b(more\s+(hands[\s-]on|lab|practical)\s+(practice|time|sessions?|work|exercises?))\b/i,
+  /\b(network\s+issue|upload\s+issue|technical\s+issue)\s+(in\s+)?(lab|class|assignment)?\b/i,
 
-  // Hinglish negative (specific phrases)
-  /\b(samajh\s+(nahi|nahin)\s+(aaya|aati|aata)|samajh\s+nahi\s+aaya)\b/i,
-  /\b(bahut\s+(fast|slow|mushkil|bura|bori|boring)|bahut\s+tez\s+padhate)\b/i,
-  /\b(improve\s+karo|theek\s+nahi|accha\s+nahi|bilkul\s+nahi\s+samjha)\b/i,
+  // ── 12. HINGLISH NEGATIVE ──
+  /\b(samajh\s+(nahi|nahin|nhi)\s*(aaya|aati|aata|aa|raha)?)\b/i,
+  /\b(samajh\s+(mein|me)\s+(nahi|nahin|nhi)\s*(aaya|aati|aata)?)\b/i,
+  /\b(kuch\s+(bhi\s+)?(samajh\s+(nahi|nhi)|pata\s+nahi))\b/i,
+  /\b(bahut\s+(fast|slow|tez|dhire|mushkil|bura|bori|boring|problem|pareshani))\b/i,
+  /\b(bahut\s+tez\s+(padhate|bolte|chalate|sikhate))\b/i,
+  /\b(improve\s+karo|sudhar\s+lo|theek\s+karo|better\s+karo)\b/i,
+  /\b(theek\s+(se\s+)?(nahi|nahin|nhi)\s*(padhate|sikhate|bolte|samjhate)?)\b/i,
+  /\b(accha\s+(nahi|nahin|nhi)\s*(padhate|sikhate|lagta)?)\b/i,
+  /\b(zyada\s+(accha|helpful|clear)\s+nahi)\b/i,
+  /\b(numerical\s+(part\s+)?(aur|or)\s+(acche\s+se|properly|clearly)\s+(krayo|karo|explain))\b/i,
+  /\b(hame\s+(hi\s+)?(samajh\s+(nahi|nhi)|pata\s+nahi))\b/i,
   /\b(padhana\s+(theek\s+nahi|accha\s+nahi|bahut\s+fast|bahut\s+slow))\b/i,
 
-  // Explicit dissatisfaction
-  /\b(not\s+satisfied|unsatisfied|dissatisfied|unhappy\s+with)\b/i,
-  /\b(could\s+be\s+better|room\s+for\s+improvement|much\s+to\s+improve)\b/i,
-  /\b(below\s+(average|expectation|standard)|below\s+par)\b/i,
+  // ── 13. EXPLICIT DISSATISFACTION ──
+  /\b(not\s+satisfied|unsatisfied|dissatisfied)\b/i,
+  /\b(below\s+(average|expectation|standard|par))\b/i,
+  /\b(not\s+at\s+all\s+(helpful|good|clear|effective|satisfied))\b/i,
 ];
 
-const SKIP_PATTERNS = [
-  /^(no|none|na|nahi|nil|n\.?a\.?|\.{3,}|-{3,}|_{3,})$/i,
-  /^.{1,3}$/
+// ── PURE APPRECIATION PATTERNS ────────────────────────────────────────────────
+// Only fire if NO attention signal found
+
+const APPRECIATION_PATTERNS = [
+  // Superlatives
+  /\b(excellent|outstanding|amazing|wonderful|fantastic|superb|brilliant|exceptional|extraordinary|tremendous|marvelous|splendid)\b/i,
+
+  // Love / enjoy / appreciate
+  /\b(love|loved|enjoy|enjoyed|appreciate|appreciated|grateful|thankful|thank\s+you|thanks\s+for)\b/i,
+
+  // Best teacher
+  /\bbest\s+(teacher|faculty|professor|sir|ma'?am|lecturer|mentor|in\s+(the\s+)?(department|college|class))\b/i,
+
+  // Very / extremely / highly positive
+  /\bvery\s+(good|helpful|clear|patient|knowledgeable|experienced|dedicated|supportive|effective|interactive|engaging|understanding|cooperative|informative|organized)\b/i,
+  /\bextremely\s+(good|helpful|supportive|knowledgeable|clear|effective|patient|dedicated)\b/i,
+  /\bhighly\s+(recommend|knowledgeable|effective|skilled|experienced|helpful|dedicated)\b/i,
+
+  // Well explained (strong qualifier)
+  /\bvery\s+well\s+(explained|taught|organized|structured|presented|communicated|covered)\b/i,
+  /\bextremely\s+well\s+(explained|taught|presented)\b/i,
+  /\bperfectly\s+(explained|taught|clear|understood)\b/i,
+  /\bwell\s+(explained|taught|covered|organized|structured|presented|communicated)\b/i,
+
+  // Great/good teacher (direct compliment)
+  /\b(great|good|nice|wonderful)\s+(teacher|teaching|faculty|professor|sir|ma'?am|mentor|lecturer)\b/i,
+
+  // Positive outcomes
+  /\b(understood|understand)\s+(everything|all|concepts|well|clearly|easily|perfectly)\b/i,
+  /\b(learned|learnt)\s+(a\s+lot|so\s+much|very\s+much|greatly|everything)\b/i,
+
+  // Clear explanation
+  /\b(explains?\s+(clearly|well|perfectly|easily|nicely|properly|very\s+well|very\s+clearly))\b/i,
+  /\b(clear(ly)?\s+(explains?|teaches?|covers?|communicates?))\b/i,
+  /\b(concepts?\s+(are|is|were)\s+(clear|well\s+explained|explained\s+well|easy\s+to\s+understand|very\s+clear))\b/i,
+
+  // Satisfaction
+  /\b(very\s+)?(satisfied|satisfying|satisfactory)\b/i,
+  /\b(happy\s+with|impressed\s+(by|with)|pleased\s+with)\b/i,
+
+  // Supportive / helpful (strong)
+  /\b(very\s+)?(supportive|helpful|cooperative|understanding|patient|dedicated|interactive|engaging|inspiring|motivating)\s+(teacher|faculty|sir|ma'?am|professor|mentor)?\b/i,
+  /\b(clears?\s+(all\s+)?(doubts?|queries|questions)\s*(well|properly|patiently|clearly|easily)?\b)/i,
+  /\b(always\s+(helpful|available|supportive|cooperative|prepared|ready\s+to\s+help))\b/i,
+
+  // Hinglish strong positive
+  /\b(bahut\s+(accha|achha|badhiya|badia)\s*(padhate|sikhate|hai|hain)?)\b/i,
+  /\b(zabardast|kamaal|behtareen|shandar|mast\s+padhate)\b/i,
+  /\b(bahut\s+badhiya\s+(teacher|faculty|sir|ma'?am)?)\b/i,
+
+  // Keep it up / well done
+  /\b(keep\s+(it\s+up|up\s+the\s+good\s+work)|well\s+done|good\s+job|great\s+job|excellent\s+work)\b/i,
 ];
 
-const NEUTRAL_SKIP_PATTERNS = [
-  /^(ok|okay|fine|average|normal|moderate|alright|decent|good)$/i,
+// ── OVERRIDE: MIXED COMMENT SIGNALS ──────────────────────────────────────────
+// These phrases definitively signal a mixed comment (positive + issue)
+// → ALWAYS goes to ATTENTION even if positive patterns found
+
+const MIXED_SIGNAL_PATTERNS = [
+  /\b(good\s+but|nice\s+but|great\s+but|best\s+but|excellent\s+but)\b/i,
+  /\b(however,?\s+(some|the|more|it|this|there))\b/i,
+  /\b(but\s+(some|the|more|it|this|there|please|sir|maam?|could|should|needs?|the\s+notes?))\b/i,
+  /\b(although|even\s+though|despite\s+(this|that|being))\b/i,
+  /\b(overall\s+(good|great|nice|fine)\s*(,|but|however|though|although|except))\b/i,
+  /\b(scope\s+for|room\s+for)\s+improvement\b/i,
+  /\b(some\s+(topics?|concepts?|experiments?|parts?)\s+could\s+be)\b/i,
+  /\b(could\s+(use|do\s+with)\s+(more|some|better|a\s+bit))\b/i,
 ];
 
-const CATEGORY_PATTERNS = {
-  Teaching: /\b(teach|explain|lecture|class|concept|syllabus|cover|topic)\b/i,
-  Communication: /\b(communicate|talk|speak|language|speed|pace|fast|slow|clear)\b/i,
-  Availability: /\b(available|accessible|office|hours|present|absent|punctual|regular)\b/i,
-  Materials: /\b(notes?|slides?|material|book|resource|pdf|study\s+material)\b/i,
-  Assessment: /\b(exam|test|quiz|grade|mark|assignment|project)\b/i,
-  General: /.*/
-};
+// ── GARBAGE DETECTION — random character strings ─────────────────────────────
+function isGarbage(text) {
+  const words = text.trim().split(/\s+/);
+  // If all words are < 2 chars or look like keyboard mashing
+  const realWords = words.filter(w => w.length >= 3 && /[aeiou]/i.test(w));
+  if (words.length <= 3 && realWords.length === 0) return true;
+  // High ratio of consonants with no vowels = keyboard mash
+  const noVowelWords = words.filter(w => w.length > 3 && !/[aeiou]/i.test(w));
+  if (noVowelWords.length >= words.length * 0.7) return true;
+  return false;
+}
 
 function deduplicateComments(comments) {
   const seen = new Set();
-  const unique = [];
-  for (const comment of comments) {
-    const key = String(comment || '').toLowerCase().trim();
-    if (key && !seen.has(key)) {
-      seen.add(key);
-      unique.push(comment);
-    }
-  }
-  return unique;
+  return comments.filter(c => {
+    const key = String(c || '').toLowerCase().replace(/\s+/g, ' ').trim();
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function duplicateKey(text) {
+  return String(text || '').toLowerCase()
+    .replace(/[""''"'`]/g, '')
+    .replace(/[.,;:!?()[\]{}]/g, '')
+    .replace(/\s+/g, ' ').trim();
 }
 
 async function getSentimentPipeline() {
-  // DISABLED: HuggingFace models crash on Render free tier
-  // Always use rule-based classification instead
-  console.log('[AI] Using rule-based classification (HuggingFace disabled to prevent crashes)');
-  return null;
+  return null; // HuggingFace disabled on Render free tier
 }
 
-// Patterns and classification logic
+// ── MAIN CLASSIFIER ───────────────────────────────────────────────────────────
 async function classifyComments(rawComments) {
   const result = {
     appreciation: [],
     commentsNeedingAttention: [],
     commentCategories: {
-      Teaching: [],
-      Communication: [],
-      Availability: [],
-      Materials: [],
-      Assessment: [],
-      General: []
+      Teaching: [], Communication: [], Availability: [],
+      Materials: [], Assessment: [], General: []
     },
     classifiedComments: [],
     statistics: {
-      totalReceived: 0,
-      appreciation: 0,
-      attention: 0,
-      neutral: 0,
-      skipped: 0,
-      aiClassified: 0
+      totalReceived: 0, appreciation: 0, attention: 0,
+      neutral: 0, skipped: 0, aiClassified: 0
     }
   };
 
-
-  // ==========================================================
-  // VALIDATE INPUT
-  // ==========================================================
-
-  if (
-    !Array.isArray(rawComments)
-  ) {
-
-    console.warn(
-      '[AI] rawComments is not an array'
-    );
-
+  if (!Array.isArray(rawComments)) {
+    console.warn('[AI] rawComments is not an array');
     return result;
-
   }
 
+  result.statistics.totalReceived = rawComments.length;
 
-  result.statistics.totalReceived =
-    rawComments.length;
+  const CATEGORY_PATTERNS = {
+    Teaching:      /\b(teach|explain|lecture|class|concept|syllabus|topic|course)\b/i,
+    Communication: /\b(communicate|speak|language|speed|pace|fast|slow|clear|voice)\b/i,
+    Availability:  /\b(available|accessible|present|absent|punctual|regular|office)\b/i,
+    Materials:     /\b(notes?|slides?|material|book|resource|pdf|ppt|study)\b/i,
+    Assessment:    /\b(exam|test|quiz|grade|mark|assignment|project|lab)\b/i,
+    General:       /.*/
+  };
 
-
-  // ==========================================================
-  // NORMALIZE TEXT
-  // ==========================================================
-
-  function normalizeComment(text) {
-
-    return String(text || '')
-      .replace(/\u00A0/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-
-  }
-
-
-  // ==========================================================
-  // DUPLICATE KEY
-  // ==========================================================
-
-  function duplicateKey(text) {
-
-    return normalizeComment(text)
-      .toLowerCase()
-      .replace(/[“”‘’"'`]/g, '')
-      .replace(/[.,;:!?()[\]{}]/g, '')
-      .replace(/\s+/g, ' ')
-      .trim();
-
-  }
-
-
-  // ==========================================================
-  // CATEGORY
-  // ==========================================================
-
-  function addToCategory(
-    text
-  ) {
-
-    let foundCategory = false;
-
-
-    for (
-      const [category, regex]
-      of Object.entries(CATEGORY_PATTERNS)
-    ) {
-
-      if (
-        regex.test(text)
-      ) {
-
-        if (
-          !result.commentCategories[category]
-        ) {
-
-          result.commentCategories[category] = [];
-
+  function addToCategory(text) {
+    let added = false;
+    for (const [cat, rx] of Object.entries(CATEGORY_PATTERNS)) {
+      if (cat === 'General') continue;
+      if (rx.test(text)) {
+        if (!result.commentCategories[cat].some(e => duplicateKey(e) === duplicateKey(text))) {
+          result.commentCategories[cat].push(text);
         }
-
-
-        if (
-          !result.commentCategories[category]
-            .some(
-              existing =>
-                duplicateKey(existing) ===
-                duplicateKey(text)
-            )
-        ) {
-
-          result.commentCategories[category]
-            .push(text);
-
-        }
-
-
-        foundCategory = true;
-
+        added = true;
       }
-
     }
-
-
-    if (!foundCategory) {
-
-      if (
-        !result.commentCategories.General
-          .some(
-            existing =>
-              duplicateKey(existing) ===
-              duplicateKey(text)
-          )
-      ) {
-
-        result.commentCategories.General
-          .push(text);
-
+    if (!added) {
+      if (!result.commentCategories.General.some(e => duplicateKey(e) === duplicateKey(text))) {
+        result.commentCategories.General.push(text);
       }
-
     }
-
   }
 
-
-  // ==========================================================
-  // ADD ATTENTION COMMENT
-  // ==========================================================
-
-  function addAttention(
-    text
-  ) {
-
-    if (
-      !result.commentsNeedingAttention
-        .some(
-          existing =>
-            duplicateKey(existing) ===
-            duplicateKey(text)
-        )
-    ) {
-
-      result.commentsNeedingAttention
-        .push(text);
-
+  function addAttention(text) {
+    if (!result.commentsNeedingAttention.some(e => duplicateKey(e) === duplicateKey(text))) {
+      result.commentsNeedingAttention.push(text);
     }
-
-
     addToCategory(text);
-
   }
 
-
-  // ==========================================================
-  // ADD APPRECIATION COMMENT
-  // ==========================================================
-
-  function addAppreciation(
-    text
-  ) {
-
-    if (
-      !result.appreciation
-        .some(
-          existing =>
-            duplicateKey(existing) ===
-            duplicateKey(text)
-        )
-    ) {
-
-      result.appreciation
-        .push(text);
-
+  function addAppreciation(text) {
+    if (!result.appreciation.some(e => duplicateKey(e) === duplicateKey(text))) {
+      result.appreciation.push(text);
     }
-
   }
 
-
-  // ==========================================================
-  // GENERIC NEGATIVE / ACTIONABLE CHECK (extra safety net)
-  // ==========================================================
-
-  function hasGenericNegative(text) {
-    const negativeIndicators = [
-      // Specific negation + quality word
-      /\bnot\s+(good|clear|helpful|available|punctual|organized|effective|understandable|satisfactory)\b/i,
-      /\bdoesn'?t\s+(explain|teach|provide|help|come|attend|listen|respond|answer)\b/i,
-      /\bdidn'?t\s+(understand|cover|explain|teach|give|provide|complete|finish)\b/i,
-      /\bcan'?t\s+(understand|follow|hear|grasp|comprehend)\b/i,
-      /\b(never|hardly|rarely|barely)\s+(available|present|comes?|helps?|explains?|answers?)\b/i,
-      // Specific speed complaints
-      /\btoo\s+(fast|slow|quick|rushed)\b/i,
-      /\bspeaks?\s+very\s+(fast|slow|quickly|slowly)\b/i,
-      // Explicit dissatisfaction (not standalone loose words)
-      /\b(not\s+satisfied|dissatisfied|unsatisfied)\b/i,
-      /\b(very\s+poor|very\s+bad|very\s+boring|very\s+dull|very\s+rude|very\s+harsh)\b/i,
-      /\b(absent|irregular|late\s+to\s+class|not\s+punctual)\b/i,
-    ];
-    return negativeIndicators.some(pattern => pattern.test(text));
-  }
-
-
-  // ==========================================================
-  // PROCESS EVERY ORIGINAL COMMENT
-  // ==========================================================
-
-  for (
-    const originalComment
-    of rawComments
-  ) {
-
-    // --------------------------------------------------------
-    // Invalid input
-    // --------------------------------------------------------
-
-    if (
-      !originalComment ||
-      typeof originalComment !== 'string'
-    ) {
-
+  for (const originalComment of rawComments) {
+    if (!originalComment || typeof originalComment !== 'string') {
       result.statistics.skipped++;
-
       continue;
-
     }
 
+    const text = String(originalComment).replace(/\u00A0/g, ' ').replace(/\s+/g, ' ').trim();
+    if (!text) { result.statistics.skipped++; continue; }
 
-    // --------------------------------------------------------
-    // VERY IMPORTANT:
-    //
-    // Do NOT do this:
-    //
-    // originalComment.split(SPLIT_REGEX)
-    //
-    // The complete student comment must remain intact.
-    // --------------------------------------------------------
-
-    const text =
-      normalizeComment(
-        originalComment
-      );
-
-
-    if (!text) {
-
+    // ── STEP 1: Skip garbage / meaningless ──
+    if (SKIP_PATTERNS.some(p => p.test(text)) || isGarbage(text)) {
       result.statistics.skipped++;
-
+      result.classifiedComments.push({ text, classification: 'skipped', needsAttention: false, reason: 'garbage-or-empty' });
       continue;
-
     }
 
-
-    // ========================================================
-    // SKIP EMPTY / INVALID
-    // ========================================================
-
-    if (
-      SKIP_PATTERNS.some(
-        pattern =>
-          pattern.test(text)
-      )
-    ) {
-
+    // ── STEP 2: Skip pure neutral fillers ──
+    if (NEUTRAL_FILLER_PATTERNS.some(p => p.test(text.toLowerCase()))) {
       result.statistics.skipped++;
-
-
-      result.classifiedComments.push({
-
-        text,
-
-        classification:
-          'skipped',
-
-        needsAttention:
-          false,
-
-        reason:
-          'empty-or-filler'
-
-      });
-
-
+      result.classifiedComments.push({ text, classification: 'neutral', needsAttention: false, reason: 'neutral-filler' });
       continue;
-
     }
 
+    const lower = text.toLowerCase();
 
-    // ========================================================
-    // SKIP NEUTRAL FILLER
-    // ========================================================
+    // ── STEP 3: Check for MIXED SIGNALS first (positive+issue) ──
+    const hasMixedSignal = MIXED_SIGNAL_PATTERNS.some(p => p.test(lower));
 
-    if (
-      NEUTRAL_SKIP_PATTERNS.some(
-        pattern =>
-          pattern.test(
-            text.toLowerCase()
-          )
-      )
-    ) {
+    // ── STEP 4: Check for ATTENTION patterns ──
+    const hasAttention = ATTENTION_PATTERNS.some(p => p.test(lower));
 
-      result.statistics.skipped++;
+    // ── STEP 5: Check for APPRECIATION patterns ──
+    const hasAppreciation = APPRECIATION_PATTERNS.some(p => p.test(lower));
 
+    // ── CLASSIFICATION DECISION TREE ──
 
-      result.classifiedComments.push({
-
-        text,
-
-        classification:
-          'neutral',
-
-        needsAttention:
-          false,
-
-        reason:
-          'neutral-filler'
-
-      });
-
-
-      continue;
-
-    }
-
-
-    const lower =
-      text.toLowerCase();
-
-
-    // ========================================================
-    // DETECT POSITIVE
-    // ========================================================
-
-    const hasPositive =
-      POSITIVE_PATTERNS.some(
-        pattern =>
-          pattern.test(lower)
-      );
-
-
-    // ========================================================
-    // DETECT ACTIONABLE NEGATIVE
-    // ========================================================
-
-    const hasNegative =
-      NEGATIVE_PATTERNS.some(
-        pattern =>
-          pattern.test(lower)
-      );
-    
-    const hasGenericNeg = hasGenericNegative(text);
-
-
-    // ========================================================
-    // RULE #1
-    //
-    // NEGATIVE ALWAYS HAS PRIORITY
-    //
-    // This solves:
-    //
-    // "Faculty teaches very well but does not provide
-    // enough practical examples."
-    //
-    // Positive = YES
-    // Negative = YES
-    // Final = NEED ATTENTION
-    // 
-    // BUT: If comment is purely positive (multiple positive words,
-    // no strong negative), don't mis-classify
-    // ========================================================
-
-    if (
-      hasNegative || hasGenericNeg
-    ) {
-
+    // ATTENTION wins always
+    if (hasAttention || hasMixedSignal) {
       addAttention(text);
-
-
       result.statistics.attention++;
-
-
       result.classifiedComments.push({
-
-        text,
-
-        classification:
-          'attention',
-
-        needsAttention:
-          true,
-
-        mixedSentiment:
-          hasPositive,
-
-        reason:
-          hasPositive
-            ? 'mixed-with-criticism'
-            : 'needs-improvement'
-
+        text, classification: 'attention', needsAttention: true,
+        mixedSentiment: hasAppreciation,
+        reason: hasMixedSignal ? 'mixed-positive-and-issue'
+              : hasAppreciation ? 'improvement-request-with-praise'
+              : 'needs-improvement'
       });
-
-
       continue;
-
     }
 
-
-    // ========================================================
-    // RULE #2: PURE POSITIVE ONLY
-    //
-    // Only appreciation if NO negative words detected
-    // ========================================================
-
-    if (
-      hasPositive
-    ) {
-
+    // Pure appreciation
+    if (hasAppreciation) {
       addAppreciation(text);
-
-
       result.statistics.appreciation++;
-
-
       result.classifiedComments.push({
-
-        text,
-
-        classification:
-          'appreciation',
-
-        needsAttention:
-          false,
-
-        mixedSentiment:
-          false,
-
-        reason:
-          'purely-positive'
-
+        text, classification: 'appreciation', needsAttention: false,
+        mixedSentiment: false, reason: 'purely-positive'
       });
-
-
       continue;
-
     }
 
-
-    // ========================================================
-    // RULE #3
-    //
-    // LONG UNKNOWN COMMENT
-    //
-    // Let HuggingFace help, but NEVER let it override an
-    // actionable negative already detected above.
-    // ========================================================
-
-    if (
-      text.split(/\s+/).length > 5
-    ) {
-
-      try {
-
-        const model =
-          await getSentimentPipeline();
-
-
-        if (model) {
-
-          const aiResult =
-            await model(text);
-
-
-          const label =
-            String(
-              aiResult?.[0]?.label || ''
-            ).toUpperCase();
-
-
-          const score =
-            Number(
-              aiResult?.[0]?.score || 0
-            );
-
-
-          // --------------------------------------------------
-          // AI NEGATIVE
-          // --------------------------------------------------
-
-          if (
-            label === 'NEGATIVE' &&
-            score >= 0.70
-          ) {
-
-            addAttention(text);
-
-
-            result.statistics.attention++;
-
-            result.statistics.aiClassified++;
-
-
-            result.classifiedComments.push({
-
-              text,
-
-              classification:
-                'attention',
-
-              needsAttention:
-                true,
-
-              confidence:
-                score,
-
-              reason:
-                'huggingface-negative'
-
-            });
-
-
-            continue;
-
-          }
-
-
-          // --------------------------------------------------
-          // AI POSITIVE
-          // --------------------------------------------------
-
-          if (
-            label === 'POSITIVE' &&
-            score >= 0.70
-          ) {
-
-            addAppreciation(text);
-
-
-            result.statistics.appreciation++;
-
-            result.statistics.aiClassified++;
-
-
-            result.classifiedComments.push({
-
-              text,
-
-              classification:
-                'appreciation',
-
-              needsAttention:
-                false,
-
-              confidence:
-                score,
-
-              reason:
-                'huggingface-positive'
-
-            });
-
-
-            continue;
-
-          }
-
-        }
-
-      } catch (error) {
-
-        console.warn(
-          '[AI] HuggingFace fallback failed:',
-          error.message
-        );
-
-      }
-
-    }
-
-
-    // ========================================================
-    // RULE #4
-    //
-    // UNKNOWN COMMENT
-    //
-    // IMPORTANT:
-    // Don't throw it away.
-    //
-    // Keep it in classifiedComments as neutral so you can
-    // inspect it later.
-    // ========================================================
-
+    // Unknown but long — keep for review
     result.statistics.neutral++;
-
-
     result.classifiedComments.push({
-
-      text,
-
-      classification:
-        'neutral',
-
-      needsAttention:
-        false,
-
-      reason:
-        'uncertain'
-
+      text, classification: 'neutral', needsAttention: false, reason: 'uncertain'
     });
-
   }
 
+  // ── FINAL DEDUPLICATION ──
+  result.appreciation             = deduplicateComments(result.appreciation);
+  result.commentsNeedingAttention = deduplicateComments(result.commentsNeedingAttention);
 
-  // ==========================================================
-  // FINAL DEDUPLICATION
-  // ==========================================================
+  // ATTENTION WINS if same comment ends up in both
+  const attentionKeys = new Set(result.commentsNeedingAttention.map(duplicateKey));
+  result.appreciation = result.appreciation.filter(c => !attentionKeys.has(duplicateKey(c)));
 
-  result.appreciation =
-    deduplicateComments(
-      result.appreciation
-    );
+  result.statistics.appreciation = result.appreciation.length;
+  result.statistics.attention    = result.commentsNeedingAttention.length;
 
-
-  result.commentsNeedingAttention =
-    deduplicateComments(
-      result.commentsNeedingAttention
-    );
-
-
-  // ==========================================================
-  // IMPORTANT:
-  //
-  // If the same comment somehow appears in both lists,
-  // NEED ATTENTION WINS.
-  // ==========================================================
-
-  const attentionKeys =
-    new Set(
-      result.commentsNeedingAttention
-        .map(
-          comment =>
-            duplicateKey(comment)
-        )
-    );
-
-
-  result.appreciation =
-    result.appreciation.filter(
-      comment =>
-        !attentionKeys.has(
-          duplicateKey(comment)
-        )
-    );
-
-
-  // ==========================================================
-  // FINAL COUNTS
-  // ==========================================================
-
-  result.statistics.appreciation =
-    result.appreciation.length;
-
-
-  result.statistics.attention =
-    result.commentsNeedingAttention.length;
-
-
-  // ==========================================================
-  // LOG
-  // ==========================================================
-
-  console.log(
-    '[AI] ========================================'
-  );
-
-  console.log(
-    '[AI] Comment analysis completed'
-  );
-
-  console.log(
-    `[AI] Received: ${rawComments.length}`
-  );
-
-  console.log(
-    `[AI] Appreciation: ${result.appreciation.length}`
-  );
-
-  console.log(
-    `[AI] Need Attention: ${result.commentsNeedingAttention.length}`
-  );
-
-  console.log(
-    `[AI] Neutral/uncertain: ${result.statistics.neutral}`
-  );
-
-  console.log(
-    `[AI] Skipped: ${result.statistics.skipped}`
-  );
-
-  console.log(
-    `[AI] AI classified: ${result.statistics.aiClassified}`
-  );
-
-  console.log(
-    '[AI] ========================================'
-  );
-
+  console.log('[AI] ========================================');
+  console.log('[AI] Comment analysis v3 completed');
+  console.log(`[AI] Received  : ${rawComments.length}`);
+  console.log(`[AI] Attention : ${result.commentsNeedingAttention.length}`);
+  console.log(`[AI] Appreciate: ${result.appreciation.length}`);
+  console.log(`[AI] Neutral   : ${result.statistics.neutral}`);
+  console.log(`[AI] Skipped   : ${result.statistics.skipped}`);
+  console.log('[AI] ========================================');
 
   return result;
 }
 
-
-// Export the main function
 module.exports = {
   classifyComments,
-  testGeminiConnection: async () => {
-    try {
-      await getSentimentPipeline();
-      return { ok: true, engine: 'HuggingFace Transformers' };
-    } catch (err) {
-      return { ok: false, error: err.message };
-    }
-  }
+  analyzeCommentsWithAI: classifyComments,
+  testGeminiConnection: async () => ({ ok: true, engine: 'Rule-Based v3 (College-Specific)' }),
 };
