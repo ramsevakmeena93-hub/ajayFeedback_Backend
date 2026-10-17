@@ -35,7 +35,7 @@ function isAllowedDomain(email) {
 // -----------------------------------------------------------------------------
 
 const DESIGNATED_ADMIN_EMAIL =
-  'admin@mits.ac.in'; // changed — 25tc1aj7 is now HOD of IP
+  'admin@mits.ac.in'; // changed — 25tc1aj7 is now Pro-VC
 
 const DESIGNATED_HOD_EMAIL =
   '25mc1sh132@mitsgwl.ac.in';
@@ -215,10 +215,10 @@ router.post('/register', async (req, res) => {
       safeDepartment = '';
     }
 
-    // Ajay Meena — HOD of Industrial Production
+    // Ajay Meena — Pro-VC
     if (cleanEmail === '25tc1aj7@mitsgwl.ac.in') {
-      safeRole = 'hod';
-      safeDepartment = 'Industrial Production';
+      safeRole = 'vc';
+      safeDepartment = '';
     }
 
     // Designated HOD.
@@ -414,27 +414,24 @@ router.post('/login', async (req, res) => {
     }
 
     // ---------------------------------------------------------
-    // Ajay Meena — HOD of Industrial Production
+    // Ajay Meena — Pro-VC
     // ---------------------------------------------------------
 
     if (cleanEmail === '25tc1aj7@mitsgwl.ac.in') {
       await User.findByIdAndUpdate(user._id, {
-        role:            'hod',
-        roles:           ['hod', 'faculty'],
-        activeWorkspace: 'hod',
-        department:      'Industrial Production',
+        role:            'vc',
+        roles:           ['vc'],
+        activeWorkspace: 'vc',
+        department:      '',
       });
 
       await UserRole.deleteMany({ userId: user._id });
-      await UserRole.create([
-        { userId: user._id, role: 'hod',     departmentScope: 'Industrial Production', active: true },
-        { userId: user._id, role: 'faculty', departmentScope: 'Industrial Production', active: true },
-      ]);
+      await UserRole.create({ userId: user._id, role: 'vc', departmentScope: '', active: true });
 
-      user.role            = 'hod';
-      user.roles           = ['hod', 'faculty'];
-      user.activeWorkspace = 'hod';
-      user.department      = 'Industrial Production';
+      user.role            = 'vc';
+      user.roles           = ['vc'];
+      user.activeWorkspace = 'vc';
+      user.department      = '';
     }
 
     // ---------------------------------------------------------
