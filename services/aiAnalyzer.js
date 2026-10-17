@@ -674,80 +674,51 @@ module.exports = {
   // "Action Taken by HOD" paragraph the HOD can use or edit.
   generateActionSuggestion: function(commentsNeedingAttention, facultyName) {
     const comments = (commentsNeedingAttention || []).filter(Boolean);
-    const name = facultyName || 'the faculty member';
 
-    // Default when no attention comments exist
+    // Default when no attention comments — short positive note
     if (comments.length === 0) {
-      return `Teaching performance of ${name} is satisfactory. Students have responded positively. Encouraged to continue maintaining current standards and keep growing in pedagogical innovation.`;
+      return 'Performance is satisfactory. Encouraged to maintain quality teaching and continue student engagement.';
     }
 
-    // Categorize each comment
-    const issues = {
-      pace:        [],
-      clarity:     [],
-      lab:         [],
-      notes:       [],
-      doubts:      [],
-      assessment:  [],
-      engagement:  [],
-      facilities:  [],
-      planning:    [],
-      support:     [],
-    };
-
+    // Detect which issue categories are present
     const RX = {
-      pace:       /\b(fast|slow|pace|speed|rushed|time|notes?\s+(not\s+)?complete|topics?\s+jaldi|syllabus.*(rushed|fast)|slides\s+change|lengthy\s+code)\b/i,
-      clarity:    /\b(unclear|confus|not\s+clear|explain|basics?|advanced|steps?\s+skip|concept|understand|samajh|slides?\s+read|terminology|connections?\s+between)\b/i,
-      lab:        /\b(lab|practical|code|copy.?paste|debug|hands.?on|experiment|program|run|implement)\b/i,
-      notes:      /\b(notes?|slides?|material|formula|definition|missing|incomplete|late|share|upload|pdf|diagrams?|errors?\s+in)\b/i,
-      doubts:     /\b(doubt|question|hesitat|ignored|unanswer|session|time\s+for\s+(doubt|question)|samajh\s+nahi|clear.*doubt)\b/i,
-      assessment: /\b(quiz|marks?|assessment|marking|criteria|answer\s+key|evaluation|transparent|syllabus.*quiz|test\s+time)\b/i,
-      engagement: /\b(interact|boring|monoton|engage|participat|discussion|real.world|examples?|voice|microphone|slides?\s+without)\b/i,
-      facilities: /\b(computer|internet|software|projector|equipment|system|network|lab\s+systems?|hardware)\b/i,
-      planning:   /\b(plan|schedul|syllabus.*complet|revision|prerequisit|objectives?|timetable|units?\s+left|practice\s+sessions?)\b/i,
-      support:    /\b(support|guidance|deadline|assignment.*instruct|disrespect|impatient|respond|feedback.*ignor|submission)\b/i,
+      pace:       /\b(fast|slow|pace|speed|rushed|jaldi|slides\s+change|lengthy\s+code|topics?\s+jaldi|notes?\s+complete\s+nahi)\b/i,
+      clarity:    /\b(unclear|confus|not\s+clear|explain|basics?|advanced|steps?\s+skip|concept|understand|samajh|slides?\s+read|terminology)\b/i,
+      lab:        /\b(lab|practical|code|copy.?paste|debug|hands.?on|program|run|implement)\b/i,
+      notes:      /\b(notes?|slides?|material|formula|definition|missing|incomplete|late|share|upload|pdf|diagrams?)\b/i,
+      doubts:     /\b(doubt|question|hesitat|ignored|unanswer|doubt\s+session|samajh\s+nahi|clear.*doubt)\b/i,
+      assessment: /\b(quiz|marks?|assessment|marking|criteria|answer\s+key|evaluation|transparent|test\s+time)\b/i,
+      engagement: /\b(interact|boring|monoton|engage|participat|discussion|real.world|examples?|voice|microphone)\b/i,
+      facilities: /\b(computer|internet|software|projector|equipment|system|network|hardware)\b/i,
+      planning:   /\b(plan|schedul|syllabus.*complet|revision|prerequisit|timetable|units?\s+left|practice\s+sessions?)\b/i,
+      support:    /\b(support|guidance|deadline|assignment.*instruct|disrespect|impatient|respond|feedback.*ignor)\b/i,
     };
 
+    const found = new Set();
     comments.forEach(c => {
       let matched = false;
       for (const [key, rx] of Object.entries(RX)) {
-        if (rx.test(c)) { issues[key].push(c); matched = true; }
+        if (rx.test(c)) { found.add(key); matched = true; }
       }
-      if (!matched) issues.clarity.push(c);
+      if (!matched) found.add('clarity');
     });
 
-    // Build action sentences per category
-    const actions = [];
+    // Short, direct action per detected issue
+    const actionMap = {
+      pace:       'Advised to slow down teaching pace and allow time for students to take notes.',
+      clarity:    'Directed to explain concepts step-by-step from basics before moving to advanced topics.',
+      lab:        'Instructed to ensure students write and run code themselves; demonstrate debugging in every lab.',
+      notes:      'Asked to upload complete notes, diagrams, and solved examples before each class.',
+      doubts:     'Assigned weekly doubt-clearing sessions; advised to pause and check understanding in class.',
+      assessment: 'Reminded to share assessment criteria in advance and discuss quiz answers with students.',
+      engagement: 'Suggested to use real-world examples, board work, and interactive Q&A to improve engagement.',
+      facilities: 'Lab infrastructure issues escalated to department; maintenance requested.',
+      planning:   'Reviewed teaching plan; advised to complete syllabus at least two weeks before assessments.',
+      support:    'Counselled to maintain a respectful environment and communicate assignment details clearly.',
+    };
 
-    if (issues.pace.length)
-      actions.push('Counselled the faculty to moderate teaching pace and ensure adequate time for note-taking and student comprehension.');
-    if (issues.clarity.length)
-      actions.push('Advised the faculty to begin each topic from foundational concepts, use step-by-step explanations, and verify student understanding before advancing.');
-    if (issues.lab.length)
-      actions.push('Directed the faculty to restructure lab sessions so students independently write and execute code rather than copying; debugging techniques must be demonstrated explicitly.');
-    if (issues.notes.length)
-      actions.push('Instructed the faculty to share complete, well-organized study material, unit-wise notes with diagrams, and solved examples well before examinations.');
-    if (issues.doubts.length)
-      actions.push('Assigned dedicated doubt-clearing sessions; faculty is advised to pause and check understanding during lectures and encourage student questions without hesitation.');
-    if (issues.assessment.length)
-      actions.push('Reminded the faculty to explain assessment criteria clearly in advance, discuss answer keys after quizzes, and ensure test coverage aligns with the announced syllabus.');
-    if (issues.engagement.length)
-      actions.push('Recommended the faculty to incorporate real-world examples, board work, interactive discussions, and varied teaching methods to improve classroom engagement.');
-    if (issues.facilities.length)
-      actions.push('Reported equipment and infrastructure issues to the department; steps initiated to ensure lab systems, software, and internet connectivity are maintained properly.');
-    if (issues.planning.length)
-      actions.push('Reviewed the course teaching plan with the faculty; advised completing syllabus well ahead of assessments and scheduling regular revision sessions.');
-    if (issues.support.length)
-      actions.push('Counselled the faculty on maintaining a respectful, approachable classroom environment; clear assignment instructions and timely feedback must be provided to students.');
-
-    if (actions.length === 0)
-      return `Feedback for ${name} has been reviewed. A discussion was held with the faculty regarding student concerns. The faculty has been advised to address the mentioned issues and continuously improve teaching quality.`;
-
-    const intro = `Following a review of student feedback for ${name}, the following actions have been taken:`;
-    const numbered = actions.map((a, i) => `${i + 1}. ${a}`).join('\n');
-    const closing = `The faculty has been informed of these observations and is expected to implement improvements in the upcoming sessions.`;
-
-    return `${intro}\n\n${numbered}\n\n${closing}`;
+    const actions = [...found].map((key, i) => `${i + 1}. ${actionMap[key]}`);
+    return actions.join('\n');
   },
 
   testGeminiConnection: async () => ({
