@@ -210,6 +210,220 @@ router.get('/all', authMiddleware, requireAnyRole('vc', 'provc', 'admin'), async
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Pro-VC: Advanced analytics aggregation endpoint
+// Returns fully aggregated data: faculty cards, need-attention breakdown,
+// department heatmap, executive summary — all from real DB records
+// ─────────────────────────────────────────────────────────────────────────────
+
+router.get('/analytics', authMiddleware, requireAnyRole('vc', 'provc', 'admin'), async (req, res) => {
+  try {
+    const submissions = await Submission.find()
+      .populate('hodId', 'name email department')
+      .populate({
+        path: 'reports',
+        model: 'FacultyReport',
+        select: 'facultyName subjectCode ffiScore appreciationCount attentionCount commentsNeedingAttention appreciation commentPercentages responseCount responsePercent semester programme academicYear branch section actionTaken hodRemarks',
+      })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // ── Issue category classifier (mirrors aiAnalyzer patterns) ──────────────
+    const ISSUE_RX = {
+      'Teaching Clarity':  /\b(unclear|confus|not\s+clear|explain|basics?|advanced|steps?\s+skip|concept|samajh|slides?\s+read|terminology|connections?\s+between)\b/i,
+      'Teaching Pace':     /\b(fast|slow|pace|speed|rushed|jaldi|slides\s+change|lengthy\s+code|too\s+(fast|slow)|quick\s+pace)\b/i,
+      'Lab & Practical':   /\b(lab|practical|code|copy.?paste|debug|hands.?on|program|run|implement|experiment)\b/i,
+      'Notes & Material':  /\b(notes?|slides?|material|formula|definition|missing|incomplete|late\s+share|upload|pdf|diagrams?|errors?\s+in\s+material)\b/i,
+      'Doubt Support':     /\b(doubt|question|hesitat|ignored|unanswer|doubt\s+session|samajh\s+nahi|clear.*doubt|follow.?up)\b/i,
+      'Assessment':        /\b(quiz|marks?|assessment|marking|criteria|answer\s+key|evaluation|transparent|test\s+time|syllabus.*quiz)\b/i,
+      'Engagement':        /\b(interact|boring|monoton|engage|participat|discussion|real.world|examples?|voice|microphone|not\s+interactive)\b/i,
+      'Facilities':        /\b(computer|internet|software|projector|equipment|system|network|hardware|lab\s+system)\b/i,
+      'Course Planning':   /\b(plan|schedul|syllabus.*complet|revision|prerequisit|timetable|units?\s+left|practice\s+session)\b/i,
+      'Student Support':   /\b(support|guidance|deadline|assignment.*instruct|disrespect|impatient|respond|feedback.*ignor|submission\s+instruct)\b/i,
+    };
+
+    function detectIssueCategories(comment) {
+      const found = [];
+      for (const [label, rx] of Object.entries(ISSUE_RX)) {
+        if (rx.test(comment)) found.push(label);
+      }
+      return found.length ? found : ['Teaching Clarity'];
+    }
+
+    // ── Aggregate all reports across all submissions ───────────────────────
+    const allReports = submissions.flatMap(sub =>
+      (sub.reports || []).map(r => ({ ...r, dept: sub.hodId?.department || sub.department || 'Unknown', hodName: sub.hodId?.name || '—', submissionStatus: sub.status }))
+    );
+
+    const totalFaculty    = new Set(allReports.map(r => r.facultyName)).size;
+    const totalResponses  = allReports.reduce((s, r) => s + (r.responseCount || 0), 0);
+    const allFFIs         = allReports.map(r => r.ffiScore).filter(Boolean);
+    const overallAvgFFI   = allFFIs.length ? parseFloat((allFFIs.reduce((s,v)=>s+v,0)/allFFIs.length).toFixed(2)) : 0;
+    const totalDepts      = new Set(allReports.map(r => r.dept)).size;
+    const totalAttention  = allReports.reduce((s, r) => s + (r.attentionCount || 0), 0);
+    const totalAppreciation = allReports.reduce((s, r) => s + (r.appreciationCount || 0), 0);
+    const reportsNeedingReview = allReports.filter(r => (r.attentionCount || 0) > 2 && (r.ffiScore || 0) < 3.5).length;
+
+    // ── Faculty intelligence cards ─────────────────────────────────────────
+    const facultyMap = {};
+    allReports.forEach(r => {
+      const key = r.facultyName || 'Unknown';
+      if (!facultyMap[key]) {
+        facultyMap[key] = {
+          name: key,
+          dept: r.dept,
+          reports: [],
+          ffis: [],
+          totalAttention: 0,
+          totalAppreciation: 0,
+          allAttentionComments: [],
+          issueCategories: {},
+          responseCount: 0,
+          subjects: new Set(),
+        };
+      }
+      const f = facultyMap[key];
+      f.reports.push(r);
+      if (r.ffiScore) f.ffis.push(r.ffiScore);
+      f.totalAttention   += r.attentionCount    || 0;
+      f.totalAppreciation += r.appreciationCount || 0;
+      f.responseCount    += r.responseCount     || 0;
+      if (r.subjectCode) f.subjects.add(r.subjectCode);
+      (r.commentsNeedingAttention || []).forEach(c => {
+        f.allAttentionComments.push(c);
+        detectIssueCategories(c).forEach(cat => {
+          f.issueCategories[cat] = (f.issueCategories[cat] || 0) + 1;
+        });
+      });
+    });
+
+    const facultyCards = Object.values(facultyMap).map(f => {
+      const avgFFI = f.ffis.length ? parseFloat((f.ffis.reduce((s,v)=>s+v,0)/f.ffis.length).toFixed(2)) : null;
+      const topIssues = Object.entries(f.issueCategories)
+        .sort((a,b)=>b[1]-a[1])
+        .slice(0,3)
+        .map(([cat, count]) => ({ cat, count }));
+      let status = 'good';
+      if (avgFFI !== null && avgFFI < 3.0) status = 'critical';
+      else if (avgFFI !== null && avgFFI < 3.5) status = 'monitor';
+      else if (f.totalAttention > 3) status = 'monitor';
+      return {
+        name: f.name,
+        dept: f.dept,
+        avgFFI,
+        totalReports: f.reports.length,
+        subjects: [...f.subjects],
+        totalAttention: f.totalAttention,
+        totalAppreciation: f.totalAppreciation,
+        responseCount: f.responseCount,
+        topIssues,
+        issueCategories: f.issueCategories,
+        topAttentionComments: f.allAttentionComments.slice(0, 5),
+        status,
+      };
+    }).sort((a,b) => (a.avgFFI||0) - (b.avgFFI||0)); // worst first
+
+    // ── Department heatmap ─────────────────────────────────────────────────
+    const deptMap = {};
+    allReports.forEach(r => {
+      const d = r.dept;
+      if (!deptMap[d]) deptMap[d] = { dept: d, reports: [], ffis: [], attention: 0, appreciation: 0, issueCategories: {}, faculty: new Set() };
+      deptMap[d].reports.push(r);
+      if (r.ffiScore) deptMap[d].ffis.push(r.ffiScore);
+      deptMap[d].attention   += r.attentionCount    || 0;
+      deptMap[d].appreciation += r.appreciationCount || 0;
+      if (r.facultyName) deptMap[d].faculty.add(r.facultyName);
+      (r.commentsNeedingAttention || []).forEach(c => {
+        detectIssueCategories(c).forEach(cat => {
+          deptMap[d].issueCategories[cat] = (deptMap[d].issueCategories[cat] || 0) + 1;
+        });
+      });
+    });
+
+    const deptHeatmap = Object.values(deptMap).map(d => {
+      const avg = d.ffis.length ? parseFloat((d.ffis.reduce((s,v)=>s+v,0)/d.ffis.length).toFixed(2)) : null;
+      const topIssue = Object.entries(d.issueCategories).sort((a,b)=>b[1]-a[1])[0];
+      return {
+        dept: d.dept,
+        avgFFI: avg,
+        totalReports: d.reports.length,
+        totalFaculty: d.faculty.size,
+        attention: d.attention,
+        appreciation: d.appreciation,
+        topIssue: topIssue ? topIssue[0] : null,
+        issueCategories: d.issueCategories,
+        status: avg === null ? 'unknown' : avg >= 4 ? 'excellent' : avg >= 3.5 ? 'good' : avg >= 3 ? 'monitor' : 'critical',
+      };
+    }).sort((a,b)=>(b.avgFFI||0)-(a.avgFFI||0));
+
+    // ── Need-attention issue breakdown (university-wide) ───────────────────
+    const universalIssues = {};
+    allReports.forEach(r => {
+      (r.commentsNeedingAttention || []).forEach(c => {
+        detectIssueCategories(c).forEach(cat => {
+          if (!universalIssues[cat]) universalIssues[cat] = { count: 0, faculties: new Set(), examples: [] };
+          universalIssues[cat].count++;
+          if (r.facultyName) universalIssues[cat].faculties.add(r.facultyName);
+          if (universalIssues[cat].examples.length < 3) universalIssues[cat].examples.push(c);
+        });
+      });
+    });
+
+    const issueBreakdown = Object.entries(universalIssues)
+      .sort((a,b)=>b[1].count-a[1].count)
+      .map(([cat, d]) => ({
+        category: cat,
+        count: d.count,
+        facultiesAffected: d.faculties.size,
+        examples: d.examples,
+      }));
+
+    // ── Executive summary generation ───────────────────────────────────────
+    const criticalFaculty = facultyCards.filter(f => f.status === 'critical');
+    const monitorFaculty  = facultyCards.filter(f => f.status === 'monitor');
+    const excellentFaculty = facultyCards.filter(f => f.avgFFI && f.avgFFI >= 4.0);
+    const topIssue        = issueBreakdown[0];
+    const pendingCount    = submissions.filter(s => ['submitted','conflict','escalated'].includes(s.status)).length;
+
+    const summaryPoints = [];
+    if (overallAvgFFI >= 4.0) summaryPoints.push(`Overall teaching quality is excellent with an average FFI of ${overallAvgFFI} across ${totalFaculty} faculty members.`);
+    else if (overallAvgFFI >= 3.5) summaryPoints.push(`Overall teaching quality is satisfactory with an average FFI of ${overallAvgFFI} across ${totalFaculty} faculty members.`);
+    else summaryPoints.push(`Teaching quality requires attention — average FFI is ${overallAvgFFI} across ${totalFaculty} faculty members.`);
+
+    if (criticalFaculty.length) summaryPoints.push(`${criticalFaculty.length} faculty member(s) are critical (FFI below 3.0) and require immediate HOD intervention: ${criticalFaculty.slice(0,3).map(f=>f.name).join(', ')}.`);
+    if (monitorFaculty.length)  summaryPoints.push(`${monitorFaculty.length} faculty member(s) are under monitoring (FFI 3.0–3.5 or high concern count).`);
+    if (excellentFaculty.length) summaryPoints.push(`${excellentFaculty.length} faculty member(s) are performing excellently (FFI ≥ 4.0) — ${excellentFaculty.slice(0,2).map(f=>f.name).join(', ')} leading the department.`);
+    if (topIssue) summaryPoints.push(`Most recurring student concern: "${topIssue.category}" — mentioned across ${topIssue.facultiesAffected} faculty member(s). HODs should prioritize addressing this.`);
+    if (pendingCount) summaryPoints.push(`${pendingCount} submission(s) are pending Pro-VC review. Timely approval ensures faculty receive feedback promptly.`);
+    if (totalResponses > 0) summaryPoints.push(`${totalResponses} student responses collected across ${allReports.length} reports from ${totalDepts} department(s).`);
+
+    res.json({
+      summary: {
+        totalFaculty,
+        totalReports: allReports.length,
+        totalResponses,
+        totalDepts,
+        overallAvgFFI,
+        totalAttention,
+        totalAppreciation,
+        reportsNeedingReview,
+        pendingSubmissions: pendingCount,
+        criticalCount: criticalFaculty.length,
+        monitorCount: monitorFaculty.length,
+        excellentCount: excellentFaculty.length,
+      },
+      executiveSummary: summaryPoints,
+      facultyCards,
+      deptHeatmap,
+      issueBreakdown,
+    });
+
+  } catch (err) {
+    console.error('[Analytics]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Pro-VC / alternate-approver: Update submission status
 // ─────────────────────────────────────────────────────────────────────────────
 
