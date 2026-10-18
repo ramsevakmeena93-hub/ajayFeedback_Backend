@@ -215,10 +215,10 @@ router.post('/register', async (req, res) => {
       safeDepartment = '';
     }
 
-    // Ajay Meena — Pro-VC
+    // Ajay Meena — HOD of Industrial Production
     if (cleanEmail === '25tc1aj7@mitsgwl.ac.in') {
-      safeRole = 'vc';
-      safeDepartment = '';
+      safeRole = 'hod';
+      safeDepartment = 'Industrial Production';
     }
 
     // Designated HOD.
@@ -419,19 +419,14 @@ router.post('/login', async (req, res) => {
 
     if (cleanEmail === '25tc1aj7@mitsgwl.ac.in') {
       await User.findByIdAndUpdate(user._id, {
-        role:            'vc',
-        roles:           ['vc'],
-        activeWorkspace: 'vc',
-        department:      '',
+        role: 'hod', roles: ['hod','faculty'], activeWorkspace: 'hod', department: 'Industrial Production',
       });
-
       await UserRole.deleteMany({ userId: user._id });
-      await UserRole.create({ userId: user._id, role: 'vc', departmentScope: '', active: true });
-
-      user.role            = 'vc';
-      user.roles           = ['vc'];
-      user.activeWorkspace = 'vc';
-      user.department      = '';
+      await UserRole.create([
+        { userId: user._id, role: 'hod',     departmentScope: 'Industrial Production', active: true },
+        { userId: user._id, role: 'faculty', departmentScope: 'Industrial Production', active: true },
+      ]);
+      user.role = 'hod'; user.roles = ['hod','faculty']; user.activeWorkspace = 'hod'; user.department = 'Industrial Production';
     }
 
     // ---------------------------------------------------------
