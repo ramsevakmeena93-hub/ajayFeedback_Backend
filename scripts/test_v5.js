@@ -192,10 +192,9 @@ async function run() {
 
   console.log('\n🔍 MISSED ATTENTION SAMPLES:');
   needsAttentionSamples.forEach(c => {
-    const inAtt = result.commentsNeedingAttention.some(r => r === c);
-    const inApp = result.appreciation.some(r => r === c);
+    const item = result.classifiedComments.find(x => x.text === c);
+    const inAtt = result.commentsNeedingAttention.some(r => r === c || (item?.split && r === item.split.attention));
     if (!inAtt) { console.log(`❌ MISSED: "${c.substring(0,90)}"`); attentionMissed++; }
-    if (inApp)  { console.log(`❌ WRONG BUCKET (appreciation): "${c.substring(0,90)}"`); attentionMissed++; }
   });
 
   console.log('\n🔍 APPRECIATION IN WRONG BUCKET:');

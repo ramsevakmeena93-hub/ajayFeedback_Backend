@@ -1,0 +1,1000 @@
+NA2-0001: Sir concepts basic se explain nahi karte, direct advanced topic shuru kar dete hain.
+NA2-0002: Problem reported: The teacher skips basic concepts and starts directly with advanced topics. Use relevant examples and show the reasoning behind each step.
+NA2-0003: This issue is affecting learning: The teacher skips basic concepts and starts directly with advanced topics. Check understanding before moving to the next concept.
+NA2-0004: Complaint: The teacher skips basic concepts and starts directly with advanced topics. Allocate time for questions and clarification.
+NA2-0005: Students are facing difficulty because the teacher skips basic concepts and starts directly with advanced topics. Provide complete, clear, unit-wise learning material.
+NA2-0006: This needs attention: The teacher skips basic concepts and starts directly with advanced topics. Include more hands-on practice and individual problem-solving.
+NA2-0007: The following problem remains unresolved: The teacher skips basic concepts and starts directly with advanced topics. Explain mistakes and give actionable feedback.
+NA2-0008: Learning is being affected. The teacher skips basic concepts and starts directly with advanced topics. Share instructions and study material before the relevant class.
+NA2-0009: Repeated concern: The teacher skips basic concepts and starts directly with advanced topics. Address the issue consistently instead of leaving it unresolved.
+NA2-0010: Correction required: The teacher skips basic concepts and starts directly with advanced topics. Review the teaching plan and make the necessary changes.
+NA2-0011: Problem reported: Explanations are unclear and leave students confused. Start from the fundamentals and explain the topic step by step.
+NA2-0012: This issue is affecting learning: Explanations are unclear and leave students confused. Use relevant examples and show the reasoning behind each step.
+NA2-0013: Complaint: Explanations are unclear and leave students confused. Check understanding before moving to the next concept.
+NA2-0014: Students are facing difficulty because explanations are unclear and leave students confused. Allocate time for questions and clarification.
+NA2-0015: This needs attention: Explanations are unclear and leave students confused. Provide complete, clear, unit-wise learning material.
+NA2-0016: The following problem remains unresolved: Explanations are unclear and leave students confused. Include more hands-on practice and individual problem-solving.
+NA2-0017: Learning is being affected. Explanations are unclear and leave students confused. Explain mistakes and give actionable feedback.
+NA2-0018: Repeated concern: Explanations are unclear and leave students confused. Share instructions and study material before the relevant class.
+NA2-0019: Correction required: Explanations are unclear and leave students confused. Address the issue consistently instead of leaving it unresolved.
+NA2-0020: Explanations are unclear and leave students confused. Review the teaching plan and make the necessary changes.
+NA2-0021: This issue is affecting learning: The teacher reads slides without explaining the content. Start from the fundamentals and explain the topic step by step.
+NA2-0022: Complaint: The teacher reads slides without explaining the content. Use relevant examples and show the reasoning behind each step.
+NA2-0023: Students are facing difficulty because the teacher reads slides without explaining the content. Check understanding before moving to the next concept.
+NA2-0024: This needs attention: The teacher reads slides without explaining the content. Allocate time for questions and clarification.
+NA2-0025: The following problem remains unresolved: The teacher reads slides without explaining the content. Provide complete, clear, unit-wise learning material.
+NA2-0026: Learning is being affected. The teacher reads slides without explaining the content. Include more hands-on practice and individual problem-solving.
+NA2-0027: Repeated concern: The teacher reads slides without explaining the content. Explain mistakes and give actionable feedback.
+NA2-0028: Correction required: The teacher reads slides without explaining the content. Share instructions and study material before the relevant class.
+NA2-0029: The teacher reads slides without explaining the content. Address the issue consistently instead of leaving it unresolved.
+NA2-0030: Problem reported: The teacher reads slides without explaining the content. Review the teaching plan and make the necessary changes.
+NA2-0031: Complaint: Examples do not match the concept being taught. Start from the fundamentals and explain the topic step by step.
+NA2-0032: Mam class itni fast hoti hai ki notes complete nahi hote aur concept samajh nahi aata.
+NA2-0033: This needs attention: Examples do not match the concept being taught. Check understanding before moving to the next concept.
+NA2-0034: The following problem remains unresolved: Examples do not match the concept being taught. Allocate time for questions and clarification.
+NA2-0035: Learning is being affected. Examples do not match the concept being taught. Provide complete, clear, unit-wise learning material.
+NA2-0036: Repeated concern: Examples do not match the concept being taught. Include more hands-on practice and individual problem-solving.
+NA2-0037: Correction required: Examples do not match the concept being taught. Explain mistakes and give actionable feedback.
+NA2-0038: Examples do not match the concept being taught. Share instructions and study material before the relevant class.
+NA2-0039: Problem reported: Examples do not match the concept being taught. Address the issue consistently instead of leaving it unresolved.
+NA2-0040: This issue is affecting learning: Examples do not match the concept being taught. Review the teaching plan and make the necessary changes.
+NA2-0041: Students are facing difficulty because important steps are skipped while solving problems. Start from the fundamentals and explain the topic step by step.
+NA2-0042: This needs attention: Important steps are skipped while solving problems. Use relevant examples and show the reasoning behind each step.
+NA2-0043: The following problem remains unresolved: Important steps are skipped while solving problems. Check understanding before moving to the next concept.
+NA2-0044: Learning is being affected. Important steps are skipped while solving problems. Allocate time for questions and clarification.
+NA2-0045: Repeated concern: Important steps are skipped while solving problems. Provide complete, clear, unit-wise learning material.
+NA2-0046: Correction required: Important steps are skipped while solving problems. Include more hands-on practice and individual problem-solving.
+NA2-0047: Important steps are skipped while solving problems. Explain mistakes and give actionable feedback.
+NA2-0048: Problem reported: Important steps are skipped while solving problems. Share instructions and study material before the relevant class.
+NA2-0049: This issue is affecting learning: Important steps are skipped while solving problems. Address the issue consistently instead of leaving it unresolved.
+NA2-0050: Complaint: Important steps are skipped while solving problems. Review the teaching plan and make the necessary changes.
+NA2-0051: This needs attention: New terminology is used without being defined. Start from the fundamentals and explain the topic step by step.
+NA2-0052: The following problem remains unresolved: New terminology is used without being defined. Use relevant examples and show the reasoning behind each step.
+NA2-0053: Learning is being affected. New terminology is used without being defined. Check understanding before moving to the next concept.
+NA2-0054: Repeated concern: New terminology is used without being defined. Allocate time for questions and clarification.
+NA2-0055: Correction required: New terminology is used without being defined. Provide complete, clear, unit-wise learning material.
+NA2-0056: New terminology is used without being defined. Include more hands-on practice and individual problem-solving.
+NA2-0057: Problem reported: New terminology is used without being defined. Explain mistakes and give actionable feedback.
+NA2-0058: This issue is affecting learning: New terminology is used without being defined. Share instructions and study material before the relevant class.
+NA2-0059: Complaint: New terminology is used without being defined. Address the issue consistently instead of leaving it unresolved.
+NA2-0060: Students are facing difficulty because new terminology is used without being defined. Review the teaching plan and make the necessary changes.
+NA2-0061: The following problem remains unresolved: The teacher changes topics before the previous concept is clear. Start from the fundamentals and explain the topic step by step.
+NA2-0062: Learning is being affected. The teacher changes topics before the previous concept is clear. Use relevant examples and show the reasoning behind each step.
+NA2-0063: Lab mein khud code likhne ka time nahi milta, sirf copy paste karwaya jata hai.
+NA2-0064: Correction required: The teacher changes topics before the previous concept is clear. Allocate time for questions and clarification.
+NA2-0065: The teacher changes topics before the previous concept is clear. Provide complete, clear, unit-wise learning material.
+NA2-0066: Problem reported: The teacher changes topics before the previous concept is clear. Include more hands-on practice and individual problem-solving.
+NA2-0067: This issue is affecting learning: The teacher changes topics before the previous concept is clear. Explain mistakes and give actionable feedback.
+NA2-0068: Complaint: The teacher changes topics before the previous concept is clear. Share instructions and study material before the relevant class.
+NA2-0069: Students are facing difficulty because the teacher changes topics before the previous concept is clear. Address the issue consistently instead of leaving it unresolved.
+NA2-0070: This needs attention: The teacher changes topics before the previous concept is clear. Review the teaching plan and make the necessary changes.
+NA2-0071: Learning is being affected. The same explanation is repeated even when students remain confused. Start from the fundamentals and explain the topic step by step.
+NA2-0072: Repeated concern: The same explanation is repeated even when students remain confused. Use relevant examples and show the reasoning behind each step.
+NA2-0073: Correction required: The same explanation is repeated even when students remain confused. Check understanding before moving to the next concept.
+NA2-0074: The same explanation is repeated even when students remain confused. Allocate time for questions and clarification.
+NA2-0075: Problem reported: The same explanation is repeated even when students remain confused. Provide complete, clear, unit-wise learning material.
+NA2-0076: This issue is affecting learning: The same explanation is repeated even when students remain confused. Include more hands-on practice and individual problem-solving.
+NA2-0077: Complaint: The same explanation is repeated even when students remain confused. Explain mistakes and give actionable feedback.
+NA2-0078: Students are facing difficulty because the same explanation is repeated even when students remain confused. Share instructions and study material before the relevant class.
+NA2-0079: This needs attention: The same explanation is repeated even when students remain confused. Address the issue consistently instead of leaving it unresolved.
+NA2-0080: The following problem remains unresolved: The same explanation is repeated even when students remain confused. Review the teaching plan and make the necessary changes.
+NA2-0081: Repeated concern: Final answers are given without explaining the method. Start from the fundamentals and explain the topic step by step.
+NA2-0082: Correction required: Final answers are given without explaining the method. Use relevant examples and show the reasoning behind each step.
+NA2-0083: Final answers are given without explaining the method. Check understanding before moving to the next concept.
+NA2-0084: Problem reported: Final answers are given without explaining the method. Allocate time for questions and clarification.
+NA2-0085: This issue is affecting learning: Final answers are given without explaining the method. Provide complete, clear, unit-wise learning material.
+NA2-0086: Complaint: Final answers are given without explaining the method. Include more hands-on practice and individual problem-solving.
+NA2-0087: Students are facing difficulty because final answers are given without explaining the method. Explain mistakes and give actionable feedback.
+NA2-0088: This needs attention: Final answers are given without explaining the method. Share instructions and study material before the relevant class.
+NA2-0089: The following problem remains unresolved: Final answers are given without explaining the method. Address the issue consistently instead of leaving it unresolved.
+NA2-0090: Learning is being affected. Final answers are given without explaining the method. Review the teaching plan and make the necessary changes.
+NA2-0091: Correction required: Connections between related topics are not explained. Start from the fundamentals and explain the topic step by step.
+NA2-0092: Connections between related topics are not explained. Use relevant examples and show the reasoning behind each step.
+NA2-0093: Problem reported: Connections between related topics are not explained. Check understanding before moving to the next concept.
+NA2-0094: Notes exam ke paas share hote hain, revision ka time nahi milta.
+NA2-0095: Complaint: Connections between related topics are not explained. Provide complete, clear, unit-wise learning material.
+NA2-0096: Students are facing difficulty because connections between related topics are not explained. Include more hands-on practice and individual problem-solving.
+NA2-0097: This needs attention: Connections between related topics are not explained. Explain mistakes and give actionable feedback.
+NA2-0098: The following problem remains unresolved: Connections between related topics are not explained. Share instructions and study material before the relevant class.
+NA2-0099: Learning is being affected. Connections between related topics are not explained. Address the issue consistently instead of leaving it unresolved.
+NA2-0100: Repeated concern: Connections between related topics are not explained. Review the teaching plan and make the necessary changes.
+NA2-0101: Problem reported: The teaching pace is too fast to follow. Start from the fundamentals and explain the topic step by step.
+NA2-0102: This issue is affecting learning: The teaching pace is too fast to follow. Use relevant examples and show the reasoning behind each step.
+NA2-0103: Complaint: The teaching pace is too fast to follow. Check understanding before moving to the next concept.
+NA2-0104: Students are facing difficulty because the teaching pace is too fast to follow. Allocate time for questions and clarification.
+NA2-0105: This needs attention: The teaching pace is too fast to follow. Provide complete, clear, unit-wise learning material.
+NA2-0106: The following problem remains unresolved: The teaching pace is too fast to follow. Include more hands-on practice and individual problem-solving.
+NA2-0107: Learning is being affected. The teaching pace is too fast to follow. Explain mistakes and give actionable feedback.
+NA2-0108: Repeated concern: The teaching pace is too fast to follow. Share instructions and study material before the relevant class.
+NA2-0109: Correction required: The teaching pace is too fast to follow. Address the issue consistently instead of leaving it unresolved.
+NA2-0110: The teaching pace is too fast to follow. Review the teaching plan and make the necessary changes.
+NA2-0111: This issue is affecting learning: Slides change before students can finish taking notes. Start from the fundamentals and explain the topic step by step.
+NA2-0112: Complaint: Slides change before students can finish taking notes. Use relevant examples and show the reasoning behind each step.
+NA2-0113: Students are facing difficulty because slides change before students can finish taking notes. Check understanding before moving to the next concept.
+NA2-0114: This needs attention: Slides change before students can finish taking notes. Allocate time for questions and clarification.
+NA2-0115: The following problem remains unresolved: Slides change before students can finish taking notes. Provide complete, clear, unit-wise learning material.
+NA2-0116: Learning is being affected. Slides change before students can finish taking notes. Include more hands-on practice and individual problem-solving.
+NA2-0117: Repeated concern: Slides change before students can finish taking notes. Explain mistakes and give actionable feedback.
+NA2-0118: Correction required: Slides change before students can finish taking notes. Share instructions and study material before the relevant class.
+NA2-0119: Slides change before students can finish taking notes. Address the issue consistently instead of leaving it unresolved.
+NA2-0120: Problem reported: Slides change before students can finish taking notes. Review the teaching plan and make the necessary changes.
+NA2-0121: Complaint: Too many topics are rushed into one lecture. Start from the fundamentals and explain the topic step by step.
+NA2-0122: Students are facing difficulty because too many topics are rushed into one lecture. Use relevant examples and show the reasoning behind each step.
+NA2-0123: This needs attention: Too many topics are rushed into one lecture. Check understanding before moving to the next concept.
+NA2-0124: The following problem remains unresolved: Too many topics are rushed into one lecture. Allocate time for questions and clarification.
+NA2-0125: Doubts poochne par clear answer nahi milta aur topic adhura reh jata hai.
+NA2-0126: Repeated concern: Too many topics are rushed into one lecture. Include more hands-on practice and individual problem-solving.
+NA2-0127: Correction required: Too many topics are rushed into one lecture. Explain mistakes and give actionable feedback.
+NA2-0128: Too many topics are rushed into one lecture. Share instructions and study material before the relevant class.
+NA2-0129: Problem reported: Too many topics are rushed into one lecture. Address the issue consistently instead of leaving it unresolved.
+NA2-0130: This issue is affecting learning: Too many topics are rushed into one lecture. Review the teaching plan and make the necessary changes.
+NA2-0131: Students are facing difficulty because long problems are started near the end and left incomplete. Start from the fundamentals and explain the topic step by step.
+NA2-0132: This needs attention: Long problems are started near the end and left incomplete. Use relevant examples and show the reasoning behind each step.
+NA2-0133: The following problem remains unresolved: Long problems are started near the end and left incomplete. Check understanding before moving to the next concept.
+NA2-0134: Learning is being affected. Long problems are started near the end and left incomplete. Allocate time for questions and clarification.
+NA2-0135: Repeated concern: Long problems are started near the end and left incomplete. Provide complete, clear, unit-wise learning material.
+NA2-0136: Correction required: Long problems are started near the end and left incomplete. Include more hands-on practice and individual problem-solving.
+NA2-0137: Long problems are started near the end and left incomplete. Explain mistakes and give actionable feedback.
+NA2-0138: Problem reported: Long problems are started near the end and left incomplete. Share instructions and study material before the relevant class.
+NA2-0139: This issue is affecting learning: Long problems are started near the end and left incomplete. Address the issue consistently instead of leaving it unresolved.
+NA2-0140: Complaint: Long problems are started near the end and left incomplete. Review the teaching plan and make the necessary changes.
+NA2-0141: This needs attention: There is almost no time for questions. Start from the fundamentals and explain the topic step by step.
+NA2-0142: The following problem remains unresolved: There is almost no time for questions. Use relevant examples and show the reasoning behind each step.
+NA2-0143: Learning is being affected. There is almost no time for questions. Check understanding before moving to the next concept.
+NA2-0144: Repeated concern: There is almost no time for questions. Allocate time for questions and clarification.
+NA2-0145: Correction required: There is almost no time for questions. Provide complete, clear, unit-wise learning material.
+NA2-0146: There is almost no time for questions. Include more hands-on practice and individual problem-solving.
+NA2-0147: Problem reported: There is almost no time for questions. Explain mistakes and give actionable feedback.
+NA2-0148: This issue is affecting learning: There is almost no time for questions. Share instructions and study material before the relevant class.
+NA2-0149: Complaint: There is almost no time for questions. Address the issue consistently instead of leaving it unresolved.
+NA2-0150: Students are facing difficulty because there is almost no time for questions. Review the teaching plan and make the necessary changes.
+NA2-0151: The following problem remains unresolved: The syllabus is rushed just before assessments. Start from the fundamentals and explain the topic step by step.
+NA2-0152: Learning is being affected. The syllabus is rushed just before assessments. Use relevant examples and show the reasoning behind each step.
+NA2-0153: Repeated concern: The syllabus is rushed just before assessments. Check understanding before moving to the next concept.
+NA2-0154: Correction required: The syllabus is rushed just before assessments. Allocate time for questions and clarification.
+NA2-0155: The syllabus is rushed just before assessments. Provide complete, clear, unit-wise learning material.
+NA2-0156: Quiz mein syllabus se bahar questions the aur marking criteria clear nahi tha.
+NA2-0157: This issue is affecting learning: The syllabus is rushed just before assessments. Explain mistakes and give actionable feedback.
+NA2-0158: Complaint: The syllabus is rushed just before assessments. Share instructions and study material before the relevant class.
+NA2-0159: Students are facing difficulty because the syllabus is rushed just before assessments. Address the issue consistently instead of leaving it unresolved.
+NA2-0160: This needs attention: The syllabus is rushed just before assessments. Review the teaching plan and make the necessary changes.
+NA2-0161: Learning is being affected. Lengthy code must be written in too little lab time. Start from the fundamentals and explain the topic step by step.
+NA2-0162: Repeated concern: Lengthy code must be written in too little lab time. Use relevant examples and show the reasoning behind each step.
+NA2-0163: Correction required: Lengthy code must be written in too little lab time. Check understanding before moving to the next concept.
+NA2-0164: Lengthy code must be written in too little lab time. Allocate time for questions and clarification.
+NA2-0165: Problem reported: Lengthy code must be written in too little lab time. Provide complete, clear, unit-wise learning material.
+NA2-0166: This issue is affecting learning: Lengthy code must be written in too little lab time. Include more hands-on practice and individual problem-solving.
+NA2-0167: Complaint: Lengthy code must be written in too little lab time. Explain mistakes and give actionable feedback.
+NA2-0168: Students are facing difficulty because lengthy code must be written in too little lab time. Share instructions and study material before the relevant class.
+NA2-0169: This needs attention: Lengthy code must be written in too little lab time. Address the issue consistently instead of leaving it unresolved.
+NA2-0170: The following problem remains unresolved: Lengthy code must be written in too little lab time. Review the teaching plan and make the necessary changes.
+NA2-0171: Repeated concern: Important concepts are rushed while minor details take too long. Start from the fundamentals and explain the topic step by step.
+NA2-0172: Correction required: Important concepts are rushed while minor details take too long. Use relevant examples and show the reasoning behind each step.
+NA2-0173: Important concepts are rushed while minor details take too long. Check understanding before moving to the next concept.
+NA2-0174: Problem reported: Important concepts are rushed while minor details take too long. Allocate time for questions and clarification.
+NA2-0175: This issue is affecting learning: Important concepts are rushed while minor details take too long. Provide complete, clear, unit-wise learning material.
+NA2-0176: Complaint: Important concepts are rushed while minor details take too long. Include more hands-on practice and individual problem-solving.
+NA2-0177: Students are facing difficulty because important concepts are rushed while minor details take too long. Explain mistakes and give actionable feedback.
+NA2-0178: This needs attention: Important concepts are rushed while minor details take too long. Share instructions and study material before the relevant class.
+NA2-0179: The following problem remains unresolved: Important concepts are rushed while minor details take too long. Address the issue consistently instead of leaving it unresolved.
+NA2-0180: Learning is being affected. Important concepts are rushed while minor details take too long. Review the teaching plan and make the necessary changes.
+NA2-0181: Correction required: The teacher moves ahead without checking understanding. Start from the fundamentals and explain the topic step by step.
+NA2-0182: The teacher moves ahead without checking understanding. Use relevant examples and show the reasoning behind each step.
+NA2-0183: Problem reported: The teacher moves ahead without checking understanding. Check understanding before moving to the next concept.
+NA2-0184: This issue is affecting learning: The teacher moves ahead without checking understanding. Allocate time for questions and clarification.
+NA2-0185: Complaint: The teacher moves ahead without checking understanding. Provide complete, clear, unit-wise learning material.
+NA2-0186: Students are facing difficulty because the teacher moves ahead without checking understanding. Include more hands-on practice and individual problem-solving.
+NA2-0187: Class interactive nahi hai, sirf slides read hoti hain.
+NA2-0188: The following problem remains unresolved: The teacher moves ahead without checking understanding. Share instructions and study material before the relevant class.
+NA2-0189: Learning is being affected. The teacher moves ahead without checking understanding. Address the issue consistently instead of leaving it unresolved.
+NA2-0190: Repeated concern: The teacher moves ahead without checking understanding. Review the teaching plan and make the necessary changes.
+NA2-0191: Revision is skipped because the lecture runs out of time. Start from the fundamentals and explain the topic step by step.
+NA2-0192: Problem reported: Revision is skipped because the lecture runs out of time. Use relevant examples and show the reasoning behind each step.
+NA2-0193: This issue is affecting learning: Revision is skipped because the lecture runs out of time. Check understanding before moving to the next concept.
+NA2-0194: Complaint: Revision is skipped because the lecture runs out of time. Allocate time for questions and clarification.
+NA2-0195: Students are facing difficulty because revision is skipped because the lecture runs out of time. Provide complete, clear, unit-wise learning material.
+NA2-0196: This needs attention: Revision is skipped because the lecture runs out of time. Include more hands-on practice and individual problem-solving.
+NA2-0197: The following problem remains unresolved: Revision is skipped because the lecture runs out of time. Explain mistakes and give actionable feedback.
+NA2-0198: Learning is being affected. Revision is skipped because the lecture runs out of time. Share instructions and study material before the relevant class.
+NA2-0199: Repeated concern: Revision is skipped because the lecture runs out of time. Address the issue consistently instead of leaving it unresolved.
+NA2-0200: Correction required: Revision is skipped because the lecture runs out of time. Review the teaching plan and make the necessary changes.
+NA2-0201: This issue is affecting learning: The lab is conducted like a theory lecture with almost no practical work. Start from the fundamentals and explain the topic step by step.
+NA2-0202: Complaint: The lab is conducted like a theory lecture with almost no practical work. Use relevant examples and show the reasoning behind each step.
+NA2-0203: Students are facing difficulty because the lab is conducted like a theory lecture with almost no practical work. Check understanding before moving to the next concept.
+NA2-0204: This needs attention: The lab is conducted like a theory lecture with almost no practical work. Allocate time for questions and clarification.
+NA2-0205: The following problem remains unresolved: The lab is conducted like a theory lecture with almost no practical work. Provide complete, clear, unit-wise learning material.
+NA2-0206: Learning is being affected. The lab is conducted like a theory lecture with almost no practical work. Include more hands-on practice and individual problem-solving.
+NA2-0207: Repeated concern: The lab is conducted like a theory lecture with almost no practical work. Explain mistakes and give actionable feedback.
+NA2-0208: Correction required: The lab is conducted like a theory lecture with almost no practical work. Share instructions and study material before the relevant class.
+NA2-0209: The lab is conducted like a theory lecture with almost no practical work. Address the issue consistently instead of leaving it unresolved.
+NA2-0210: Problem reported: The lab is conducted like a theory lecture with almost no practical work. Review the teaching plan and make the necessary changes.
+NA2-0211: Complaint: Students copy code without learning how to write it. Start from the fundamentals and explain the topic step by step.
+NA2-0212: Students are facing difficulty because students copy code without learning how to write it. Use relevant examples and show the reasoning behind each step.
+NA2-0213: This needs attention: Students copy code without learning how to write it. Check understanding before moving to the next concept.
+NA2-0214: The following problem remains unresolved: Students copy code without learning how to write it. Allocate time for questions and clarification.
+NA2-0215: Learning is being affected. Students copy code without learning how to write it. Provide complete, clear, unit-wise learning material.
+NA2-0216: Repeated concern: Students copy code without learning how to write it. Include more hands-on practice and individual problem-solving.
+NA2-0217: Correction required: Students copy code without learning how to write it. Explain mistakes and give actionable feedback.
+NA2-0218: Lab ke computers baar-baar band ho jaate hain aur practical work rukta hai.
+NA2-0219: Problem reported: Students copy code without learning how to write it. Address the issue consistently instead of leaving it unresolved.
+NA2-0220: This issue is affecting learning: Students copy code without learning how to write it. Review the teaching plan and make the necessary changes.
+NA2-0221: Students are facing difficulty because code output is shown without explaining debugging. Start from the fundamentals and explain the topic step by step.
+NA2-0222: This needs attention: Code output is shown without explaining debugging. Use relevant examples and show the reasoning behind each step.
+NA2-0223: The following problem remains unresolved: Code output is shown without explaining debugging. Check understanding before moving to the next concept.
+NA2-0224: Learning is being affected. Code output is shown without explaining debugging. Allocate time for questions and clarification.
+NA2-0225: Repeated concern: Code output is shown without explaining debugging. Provide complete, clear, unit-wise learning material.
+NA2-0226: Correction required: Code output is shown without explaining debugging. Include more hands-on practice and individual problem-solving.
+NA2-0227: Code output is shown without explaining debugging. Explain mistakes and give actionable feedback.
+NA2-0228: Problem reported: Code output is shown without explaining debugging. Share instructions and study material before the relevant class.
+NA2-0229: This issue is affecting learning: Code output is shown without explaining debugging. Address the issue consistently instead of leaving it unresolved.
+NA2-0230: Complaint: Code output is shown without explaining debugging. Review the teaching plan and make the necessary changes.
+NA2-0231: This needs attention: There is not enough time to complete lab assignments. Start from the fundamentals and explain the topic step by step.
+NA2-0232: The following problem remains unresolved: There is not enough time to complete lab assignments. Use relevant examples and show the reasoning behind each step.
+NA2-0233: Learning is being affected. There is not enough time to complete lab assignments. Check understanding before moving to the next concept.
+NA2-0234: Repeated concern: There is not enough time to complete lab assignments. Allocate time for questions and clarification.
+NA2-0235: Correction required: There is not enough time to complete lab assignments. Provide complete, clear, unit-wise learning material.
+NA2-0236: There is not enough time to complete lab assignments. Include more hands-on practice and individual problem-solving.
+NA2-0237: Problem reported: There is not enough time to complete lab assignments. Explain mistakes and give actionable feedback.
+NA2-0238: This issue is affecting learning: There is not enough time to complete lab assignments. Share instructions and study material before the relevant class.
+NA2-0239: Complaint: There is not enough time to complete lab assignments. Address the issue consistently instead of leaving it unresolved.
+NA2-0240: Students are facing difficulty because there is not enough time to complete lab assignments. Review the teaching plan and make the necessary changes.
+NA2-0241: The following problem remains unresolved: Lab exercises do not match the theory topics. Start from the fundamentals and explain the topic step by step.
+NA2-0242: Learning is being affected. Lab exercises do not match the theory topics. Use relevant examples and show the reasoning behind each step.
+NA2-0243: Repeated concern: Lab exercises do not match the theory topics. Check understanding before moving to the next concept.
+NA2-0244: Correction required: Lab exercises do not match the theory topics. Allocate time for questions and clarification.
+NA2-0245: Lab exercises do not match the theory topics. Provide complete, clear, unit-wise learning material.
+NA2-0246: Problem reported: Lab exercises do not match the theory topics. Include more hands-on practice and individual problem-solving.
+NA2-0247: This issue is affecting learning: Lab exercises do not match the theory topics. Explain mistakes and give actionable feedback.
+NA2-0248: Complaint: Lab exercises do not match the theory topics. Share instructions and study material before the relevant class.
+NA2-0249: Central quiz se pehle syllabus complete nahi hua tha.
+NA2-0250: This needs attention: Lab exercises do not match the theory topics. Review the teaching plan and make the necessary changes.
+NA2-0251: Learning is being affected. Students receive little individual guidance during lab work. Start from the fundamentals and explain the topic step by step.
+NA2-0252: Repeated concern: Students receive little individual guidance during lab work. Use relevant examples and show the reasoning behind each step.
+NA2-0253: Correction required: Students receive little individual guidance during lab work. Check understanding before moving to the next concept.
+NA2-0254: Students receive little individual guidance during lab work. Allocate time for questions and clarification.
+NA2-0255: Problem reported: Students receive little individual guidance during lab work. Provide complete, clear, unit-wise learning material.
+NA2-0256: This issue is affecting learning: Students receive little individual guidance during lab work. Include more hands-on practice and individual problem-solving.
+NA2-0257: Complaint: Students receive little individual guidance during lab work. Explain mistakes and give actionable feedback.
+NA2-0258: Students are facing difficulty because students receive little individual guidance during lab work. Share instructions and study material before the relevant class.
+NA2-0259: This needs attention: Students receive little individual guidance during lab work. Address the issue consistently instead of leaving it unresolved.
+NA2-0260: The following problem remains unresolved: Students receive little individual guidance during lab work. Review the teaching plan and make the necessary changes.
+NA2-0261: Repeated concern: The same basic exercise is repeated without increasing difficulty. Start from the fundamentals and explain the topic step by step.
+NA2-0262: Correction required: The same basic exercise is repeated without increasing difficulty. Use relevant examples and show the reasoning behind each step.
+NA2-0263: The same basic exercise is repeated without increasing difficulty. Check understanding before moving to the next concept.
+NA2-0264: Problem reported: The same basic exercise is repeated without increasing difficulty. Allocate time for questions and clarification.
+NA2-0265: This issue is affecting learning: The same basic exercise is repeated without increasing difficulty. Provide complete, clear, unit-wise learning material.
+NA2-0266: Complaint: The same basic exercise is repeated without increasing difficulty. Include more hands-on practice and individual problem-solving.
+NA2-0267: Students are facing difficulty because the same basic exercise is repeated without increasing difficulty. Explain mistakes and give actionable feedback.
+NA2-0268: This needs attention: The same basic exercise is repeated without increasing difficulty. Share instructions and study material before the relevant class.
+NA2-0269: The following problem remains unresolved: The same basic exercise is repeated without increasing difficulty. Address the issue consistently instead of leaving it unresolved.
+NA2-0270: Learning is being affected. The same basic exercise is repeated without increasing difficulty. Review the teaching plan and make the necessary changes.
+NA2-0271: Correction required: The purpose of code statements is not explained. Start from the fundamentals and explain the topic step by step.
+NA2-0272: The purpose of code statements is not explained. Use relevant examples and show the reasoning behind each step.
+NA2-0273: Problem reported: The purpose of code statements is not explained. Check understanding before moving to the next concept.
+NA2-0274: This issue is affecting learning: The purpose of code statements is not explained. Allocate time for questions and clarification.
+NA2-0275: Complaint: The purpose of code statements is not explained. Provide complete, clear, unit-wise learning material.
+NA2-0276: Students are facing difficulty because the purpose of code statements is not explained. Include more hands-on practice and individual problem-solving.
+NA2-0277: This needs attention: The purpose of code statements is not explained. Explain mistakes and give actionable feedback.
+NA2-0278: The following problem remains unresolved: The purpose of code statements is not explained. Share instructions and study material before the relevant class.
+NA2-0279: Learning is being affected. The purpose of code statements is not explained. Address the issue consistently instead of leaving it unresolved.
+NA2-0280: Assignment ki instructions clear nahi hoti aur deadline late batayi jaati hai.
+NA2-0281: Students are told to paste code instead of developing solutions. Start from the fundamentals and explain the topic step by step.
+NA2-0282: Problem reported: Students are told to paste code instead of developing solutions. Use relevant examples and show the reasoning behind each step.
+NA2-0283: This issue is affecting learning: Students are told to paste code instead of developing solutions. Check understanding before moving to the next concept.
+NA2-0284: Complaint: Students are told to paste code instead of developing solutions. Allocate time for questions and clarification.
+NA2-0285: Students are facing difficulty because students are told to paste code instead of developing solutions. Provide complete, clear, unit-wise learning material.
+NA2-0286: This needs attention: Students are told to paste code instead of developing solutions. Include more hands-on practice and individual problem-solving.
+NA2-0287: The following problem remains unresolved: Students are told to paste code instead of developing solutions. Explain mistakes and give actionable feedback.
+NA2-0288: Learning is being affected. Students are told to paste code instead of developing solutions. Share instructions and study material before the relevant class.
+NA2-0289: Repeated concern: Students are told to paste code instead of developing solutions. Address the issue consistently instead of leaving it unresolved.
+NA2-0290: Correction required: Students are told to paste code instead of developing solutions. Review the teaching plan and make the necessary changes.
+NA2-0291: Problem reported: There are too few lab sessions for the required practice. Start from the fundamentals and explain the topic step by step.
+NA2-0292: This issue is affecting learning: There are too few lab sessions for the required practice. Use relevant examples and show the reasoning behind each step.
+NA2-0293: Complaint: There are too few lab sessions for the required practice. Check understanding before moving to the next concept.
+NA2-0294: Students are facing difficulty because there are too few lab sessions for the required practice. Allocate time for questions and clarification.
+NA2-0295: This needs attention: There are too few lab sessions for the required practice. Provide complete, clear, unit-wise learning material.
+NA2-0296: The following problem remains unresolved: There are too few lab sessions for the required practice. Include more hands-on practice and individual problem-solving.
+NA2-0297: Learning is being affected. There are too few lab sessions for the required practice. Explain mistakes and give actionable feedback.
+NA2-0298: Repeated concern: There are too few lab sessions for the required practice. Share instructions and study material before the relevant class.
+NA2-0299: Correction required: There are too few lab sessions for the required practice. Address the issue consistently instead of leaving it unresolved.
+NA2-0300: There are too few lab sessions for the required practice. Review the teaching plan and make the necessary changes.
+NA2-0301: Complaint: The notes are incomplete and omit syllabus topics. Start from the fundamentals and explain the topic step by step.
+NA2-0302: Students are facing difficulty because the notes are incomplete and omit syllabus topics. Use relevant examples and show the reasoning behind each step.
+NA2-0303: This needs attention: The notes are incomplete and omit syllabus topics. Check understanding before moving to the next concept.
+NA2-0304: The following problem remains unresolved: The notes are incomplete and omit syllabus topics. Allocate time for questions and clarification.
+NA2-0305: Learning is being affected. The notes are incomplete and omit syllabus topics. Provide complete, clear, unit-wise learning material.
+NA2-0306: Repeated concern: The notes are incomplete and omit syllabus topics. Include more hands-on practice and individual problem-solving.
+NA2-0307: Correction required: The notes are incomplete and omit syllabus topics. Explain mistakes and give actionable feedback.
+NA2-0308: The notes are incomplete and omit syllabus topics. Share instructions and study material before the relevant class.
+NA2-0309: Problem reported: The notes are incomplete and omit syllabus topics. Address the issue consistently instead of leaving it unresolved.
+NA2-0310: This issue is affecting learning: The notes are incomplete and omit syllabus topics. Review the teaching plan and make the necessary changes.
+NA2-0311: Sir examples ke bina theory samjhate hain, concepts samajhna mushkil hota hai.
+NA2-0312: This needs attention: Study material is shared too late for preparation. Use relevant examples and show the reasoning behind each step.
+NA2-0313: The following problem remains unresolved: Study material is shared too late for preparation. Check understanding before moving to the next concept.
+NA2-0314: Learning is being affected. Study material is shared too late for preparation. Allocate time for questions and clarification.
+NA2-0315: Repeated concern: Study material is shared too late for preparation. Provide complete, clear, unit-wise learning material.
+NA2-0316: Correction required: Study material is shared too late for preparation. Include more hands-on practice and individual problem-solving.
+NA2-0317: Study material is shared too late for preparation. Explain mistakes and give actionable feedback.
+NA2-0318: Problem reported: Study material is shared too late for preparation. Share instructions and study material before the relevant class.
+NA2-0319: This issue is affecting learning: Study material is shared too late for preparation. Address the issue consistently instead of leaving it unresolved.
+NA2-0320: Complaint: Study material is shared too late for preparation. Review the teaching plan and make the necessary changes.
+NA2-0321: This needs attention: Slides contain too much text and lack diagrams. Start from the fundamentals and explain the topic step by step.
+NA2-0322: The following problem remains unresolved: Slides contain too much text and lack diagrams. Use relevant examples and show the reasoning behind each step.
+NA2-0323: Learning is being affected. Slides contain too much text and lack diagrams. Check understanding before moving to the next concept.
+NA2-0324: Repeated concern: Slides contain too much text and lack diagrams. Allocate time for questions and clarification.
+NA2-0325: Correction required: Slides contain too much text and lack diagrams. Provide complete, clear, unit-wise learning material.
+NA2-0326: Slides contain too much text and lack diagrams. Include more hands-on practice and individual problem-solving.
+NA2-0327: Problem reported: Slides contain too much text and lack diagrams. Explain mistakes and give actionable feedback.
+NA2-0328: This issue is affecting learning: Slides contain too much text and lack diagrams. Share instructions and study material before the relevant class.
+NA2-0329: Complaint: Slides contain too much text and lack diagrams. Address the issue consistently instead of leaving it unresolved.
+NA2-0330: Students are facing difficulty because slides contain too much text and lack diagrams. Review the teaching plan and make the necessary changes.
+NA2-0331: The following problem remains unresolved: The notes are difficult to revise before examinations. Start from the fundamentals and explain the topic step by step.
+NA2-0332: Learning is being affected. The notes are difficult to revise before examinations. Use relevant examples and show the reasoning behind each step.
+NA2-0333: Repeated concern: The notes are difficult to revise before examinations. Check understanding before moving to the next concept.
+NA2-0334: Correction required: The notes are difficult to revise before examinations. Allocate time for questions and clarification.
+NA2-0335: The notes are difficult to revise before examinations. Provide complete, clear, unit-wise learning material.
+NA2-0336: Problem reported: The notes are difficult to revise before examinations. Include more hands-on practice and individual problem-solving.
+NA2-0337: This issue is affecting learning: The notes are difficult to revise before examinations. Explain mistakes and give actionable feedback.
+NA2-0338: Complaint: The notes are difficult to revise before examinations. Share instructions and study material before the relevant class.
+NA2-0339: Students are facing difficulty because the notes are difficult to revise before examinations. Address the issue consistently instead of leaving it unresolved.
+NA2-0340: This needs attention: The notes are difficult to revise before examinations. Review the teaching plan and make the necessary changes.
+NA2-0341: Learning is being affected. Important formulas and definitions are missing. Start from the fundamentals and explain the topic step by step.
+NA2-0342: Ma'am sirf PPT dikhakar aage badh jaati hain, steps explain nahi karti.
+NA2-0343: Correction required: Important formulas and definitions are missing. Check understanding before moving to the next concept.
+NA2-0344: Important formulas and definitions are missing. Allocate time for questions and clarification.
+NA2-0345: Problem reported: Important formulas and definitions are missing. Provide complete, clear, unit-wise learning material.
+NA2-0346: This issue is affecting learning: Important formulas and definitions are missing. Include more hands-on practice and individual problem-solving.
+NA2-0347: Complaint: Important formulas and definitions are missing. Explain mistakes and give actionable feedback.
+NA2-0348: Students are facing difficulty because important formulas and definitions are missing. Share instructions and study material before the relevant class.
+NA2-0349: This needs attention: Important formulas and definitions are missing. Address the issue consistently instead of leaving it unresolved.
+NA2-0350: The following problem remains unresolved: Important formulas and definitions are missing. Review the teaching plan and make the necessary changes.
+NA2-0351: Repeated concern: The notes do not match what is taught in class. Start from the fundamentals and explain the topic step by step.
+NA2-0352: Correction required: The notes do not match what is taught in class. Use relevant examples and show the reasoning behind each step.
+NA2-0353: The notes do not match what is taught in class. Check understanding before moving to the next concept.
+NA2-0354: Problem reported: The notes do not match what is taught in class. Allocate time for questions and clarification.
+NA2-0355: This issue is affecting learning: The notes do not match what is taught in class. Provide complete, clear, unit-wise learning material.
+NA2-0356: Complaint: The notes do not match what is taught in class. Include more hands-on practice and individual problem-solving.
+NA2-0357: Students are facing difficulty because the notes do not match what is taught in class. Explain mistakes and give actionable feedback.
+NA2-0358: This needs attention: The notes do not match what is taught in class. Share instructions and study material before the relevant class.
+NA2-0359: The following problem remains unresolved: The notes do not match what is taught in class. Address the issue consistently instead of leaving it unresolved.
+NA2-0360: Learning is being affected. The notes do not match what is taught in class. Review the teaching plan and make the necessary changes.
+NA2-0361: Correction required: Examples in the material have no explanations. Start from the fundamentals and explain the topic step by step.
+NA2-0362: Examples in the material have no explanations. Use relevant examples and show the reasoning behind each step.
+NA2-0363: Problem reported: Examples in the material have no explanations. Check understanding before moving to the next concept.
+NA2-0364: This issue is affecting learning: Examples in the material have no explanations. Allocate time for questions and clarification.
+NA2-0365: Complaint: Examples in the material have no explanations. Provide complete, clear, unit-wise learning material.
+NA2-0366: Students are facing difficulty because examples in the material have no explanations. Include more hands-on practice and individual problem-solving.
+NA2-0367: This needs attention: Examples in the material have no explanations. Explain mistakes and give actionable feedback.
+NA2-0368: The following problem remains unresolved: Examples in the material have no explanations. Share instructions and study material before the relevant class.
+NA2-0369: Learning is being affected. Examples in the material have no explanations. Address the issue consistently instead of leaving it unresolved.
+NA2-0370: Repeated concern: Examples in the material have no explanations. Review the teaching plan and make the necessary changes.
+NA2-0371: Shared files are disorganized and difficult to locate. Start from the fundamentals and explain the topic step by step.
+NA2-0372: Problem reported: Shared files are disorganized and difficult to locate. Use relevant examples and show the reasoning behind each step.
+NA2-0373: Lab mein practical experiments kam hote hain aur theory zyada hoti hai.
+NA2-0374: Complaint: Shared files are disorganized and difficult to locate. Allocate time for questions and clarification.
+NA2-0375: Students are facing difficulty because shared files are disorganized and difficult to locate. Provide complete, clear, unit-wise learning material.
+NA2-0376: This needs attention: Shared files are disorganized and difficult to locate. Include more hands-on practice and individual problem-solving.
+NA2-0377: The following problem remains unresolved: Shared files are disorganized and difficult to locate. Explain mistakes and give actionable feedback.
+NA2-0378: Learning is being affected. Shared files are disorganized and difficult to locate. Share instructions and study material before the relevant class.
+NA2-0379: Repeated concern: Shared files are disorganized and difficult to locate. Address the issue consistently instead of leaving it unresolved.
+NA2-0380: Correction required: Shared files are disorganized and difficult to locate. Review the teaching plan and make the necessary changes.
+NA2-0381: Problem reported: No practice questions are provided for taught topics. Start from the fundamentals and explain the topic step by step.
+NA2-0382: This issue is affecting learning: No practice questions are provided for taught topics. Use relevant examples and show the reasoning behind each step.
+NA2-0383: Complaint: No practice questions are provided for taught topics. Check understanding before moving to the next concept.
+NA2-0384: Students are facing difficulty because no practice questions are provided for taught topics. Allocate time for questions and clarification.
+NA2-0385: This needs attention: No practice questions are provided for taught topics. Provide complete, clear, unit-wise learning material.
+NA2-0386: The following problem remains unresolved: No practice questions are provided for taught topics. Include more hands-on practice and individual problem-solving.
+NA2-0387: Learning is being affected. No practice questions are provided for taught topics. Explain mistakes and give actionable feedback.
+NA2-0388: Repeated concern: No practice questions are provided for taught topics. Share instructions and study material before the relevant class.
+NA2-0389: Correction required: No practice questions are provided for taught topics. Address the issue consistently instead of leaving it unresolved.
+NA2-0390: No practice questions are provided for taught topics. Review the teaching plan and make the necessary changes.
+NA2-0391: This issue is affecting learning: The slides contain errors that cause confusion. Start from the fundamentals and explain the topic step by step.
+NA2-0392: Complaint: The slides contain errors that cause confusion. Use relevant examples and show the reasoning behind each step.
+NA2-0393: Students are facing difficulty because the slides contain errors that cause confusion. Check understanding before moving to the next concept.
+NA2-0394: This needs attention: The slides contain errors that cause confusion. Allocate time for questions and clarification.
+NA2-0395: The following problem remains unresolved: The slides contain errors that cause confusion. Provide complete, clear, unit-wise learning material.
+NA2-0396: Learning is being affected. The slides contain errors that cause confusion. Include more hands-on practice and individual problem-solving.
+NA2-0397: Repeated concern: The slides contain errors that cause confusion. Explain mistakes and give actionable feedback.
+NA2-0398: Correction required: The slides contain errors that cause confusion. Share instructions and study material before the relevant class.
+NA2-0399: The slides contain errors that cause confusion. Address the issue consistently instead of leaving it unresolved.
+NA2-0400: Problem reported: The slides contain errors that cause confusion. Review the teaching plan and make the necessary changes.
+NA2-0401: Students are facing difficulty because questions raised during class are ignored. Start from the fundamentals and explain the topic step by step.
+NA2-0402: This needs attention: Questions raised during class are ignored. Use relevant examples and show the reasoning behind each step.
+NA2-0403: The following problem remains unresolved: Questions raised during class are ignored. Check understanding before moving to the next concept.
+NA2-0404: Class mein doubts clear karne ke liye time nahi diya jata.
+NA2-0405: Repeated concern: Questions raised during class are ignored. Provide complete, clear, unit-wise learning material.
+NA2-0406: Correction required: Questions raised during class are ignored. Include more hands-on practice and individual problem-solving.
+NA2-0407: Questions raised during class are ignored. Explain mistakes and give actionable feedback.
+NA2-0408: Problem reported: Questions raised during class are ignored. Share instructions and study material before the relevant class.
+NA2-0409: This issue is affecting learning: Questions raised during class are ignored. Address the issue consistently instead of leaving it unresolved.
+NA2-0410: Complaint: Questions raised during class are ignored. Review the teaching plan and make the necessary changes.
+NA2-0411: This needs attention: There is no dedicated time for clearing doubts. Start from the fundamentals and explain the topic step by step.
+NA2-0412: The following problem remains unresolved: There is no dedicated time for clearing doubts. Use relevant examples and show the reasoning behind each step.
+NA2-0413: Learning is being affected. There is no dedicated time for clearing doubts. Check understanding before moving to the next concept.
+NA2-0414: Repeated concern: There is no dedicated time for clearing doubts. Allocate time for questions and clarification.
+NA2-0415: Correction required: There is no dedicated time for clearing doubts. Provide complete, clear, unit-wise learning material.
+NA2-0416: There is no dedicated time for clearing doubts. Include more hands-on practice and individual problem-solving.
+NA2-0417: Problem reported: There is no dedicated time for clearing doubts. Explain mistakes and give actionable feedback.
+NA2-0418: This issue is affecting learning: There is no dedicated time for clearing doubts. Share instructions and study material before the relevant class.
+NA2-0419: Complaint: There is no dedicated time for clearing doubts. Address the issue consistently instead of leaving it unresolved.
+NA2-0420: Students are facing difficulty because there is no dedicated time for clearing doubts. Review the teaching plan and make the necessary changes.
+NA2-0421: The following problem remains unresolved: The answer to a question repeats the same unclear explanation. Start from the fundamentals and explain the topic step by step.
+NA2-0422: Learning is being affected. The answer to a question repeats the same unclear explanation. Use relevant examples and show the reasoning behind each step.
+NA2-0423: Repeated concern: The answer to a question repeats the same unclear explanation. Check understanding before moving to the next concept.
+NA2-0424: Correction required: The answer to a question repeats the same unclear explanation. Allocate time for questions and clarification.
+NA2-0425: The answer to a question repeats the same unclear explanation. Provide complete, clear, unit-wise learning material.
+NA2-0426: Problem reported: The answer to a question repeats the same unclear explanation. Include more hands-on practice and individual problem-solving.
+NA2-0427: This issue is affecting learning: The answer to a question repeats the same unclear explanation. Explain mistakes and give actionable feedback.
+NA2-0428: Complaint: The answer to a question repeats the same unclear explanation. Share instructions and study material before the relevant class.
+NA2-0429: Students are facing difficulty because the answer to a question repeats the same unclear explanation. Address the issue consistently instead of leaving it unresolved.
+NA2-0430: This needs attention: The answer to a question repeats the same unclear explanation. Review the teaching plan and make the necessary changes.
+NA2-0431: Learning is being affected. Students hesitate to ask questions because the class feels intimidating. Start from the fundamentals and explain the topic step by step.
+NA2-0432: Repeated concern: Students hesitate to ask questions because the class feels intimidating. Use relevant examples and show the reasoning behind each step.
+NA2-0433: Correction required: Students hesitate to ask questions because the class feels intimidating. Check understanding before moving to the next concept.
+NA2-0434: Students hesitate to ask questions because the class feels intimidating. Allocate time for questions and clarification.
+NA2-0435: Notes unit-wise nahi hain aur important topics missing hain.
+NA2-0436: This issue is affecting learning: Students hesitate to ask questions because the class feels intimidating. Include more hands-on practice and individual problem-solving.
+NA2-0437: Complaint: Students hesitate to ask questions because the class feels intimidating. Explain mistakes and give actionable feedback.
+NA2-0438: Students are facing difficulty because students hesitate to ask questions because the class feels intimidating. Share instructions and study material before the relevant class.
+NA2-0439: This needs attention: Students hesitate to ask questions because the class feels intimidating. Address the issue consistently instead of leaving it unresolved.
+NA2-0440: The following problem remains unresolved: Students hesitate to ask questions because the class feels intimidating. Review the teaching plan and make the necessary changes.
+NA2-0441: Repeated concern: The teacher moves on before checking if a doubt is resolved. Start from the fundamentals and explain the topic step by step.
+NA2-0442: Correction required: The teacher moves on before checking if a doubt is resolved. Use relevant examples and show the reasoning behind each step.
+NA2-0443: The teacher moves on before checking if a doubt is resolved. Check understanding before moving to the next concept.
+NA2-0444: Problem reported: The teacher moves on before checking if a doubt is resolved. Allocate time for questions and clarification.
+NA2-0445: This issue is affecting learning: The teacher moves on before checking if a doubt is resolved. Provide complete, clear, unit-wise learning material.
+NA2-0446: Complaint: The teacher moves on before checking if a doubt is resolved. Include more hands-on practice and individual problem-solving.
+NA2-0447: Students are facing difficulty because the teacher moves on before checking if a doubt is resolved. Explain mistakes and give actionable feedback.
+NA2-0448: This needs attention: The teacher moves on before checking if a doubt is resolved. Share instructions and study material before the relevant class.
+NA2-0449: The following problem remains unresolved: The teacher moves on before checking if a doubt is resolved. Address the issue consistently instead of leaving it unresolved.
+NA2-0450: Learning is being affected. The teacher moves on before checking if a doubt is resolved. Review the teaching plan and make the necessary changes.
+NA2-0451: Correction required: Students receive little help with difficult assignments. Start from the fundamentals and explain the topic step by step.
+NA2-0452: Students receive little help with difficult assignments. Use relevant examples and show the reasoning behind each step.
+NA2-0453: Problem reported: Students receive little help with difficult assignments. Check understanding before moving to the next concept.
+NA2-0454: This issue is affecting learning: Students receive little help with difficult assignments. Allocate time for questions and clarification.
+NA2-0455: Complaint: Students receive little help with difficult assignments. Provide complete, clear, unit-wise learning material.
+NA2-0456: Students are facing difficulty because students receive little help with difficult assignments. Include more hands-on practice and individual problem-solving.
+NA2-0457: This needs attention: Students receive little help with difficult assignments. Explain mistakes and give actionable feedback.
+NA2-0458: The following problem remains unresolved: Students receive little help with difficult assignments. Share instructions and study material before the relevant class.
+NA2-0459: Learning is being affected. Students receive little help with difficult assignments. Address the issue consistently instead of leaving it unresolved.
+NA2-0460: Repeated concern: Students receive little help with difficult assignments. Review the teaching plan and make the necessary changes.
+NA2-0461: Follow-up questions are discouraged during lectures. Start from the fundamentals and explain the topic step by step.
+NA2-0462: Problem reported: Follow-up questions are discouraged during lectures. Use relevant examples and show the reasoning behind each step.
+NA2-0463: This issue is affecting learning: Follow-up questions are discouraged during lectures. Check understanding before moving to the next concept.
+NA2-0464: Complaint: Follow-up questions are discouraged during lectures. Allocate time for questions and clarification.
+NA2-0465: Students are facing difficulty because follow-up questions are discouraged during lectures. Provide complete, clear, unit-wise learning material.
+NA2-0466: Sir ki awaaz last benches tak sunai nahi deti.
+NA2-0467: The following problem remains unresolved: Follow-up questions are discouraged during lectures. Explain mistakes and give actionable feedback.
+NA2-0468: Learning is being affected. Follow-up questions are discouraged during lectures. Share instructions and study material before the relevant class.
+NA2-0469: Repeated concern: Follow-up questions are discouraged during lectures. Address the issue consistently instead of leaving it unresolved.
+NA2-0470: Correction required: Follow-up questions are discouraged during lectures. Review the teaching plan and make the necessary changes.
+NA2-0471: Problem reported: Confusing topics are never revisited. Start from the fundamentals and explain the topic step by step.
+NA2-0472: This issue is affecting learning: Confusing topics are never revisited. Use relevant examples and show the reasoning behind each step.
+NA2-0473: Complaint: Confusing topics are never revisited. Check understanding before moving to the next concept.
+NA2-0474: Students are facing difficulty because confusing topics are never revisited. Allocate time for questions and clarification.
+NA2-0475: This needs attention: Confusing topics are never revisited. Provide complete, clear, unit-wise learning material.
+NA2-0476: The following problem remains unresolved: Confusing topics are never revisited. Include more hands-on practice and individual problem-solving.
+NA2-0477: Learning is being affected. Confusing topics are never revisited. Explain mistakes and give actionable feedback.
+NA2-0478: Repeated concern: Confusing topics are never revisited. Share instructions and study material before the relevant class.
+NA2-0479: Correction required: Confusing topics are never revisited. Address the issue consistently instead of leaving it unresolved.
+NA2-0480: Confusing topics are never revisited. Review the teaching plan and make the necessary changes.
+NA2-0481: This issue is affecting learning: Requests for academic help receive no timely response. Start from the fundamentals and explain the topic step by step.
+NA2-0482: Complaint: Requests for academic help receive no timely response. Use relevant examples and show the reasoning behind each step.
+NA2-0483: Students are facing difficulty because requests for academic help receive no timely response. Check understanding before moving to the next concept.
+NA2-0484: This needs attention: Requests for academic help receive no timely response. Allocate time for questions and clarification.
+NA2-0485: The following problem remains unresolved: Requests for academic help receive no timely response. Provide complete, clear, unit-wise learning material.
+NA2-0486: Learning is being affected. Requests for academic help receive no timely response. Include more hands-on practice and individual problem-solving.
+NA2-0487: Repeated concern: Requests for academic help receive no timely response. Explain mistakes and give actionable feedback.
+NA2-0488: Correction required: Requests for academic help receive no timely response. Share instructions and study material before the relevant class.
+NA2-0489: Requests for academic help receive no timely response. Address the issue consistently instead of leaving it unresolved.
+NA2-0490: Problem reported: Requests for academic help receive no timely response. Review the teaching plan and make the necessary changes.
+NA2-0491: Complaint: There is no clear way to get help outside lecture hours. Start from the fundamentals and explain the topic step by step.
+NA2-0492: Students are facing difficulty because there is no clear way to get help outside lecture hours. Use relevant examples and show the reasoning behind each step.
+NA2-0493: This needs attention: There is no clear way to get help outside lecture hours. Check understanding before moving to the next concept.
+NA2-0494: The following problem remains unresolved: There is no clear way to get help outside lecture hours. Allocate time for questions and clarification.
+NA2-0495: Learning is being affected. There is no clear way to get help outside lecture hours. Provide complete, clear, unit-wise learning material.
+NA2-0496: Repeated concern: There is no clear way to get help outside lecture hours. Include more hands-on practice and individual problem-solving.
+NA2-0497: Quiz ke baad answers discuss nahi hote, mistakes samajh nahi aati.
+NA2-0498: There is no clear way to get help outside lecture hours. Share instructions and study material before the relevant class.
+NA2-0499: Problem reported: There is no clear way to get help outside lecture hours. Address the issue consistently instead of leaving it unresolved.
+NA2-0500: This issue is affecting learning: There is no clear way to get help outside lecture hours. Review the teaching plan and make the necessary changes.
+NA2-0501: This needs attention: Quiz questions include topics that were not covered in class. Start from the fundamentals and explain the topic step by step.
+NA2-0502: The following problem remains unresolved: Quiz questions include topics that were not covered in class. Use relevant examples and show the reasoning behind each step.
+NA2-0503: Learning is being affected. Quiz questions include topics that were not covered in class. Check understanding before moving to the next concept.
+NA2-0504: Repeated concern: Quiz questions include topics that were not covered in class. Allocate time for questions and clarification.
+NA2-0505: Correction required: Quiz questions include topics that were not covered in class. Provide complete, clear, unit-wise learning material.
+NA2-0506: Quiz questions include topics that were not covered in class. Include more hands-on practice and individual problem-solving.
+NA2-0507: Problem reported: Quiz questions include topics that were not covered in class. Explain mistakes and give actionable feedback.
+NA2-0508: This issue is affecting learning: Quiz questions include topics that were not covered in class. Share instructions and study material before the relevant class.
+NA2-0509: Complaint: Quiz questions include topics that were not covered in class. Address the issue consistently instead of leaving it unresolved.
+NA2-0510: Students are facing difficulty because quiz questions include topics that were not covered in class. Review the teaching plan and make the necessary changes.
+NA2-0511: The following problem remains unresolved: The marking scheme is not explained before assessments. Start from the fundamentals and explain the topic step by step.
+NA2-0512: Learning is being affected. The marking scheme is not explained before assessments. Use relevant examples and show the reasoning behind each step.
+NA2-0513: Repeated concern: The marking scheme is not explained before assessments. Check understanding before moving to the next concept.
+NA2-0514: Correction required: The marking scheme is not explained before assessments. Allocate time for questions and clarification.
+NA2-0515: The marking scheme is not explained before assessments. Provide complete, clear, unit-wise learning material.
+NA2-0516: Problem reported: The marking scheme is not explained before assessments. Include more hands-on practice and individual problem-solving.
+NA2-0517: This issue is affecting learning: The marking scheme is not explained before assessments. Explain mistakes and give actionable feedback.
+NA2-0518: Complaint: The marking scheme is not explained before assessments. Share instructions and study material before the relevant class.
+NA2-0519: Students are facing difficulty because the marking scheme is not explained before assessments. Address the issue consistently instead of leaving it unresolved.
+NA2-0520: This needs attention: The marking scheme is not explained before assessments. Review the teaching plan and make the necessary changes.
+NA2-0521: Learning is being affected. Marks are returned without explaining mistakes. Start from the fundamentals and explain the topic step by step.
+NA2-0522: Repeated concern: Marks are returned without explaining mistakes. Use relevant examples and show the reasoning behind each step.
+NA2-0523: Correction required: Marks are returned without explaining mistakes. Check understanding before moving to the next concept.
+NA2-0524: Marks are returned without explaining mistakes. Allocate time for questions and clarification.
+NA2-0525: Problem reported: Marks are returned without explaining mistakes. Provide complete, clear, unit-wise learning material.
+NA2-0526: This issue is affecting learning: Marks are returned without explaining mistakes. Include more hands-on practice and individual problem-solving.
+NA2-0527: Complaint: Marks are returned without explaining mistakes. Explain mistakes and give actionable feedback.
+NA2-0528: Computer lab ka internet disconnect hota hai aur software missing hai.
+NA2-0529: This needs attention: Marks are returned without explaining mistakes. Address the issue consistently instead of leaving it unresolved.
+NA2-0530: The following problem remains unresolved: Marks are returned without explaining mistakes. Review the teaching plan and make the necessary changes.
+NA2-0531: Repeated concern: The syllabus is incomplete when the central quiz takes place. Start from the fundamentals and explain the topic step by step.
+NA2-0532: Correction required: The syllabus is incomplete when the central quiz takes place. Use relevant examples and show the reasoning behind each step.
+NA2-0533: The syllabus is incomplete when the central quiz takes place. Check understanding before moving to the next concept.
+NA2-0534: Problem reported: The syllabus is incomplete when the central quiz takes place. Allocate time for questions and clarification.
+NA2-0535: This issue is affecting learning: The syllabus is incomplete when the central quiz takes place. Provide complete, clear, unit-wise learning material.
+NA2-0536: Complaint: The syllabus is incomplete when the central quiz takes place. Include more hands-on practice and individual problem-solving.
+NA2-0537: Students are facing difficulty because the syllabus is incomplete when the central quiz takes place. Explain mistakes and give actionable feedback.
+NA2-0538: This needs attention: The syllabus is incomplete when the central quiz takes place. Share instructions and study material before the relevant class.
+NA2-0539: The following problem remains unresolved: The syllabus is incomplete when the central quiz takes place. Address the issue consistently instead of leaving it unresolved.
+NA2-0540: Learning is being affected. The syllabus is incomplete when the central quiz takes place. Review the teaching plan and make the necessary changes.
+NA2-0541: Correction required: Assessment instructions are confusing. Start from the fundamentals and explain the topic step by step.
+NA2-0542: Assessment instructions are confusing. Use relevant examples and show the reasoning behind each step.
+NA2-0543: Problem reported: Assessment instructions are confusing. Check understanding before moving to the next concept.
+NA2-0544: This issue is affecting learning: Assessment instructions are confusing. Allocate time for questions and clarification.
+NA2-0545: Complaint: Assessment instructions are confusing. Provide complete, clear, unit-wise learning material.
+NA2-0546: Students are facing difficulty because assessment instructions are confusing. Include more hands-on practice and individual problem-solving.
+NA2-0547: This needs attention: Assessment instructions are confusing. Explain mistakes and give actionable feedback.
+NA2-0548: The following problem remains unresolved: Assessment instructions are confusing. Share instructions and study material before the relevant class.
+NA2-0549: Learning is being affected. Assessment instructions are confusing. Address the issue consistently instead of leaving it unresolved.
+NA2-0550: Repeated concern: Assessment instructions are confusing. Review the teaching plan and make the necessary changes.
+NA2-0551: The allotted test time is insufficient. Start from the fundamentals and explain the topic step by step.
+NA2-0552: Problem reported: The allotted test time is insufficient. Use relevant examples and show the reasoning behind each step.
+NA2-0553: This issue is affecting learning: The allotted test time is insufficient. Check understanding before moving to the next concept.
+NA2-0554: Complaint: The allotted test time is insufficient. Allocate time for questions and clarification.
+NA2-0555: Students are facing difficulty because the allotted test time is insufficient. Provide complete, clear, unit-wise learning material.
+NA2-0556: This needs attention: The allotted test time is insufficient. Include more hands-on practice and individual problem-solving.
+NA2-0557: The following problem remains unresolved: The allotted test time is insufficient. Explain mistakes and give actionable feedback.
+NA2-0558: Learning is being affected. The allotted test time is insufficient. Share instructions and study material before the relevant class.
+NA2-0559: Topics jaldi complete hote hain aur revision nahi hota.
+NA2-0560: Correction required: The allotted test time is insufficient. Review the teaching plan and make the necessary changes.
+NA2-0561: Problem reported: The answer key is not discussed after the quiz. Start from the fundamentals and explain the topic step by step.
+NA2-0562: This issue is affecting learning: The answer key is not discussed after the quiz. Use relevant examples and show the reasoning behind each step.
+NA2-0563: Complaint: The answer key is not discussed after the quiz. Check understanding before moving to the next concept.
+NA2-0564: Students are facing difficulty because the answer key is not discussed after the quiz. Allocate time for questions and clarification.
+NA2-0565: This needs attention: The answer key is not discussed after the quiz. Provide complete, clear, unit-wise learning material.
+NA2-0566: The following problem remains unresolved: The answer key is not discussed after the quiz. Include more hands-on practice and individual problem-solving.
+NA2-0567: Learning is being affected. The answer key is not discussed after the quiz. Explain mistakes and give actionable feedback.
+NA2-0568: Repeated concern: The answer key is not discussed after the quiz. Share instructions and study material before the relevant class.
+NA2-0569: Correction required: The answer key is not discussed after the quiz. Address the issue consistently instead of leaving it unresolved.
+NA2-0570: The answer key is not discussed after the quiz. Review the teaching plan and make the necessary changes.
+NA2-0571: This issue is affecting learning: Students are not told which topics will be assessed. Start from the fundamentals and explain the topic step by step.
+NA2-0572: Complaint: Students are not told which topics will be assessed. Use relevant examples and show the reasoning behind each step.
+NA2-0573: Students are facing difficulty because students are not told which topics will be assessed. Check understanding before moving to the next concept.
+NA2-0574: This needs attention: Students are not told which topics will be assessed. Allocate time for questions and clarification.
+NA2-0575: The following problem remains unresolved: Students are not told which topics will be assessed. Provide complete, clear, unit-wise learning material.
+NA2-0576: Learning is being affected. Students are not told which topics will be assessed. Include more hands-on practice and individual problem-solving.
+NA2-0577: Repeated concern: Students are not told which topics will be assessed. Explain mistakes and give actionable feedback.
+NA2-0578: Correction required: Students are not told which topics will be assessed. Share instructions and study material before the relevant class.
+NA2-0579: Students are not told which topics will be assessed. Address the issue consistently instead of leaving it unresolved.
+NA2-0580: Problem reported: Students are not told which topics will be assessed. Review the teaching plan and make the necessary changes.
+NA2-0581: Complaint: Evaluation criteria appear inconsistent. Start from the fundamentals and explain the topic step by step.
+NA2-0582: Students are facing difficulty because evaluation criteria appear inconsistent. Use relevant examples and show the reasoning behind each step.
+NA2-0583: This needs attention: Evaluation criteria appear inconsistent. Check understanding before moving to the next concept.
+NA2-0584: The following problem remains unresolved: Evaluation criteria appear inconsistent. Allocate time for questions and clarification.
+NA2-0585: Learning is being affected. Evaluation criteria appear inconsistent. Provide complete, clear, unit-wise learning material.
+NA2-0586: Repeated concern: Evaluation criteria appear inconsistent. Include more hands-on practice and individual problem-solving.
+NA2-0587: Correction required: Evaluation criteria appear inconsistent. Explain mistakes and give actionable feedback.
+NA2-0588: Evaluation criteria appear inconsistent. Share instructions and study material before the relevant class.
+NA2-0589: Problem reported: Evaluation criteria appear inconsistent. Address the issue consistently instead of leaving it unresolved.
+NA2-0590: Assignment mein problem aane par individual guidance nahi milti.
+NA2-0591: Students are facing difficulty because reported errors in quiz questions are not addressed. Start from the fundamentals and explain the topic step by step.
+NA2-0592: This needs attention: Reported errors in quiz questions are not addressed. Use relevant examples and show the reasoning behind each step.
+NA2-0593: The following problem remains unresolved: Reported errors in quiz questions are not addressed. Check understanding before moving to the next concept.
+NA2-0594: Learning is being affected. Reported errors in quiz questions are not addressed. Allocate time for questions and clarification.
+NA2-0595: Repeated concern: Reported errors in quiz questions are not addressed. Provide complete, clear, unit-wise learning material.
+NA2-0596: Correction required: Reported errors in quiz questions are not addressed. Include more hands-on practice and individual problem-solving.
+NA2-0597: Reported errors in quiz questions are not addressed. Explain mistakes and give actionable feedback.
+NA2-0598: Problem reported: Reported errors in quiz questions are not addressed. Share instructions and study material before the relevant class.
+NA2-0599: This issue is affecting learning: Reported errors in quiz questions are not addressed. Address the issue consistently instead of leaving it unresolved.
+NA2-0600: Complaint: Reported errors in quiz questions are not addressed. Review the teaching plan and make the necessary changes.
+NA2-0601: The following problem remains unresolved: The class is monotonous and difficult to stay engaged in. Start from the fundamentals and explain the topic step by step.
+NA2-0602: Learning is being affected. The class is monotonous and difficult to stay engaged in. Use relevant examples and show the reasoning behind each step.
+NA2-0603: Repeated concern: The class is monotonous and difficult to stay engaged in. Check understanding before moving to the next concept.
+NA2-0604: Correction required: The class is monotonous and difficult to stay engaged in. Allocate time for questions and clarification.
+NA2-0605: The class is monotonous and difficult to stay engaged in. Provide complete, clear, unit-wise learning material.
+NA2-0606: Problem reported: The class is monotonous and difficult to stay engaged in. Include more hands-on practice and individual problem-solving.
+NA2-0607: This issue is affecting learning: The class is monotonous and difficult to stay engaged in. Explain mistakes and give actionable feedback.
+NA2-0608: Complaint: The class is monotonous and difficult to stay engaged in. Share instructions and study material before the relevant class.
+NA2-0609: Students are facing difficulty because the class is monotonous and difficult to stay engaged in. Address the issue consistently instead of leaving it unresolved.
+NA2-0610: This needs attention: The class is monotonous and difficult to stay engaged in. Review the teaching plan and make the necessary changes.
+NA2-0611: Learning is being affected. Students are rarely invited to participate. Start from the fundamentals and explain the topic step by step.
+NA2-0612: Repeated concern: Students are rarely invited to participate. Use relevant examples and show the reasoning behind each step.
+NA2-0613: Correction required: Students are rarely invited to participate. Check understanding before moving to the next concept.
+NA2-0614: Students are rarely invited to participate. Allocate time for questions and clarification.
+NA2-0615: Problem reported: Students are rarely invited to participate. Provide complete, clear, unit-wise learning material.
+NA2-0616: This issue is affecting learning: Students are rarely invited to participate. Include more hands-on practice and individual problem-solving.
+NA2-0617: Complaint: Students are rarely invited to participate. Explain mistakes and give actionable feedback.
+NA2-0618: Students are facing difficulty because students are rarely invited to participate. Share instructions and study material before the relevant class.
+NA2-0619: This needs attention: Students are rarely invited to participate. Address the issue consistently instead of leaving it unresolved.
+NA2-0620: The following problem remains unresolved: Students are rarely invited to participate. Review the teaching plan and make the necessary changes.
+NA2-0621: Code ka output bataya jata hai lekin debugging nahi samjhate.
+NA2-0622: Correction required: The instructor speaks too softly for the back rows. Use relevant examples and show the reasoning behind each step.
+NA2-0623: The instructor speaks too softly for the back rows. Check understanding before moving to the next concept.
+NA2-0624: Problem reported: The instructor speaks too softly for the back rows. Allocate time for questions and clarification.
+NA2-0625: This issue is affecting learning: The instructor speaks too softly for the back rows. Provide complete, clear, unit-wise learning material.
+NA2-0626: Complaint: The instructor speaks too softly for the back rows. Include more hands-on practice and individual problem-solving.
+NA2-0627: Students are facing difficulty because the instructor speaks too softly for the back rows. Explain mistakes and give actionable feedback.
+NA2-0628: This needs attention: The instructor speaks too softly for the back rows. Share instructions and study material before the relevant class.
+NA2-0629: The following problem remains unresolved: The instructor speaks too softly for the back rows. Address the issue consistently instead of leaving it unresolved.
+NA2-0630: Learning is being affected. The instructor speaks too softly for the back rows. Review the teaching plan and make the necessary changes.
+NA2-0631: Correction required: The lecture relies on slides without discussion. Start from the fundamentals and explain the topic step by step.
+NA2-0632: The lecture relies on slides without discussion. Use relevant examples and show the reasoning behind each step.
+NA2-0633: Problem reported: The lecture relies on slides without discussion. Check understanding before moving to the next concept.
+NA2-0634: This issue is affecting learning: The lecture relies on slides without discussion. Allocate time for questions and clarification.
+NA2-0635: Complaint: The lecture relies on slides without discussion. Provide complete, clear, unit-wise learning material.
+NA2-0636: Students are facing difficulty because the lecture relies on slides without discussion. Include more hands-on practice and individual problem-solving.
+NA2-0637: This needs attention: The lecture relies on slides without discussion. Explain mistakes and give actionable feedback.
+NA2-0638: The following problem remains unresolved: The lecture relies on slides without discussion. Share instructions and study material before the relevant class.
+NA2-0639: Learning is being affected. The lecture relies on slides without discussion. Address the issue consistently instead of leaving it unresolved.
+NA2-0640: Repeated concern: The lecture relies on slides without discussion. Review the teaching plan and make the necessary changes.
+NA2-0641: Class instructions are unclear. Start from the fundamentals and explain the topic step by step.
+NA2-0642: Problem reported: Class instructions are unclear. Use relevant examples and show the reasoning behind each step.
+NA2-0643: This issue is affecting learning: Class instructions are unclear. Check understanding before moving to the next concept.
+NA2-0644: Complaint: Class instructions are unclear. Allocate time for questions and clarification.
+NA2-0645: Students are facing difficulty because class instructions are unclear. Provide complete, clear, unit-wise learning material.
+NA2-0646: This needs attention: Class instructions are unclear. Include more hands-on practice and individual problem-solving.
+NA2-0647: The following problem remains unresolved: Class instructions are unclear. Explain mistakes and give actionable feedback.
+NA2-0648: Learning is being affected. Class instructions are unclear. Share instructions and study material before the relevant class.
+NA2-0649: Repeated concern: Class instructions are unclear. Address the issue consistently instead of leaving it unresolved.
+NA2-0650: Correction required: Class instructions are unclear. Review the teaching plan and make the necessary changes.
+NA2-0651: Problem reported: The teacher does not check whether students are following. Start from the fundamentals and explain the topic step by step.
+NA2-0652: Lab hours kam hain, programs complete karne ka time nahi milta.
+NA2-0653: Complaint: The teacher does not check whether students are following. Check understanding before moving to the next concept.
+NA2-0654: Students are facing difficulty because the teacher does not check whether students are following. Allocate time for questions and clarification.
+NA2-0655: This needs attention: The teacher does not check whether students are following. Provide complete, clear, unit-wise learning material.
+NA2-0656: The following problem remains unresolved: The teacher does not check whether students are following. Include more hands-on practice and individual problem-solving.
+NA2-0657: Learning is being affected. The teacher does not check whether students are following. Explain mistakes and give actionable feedback.
+NA2-0658: Repeated concern: The teacher does not check whether students are following. Share instructions and study material before the relevant class.
+NA2-0659: Correction required: The teacher does not check whether students are following. Address the issue consistently instead of leaving it unresolved.
+NA2-0660: The teacher does not check whether students are following. Review the teaching plan and make the necessary changes.
+NA2-0661: This issue is affecting learning: Real-world examples are rarely used. Start from the fundamentals and explain the topic step by step.
+NA2-0662: Complaint: Real-world examples are rarely used. Use relevant examples and show the reasoning behind each step.
+NA2-0663: Students are facing difficulty because real-world examples are rarely used. Check understanding before moving to the next concept.
+NA2-0664: This needs attention: Real-world examples are rarely used. Allocate time for questions and clarification.
+NA2-0665: The following problem remains unresolved: Real-world examples are rarely used. Provide complete, clear, unit-wise learning material.
+NA2-0666: Learning is being affected. Real-world examples are rarely used. Include more hands-on practice and individual problem-solving.
+NA2-0667: Repeated concern: Real-world examples are rarely used. Explain mistakes and give actionable feedback.
+NA2-0668: Correction required: Real-world examples are rarely used. Share instructions and study material before the relevant class.
+NA2-0669: Real-world examples are rarely used. Address the issue consistently instead of leaving it unresolved.
+NA2-0670: Problem reported: Real-world examples are rarely used. Review the teaching plan and make the necessary changes.
+NA2-0671: Complaint: Students cannot discuss alternative solution methods. Start from the fundamentals and explain the topic step by step.
+NA2-0672: Students are facing difficulty because students cannot discuss alternative solution methods. Use relevant examples and show the reasoning behind each step.
+NA2-0673: This needs attention: Students cannot discuss alternative solution methods. Check understanding before moving to the next concept.
+NA2-0674: The following problem remains unresolved: Students cannot discuss alternative solution methods. Allocate time for questions and clarification.
+NA2-0675: Learning is being affected. Students cannot discuss alternative solution methods. Provide complete, clear, unit-wise learning material.
+NA2-0676: Repeated concern: Students cannot discuss alternative solution methods. Include more hands-on practice and individual problem-solving.
+NA2-0677: Correction required: Students cannot discuss alternative solution methods. Explain mistakes and give actionable feedback.
+NA2-0678: Students cannot discuss alternative solution methods. Share instructions and study material before the relevant class.
+NA2-0679: Problem reported: Students cannot discuss alternative solution methods. Address the issue consistently instead of leaving it unresolved.
+NA2-0680: This issue is affecting learning: Students cannot discuss alternative solution methods. Review the teaching plan and make the necessary changes.
+NA2-0681: Students are facing difficulty because the classroom environment discourages students from speaking. Start from the fundamentals and explain the topic step by step.
+NA2-0682: This needs attention: The classroom environment discourages students from speaking. Use relevant examples and show the reasoning behind each step.
+NA2-0683: Class mein students ko participate karne ka mauka nahi milta.
+NA2-0684: Learning is being affected. The classroom environment discourages students from speaking. Allocate time for questions and clarification.
+NA2-0685: Repeated concern: The classroom environment discourages students from speaking. Provide complete, clear, unit-wise learning material.
+NA2-0686: Correction required: The classroom environment discourages students from speaking. Include more hands-on practice and individual problem-solving.
+NA2-0687: The classroom environment discourages students from speaking. Explain mistakes and give actionable feedback.
+NA2-0688: Problem reported: The classroom environment discourages students from speaking. Share instructions and study material before the relevant class.
+NA2-0689: This issue is affecting learning: The classroom environment discourages students from speaking. Address the issue consistently instead of leaving it unresolved.
+NA2-0690: Complaint: The classroom environment discourages students from speaking. Review the teaching plan and make the necessary changes.
+NA2-0691: This needs attention: Announcements about class activities are communicated late. Start from the fundamentals and explain the topic step by step.
+NA2-0692: The following problem remains unresolved: Announcements about class activities are communicated late. Use relevant examples and show the reasoning behind each step.
+NA2-0693: Learning is being affected. Announcements about class activities are communicated late. Check understanding before moving to the next concept.
+NA2-0694: Repeated concern: Announcements about class activities are communicated late. Allocate time for questions and clarification.
+NA2-0695: Correction required: Announcements about class activities are communicated late. Provide complete, clear, unit-wise learning material.
+NA2-0696: Announcements about class activities are communicated late. Include more hands-on practice and individual problem-solving.
+NA2-0697: Problem reported: Announcements about class activities are communicated late. Explain mistakes and give actionable feedback.
+NA2-0698: This issue is affecting learning: Announcements about class activities are communicated late. Share instructions and study material before the relevant class.
+NA2-0699: Complaint: Announcements about class activities are communicated late. Address the issue consistently instead of leaving it unresolved.
+NA2-0700: Students are facing difficulty because announcements about class activities are communicated late. Review the teaching plan and make the necessary changes.
+NA2-0701: Learning is being affected. Lab computers frequently stop working. Start from the fundamentals and explain the topic step by step.
+NA2-0702: Repeated concern: Lab computers frequently stop working. Use relevant examples and show the reasoning behind each step.
+NA2-0703: Correction required: Lab computers frequently stop working. Check understanding before moving to the next concept.
+NA2-0704: Lab computers frequently stop working. Allocate time for questions and clarification.
+NA2-0705: Problem reported: Lab computers frequently stop working. Provide complete, clear, unit-wise learning material.
+NA2-0706: This issue is affecting learning: Lab computers frequently stop working. Include more hands-on practice and individual problem-solving.
+NA2-0707: Complaint: Lab computers frequently stop working. Explain mistakes and give actionable feedback.
+NA2-0708: Students are facing difficulty because lab computers frequently stop working. Share instructions and study material before the relevant class.
+NA2-0709: This needs attention: Lab computers frequently stop working. Address the issue consistently instead of leaving it unresolved.
+NA2-0710: The following problem remains unresolved: Lab computers frequently stop working. Review the teaching plan and make the necessary changes.
+NA2-0711: Repeated concern: The internet connection interrupts practical work. Start from the fundamentals and explain the topic step by step.
+NA2-0712: Correction required: The internet connection interrupts practical work. Use relevant examples and show the reasoning behind each step.
+NA2-0713: The internet connection interrupts practical work. Check understanding before moving to the next concept.
+NA2-0714: Assignment requirements last moment par batayi jaati hain.
+NA2-0715: This issue is affecting learning: The internet connection interrupts practical work. Provide complete, clear, unit-wise learning material.
+NA2-0716: Complaint: The internet connection interrupts practical work. Include more hands-on practice and individual problem-solving.
+NA2-0717: Students are facing difficulty because the internet connection interrupts practical work. Explain mistakes and give actionable feedback.
+NA2-0718: This needs attention: The internet connection interrupts practical work. Share instructions and study material before the relevant class.
+NA2-0719: The following problem remains unresolved: The internet connection interrupts practical work. Address the issue consistently instead of leaving it unresolved.
+NA2-0720: Learning is being affected. The internet connection interrupts practical work. Review the teaching plan and make the necessary changes.
+NA2-0721: Correction required: Required software is missing from lab computers. Start from the fundamentals and explain the topic step by step.
+NA2-0722: Required software is missing from lab computers. Use relevant examples and show the reasoning behind each step.
+NA2-0723: Problem reported: Required software is missing from lab computers. Check understanding before moving to the next concept.
+NA2-0724: This issue is affecting learning: Required software is missing from lab computers. Allocate time for questions and clarification.
+NA2-0725: Complaint: Required software is missing from lab computers. Provide complete, clear, unit-wise learning material.
+NA2-0726: Students are facing difficulty because required software is missing from lab computers. Include more hands-on practice and individual problem-solving.
+NA2-0727: This needs attention: Required software is missing from lab computers. Explain mistakes and give actionable feedback.
+NA2-0728: The following problem remains unresolved: Required software is missing from lab computers. Share instructions and study material before the relevant class.
+NA2-0729: Learning is being affected. Required software is missing from lab computers. Address the issue consistently instead of leaving it unresolved.
+NA2-0730: Repeated concern: Required software is missing from lab computers. Review the teaching plan and make the necessary changes.
+NA2-0731: Lab equipment is outdated for assigned tasks. Start from the fundamentals and explain the topic step by step.
+NA2-0732: Problem reported: Lab equipment is outdated for assigned tasks. Use relevant examples and show the reasoning behind each step.
+NA2-0733: This issue is affecting learning: Lab equipment is outdated for assigned tasks. Check understanding before moving to the next concept.
+NA2-0734: Complaint: Lab equipment is outdated for assigned tasks. Allocate time for questions and clarification.
+NA2-0735: Students are facing difficulty because lab equipment is outdated for assigned tasks. Provide complete, clear, unit-wise learning material.
+NA2-0736: This needs attention: Lab equipment is outdated for assigned tasks. Include more hands-on practice and individual problem-solving.
+NA2-0737: The following problem remains unresolved: Lab equipment is outdated for assigned tasks. Explain mistakes and give actionable feedback.
+NA2-0738: Learning is being affected. Lab equipment is outdated for assigned tasks. Share instructions and study material before the relevant class.
+NA2-0739: Repeated concern: Lab equipment is outdated for assigned tasks. Address the issue consistently instead of leaving it unresolved.
+NA2-0740: Correction required: Lab equipment is outdated for assigned tasks. Review the teaching plan and make the necessary changes.
+NA2-0741: Problem reported: There are not enough working computers for students. Start from the fundamentals and explain the topic step by step.
+NA2-0742: This issue is affecting learning: There are not enough working computers for students. Use relevant examples and show the reasoning behind each step.
+NA2-0743: Complaint: There are not enough working computers for students. Check understanding before moving to the next concept.
+NA2-0744: Students are facing difficulty because there are not enough working computers for students. Allocate time for questions and clarification.
+NA2-0745: Important concepts ke steps skip hote hain, solution follow nahi hota.
+NA2-0746: The following problem remains unresolved: There are not enough working computers for students. Include more hands-on practice and individual problem-solving.
+NA2-0747: Learning is being affected. There are not enough working computers for students. Explain mistakes and give actionable feedback.
+NA2-0748: Repeated concern: There are not enough working computers for students. Share instructions and study material before the relevant class.
+NA2-0749: Correction required: There are not enough working computers for students. Address the issue consistently instead of leaving it unresolved.
+NA2-0750: There are not enough working computers for students. Review the teaching plan and make the necessary changes.
+NA2-0751: This issue is affecting learning: The projector display is unclear. Start from the fundamentals and explain the topic step by step.
+NA2-0752: Complaint: The projector display is unclear. Use relevant examples and show the reasoning behind each step.
+NA2-0753: Students are facing difficulty because the projector display is unclear. Check understanding before moving to the next concept.
+NA2-0754: This needs attention: The projector display is unclear. Allocate time for questions and clarification.
+NA2-0755: The following problem remains unresolved: The projector display is unclear. Provide complete, clear, unit-wise learning material.
+NA2-0756: Learning is being affected. The projector display is unclear. Include more hands-on practice and individual problem-solving.
+NA2-0757: Repeated concern: The projector display is unclear. Explain mistakes and give actionable feedback.
+NA2-0758: Correction required: The projector display is unclear. Share instructions and study material before the relevant class.
+NA2-0759: The projector display is unclear. Address the issue consistently instead of leaving it unresolved.
+NA2-0760: Problem reported: The projector display is unclear. Review the teaching plan and make the necessary changes.
+NA2-0761: Complaint: Students lose lab time waiting for functioning systems. Start from the fundamentals and explain the topic step by step.
+NA2-0762: Students are facing difficulty because students lose lab time waiting for functioning systems. Use relevant examples and show the reasoning behind each step.
+NA2-0763: This needs attention: Students lose lab time waiting for functioning systems. Check understanding before moving to the next concept.
+NA2-0764: The following problem remains unresolved: Students lose lab time waiting for functioning systems. Allocate time for questions and clarification.
+NA2-0765: Learning is being affected. Students lose lab time waiting for functioning systems. Provide complete, clear, unit-wise learning material.
+NA2-0766: Repeated concern: Students lose lab time waiting for functioning systems. Include more hands-on practice and individual problem-solving.
+NA2-0767: Correction required: Students lose lab time waiting for functioning systems. Explain mistakes and give actionable feedback.
+NA2-0768: Students lose lab time waiting for functioning systems. Share instructions and study material before the relevant class.
+NA2-0769: Problem reported: Students lose lab time waiting for functioning systems. Address the issue consistently instead of leaving it unresolved.
+NA2-0770: This issue is affecting learning: Students lose lab time waiting for functioning systems. Review the teaching plan and make the necessary changes.
+NA2-0771: Students are facing difficulty because software works differently across lab computers. Start from the fundamentals and explain the topic step by step.
+NA2-0772: This needs attention: Software works differently across lab computers. Use relevant examples and show the reasoning behind each step.
+NA2-0773: The following problem remains unresolved: Software works differently across lab computers. Check understanding before moving to the next concept.
+NA2-0774: Learning is being affected. Software works differently across lab computers. Allocate time for questions and clarification.
+NA2-0775: Repeated concern: Software works differently across lab computers. Provide complete, clear, unit-wise learning material.
+NA2-0776: Slides mein bahut text hai aur diagrams ya solved examples nahi hain.
+NA2-0777: Software works differently across lab computers. Explain mistakes and give actionable feedback.
+NA2-0778: Problem reported: Software works differently across lab computers. Share instructions and study material before the relevant class.
+NA2-0779: This issue is affecting learning: Software works differently across lab computers. Address the issue consistently instead of leaving it unresolved.
+NA2-0780: Complaint: Software works differently across lab computers. Review the teaching plan and make the necessary changes.
+NA2-0781: This needs attention: Lab sessions are too short for assigned experiments. Start from the fundamentals and explain the topic step by step.
+NA2-0782: The following problem remains unresolved: Lab sessions are too short for assigned experiments. Use relevant examples and show the reasoning behind each step.
+NA2-0783: Learning is being affected. Lab sessions are too short for assigned experiments. Check understanding before moving to the next concept.
+NA2-0784: Repeated concern: Lab sessions are too short for assigned experiments. Allocate time for questions and clarification.
+NA2-0785: Correction required: Lab sessions are too short for assigned experiments. Provide complete, clear, unit-wise learning material.
+NA2-0786: Lab sessions are too short for assigned experiments. Include more hands-on practice and individual problem-solving.
+NA2-0787: Problem reported: Lab sessions are too short for assigned experiments. Explain mistakes and give actionable feedback.
+NA2-0788: This issue is affecting learning: Lab sessions are too short for assigned experiments. Share instructions and study material before the relevant class.
+NA2-0789: Complaint: Lab sessions are too short for assigned experiments. Address the issue consistently instead of leaving it unresolved.
+NA2-0790: Students are facing difficulty because lab sessions are too short for assigned experiments. Review the teaching plan and make the necessary changes.
+NA2-0791: The following problem remains unresolved: Reported equipment faults remain unresolved. Start from the fundamentals and explain the topic step by step.
+NA2-0792: Learning is being affected. Reported equipment faults remain unresolved. Use relevant examples and show the reasoning behind each step.
+NA2-0793: Repeated concern: Reported equipment faults remain unresolved. Check understanding before moving to the next concept.
+NA2-0794: Correction required: Reported equipment faults remain unresolved. Allocate time for questions and clarification.
+NA2-0795: Reported equipment faults remain unresolved. Provide complete, clear, unit-wise learning material.
+NA2-0796: Problem reported: Reported equipment faults remain unresolved. Include more hands-on practice and individual problem-solving.
+NA2-0797: This issue is affecting learning: Reported equipment faults remain unresolved. Explain mistakes and give actionable feedback.
+NA2-0798: Complaint: Reported equipment faults remain unresolved. Share instructions and study material before the relevant class.
+NA2-0799: Students are facing difficulty because reported equipment faults remain unresolved. Address the issue consistently instead of leaving it unresolved.
+NA2-0800: This needs attention: Reported equipment faults remain unresolved. Review the teaching plan and make the necessary changes.
+NA2-0801: Repeated concern: The syllabus is not completed before the scheduled assessment. Start from the fundamentals and explain the topic step by step.
+NA2-0802: Correction required: The syllabus is not completed before the scheduled assessment. Use relevant examples and show the reasoning behind each step.
+NA2-0803: The syllabus is not completed before the scheduled assessment. Check understanding before moving to the next concept.
+NA2-0804: Problem reported: The syllabus is not completed before the scheduled assessment. Allocate time for questions and clarification.
+NA2-0805: This issue is affecting learning: The syllabus is not completed before the scheduled assessment. Provide complete, clear, unit-wise learning material.
+NA2-0806: Complaint: The syllabus is not completed before the scheduled assessment. Include more hands-on practice and individual problem-solving.
+NA2-0807: Marks ke criteria transparent nahi hain aur evaluation ka reason nahi bataya jata.
+NA2-0808: This needs attention: The syllabus is not completed before the scheduled assessment. Share instructions and study material before the relevant class.
+NA2-0809: The following problem remains unresolved: The syllabus is not completed before the scheduled assessment. Address the issue consistently instead of leaving it unresolved.
+NA2-0810: Learning is being affected. The syllabus is not completed before the scheduled assessment. Review the teaching plan and make the necessary changes.
+NA2-0811: Correction required: Advanced topics begin before prerequisites are revised. Start from the fundamentals and explain the topic step by step.
+NA2-0812: Advanced topics begin before prerequisites are revised. Use relevant examples and show the reasoning behind each step.
+NA2-0813: Problem reported: Advanced topics begin before prerequisites are revised. Check understanding before moving to the next concept.
+NA2-0814: This issue is affecting learning: Advanced topics begin before prerequisites are revised. Allocate time for questions and clarification.
+NA2-0815: Complaint: Advanced topics begin before prerequisites are revised. Provide complete, clear, unit-wise learning material.
+NA2-0816: Students are facing difficulty because advanced topics begin before prerequisites are revised. Include more hands-on practice and individual problem-solving.
+NA2-0817: This needs attention: Advanced topics begin before prerequisites are revised. Explain mistakes and give actionable feedback.
+NA2-0818: The following problem remains unresolved: Advanced topics begin before prerequisites are revised. Share instructions and study material before the relevant class.
+NA2-0819: Learning is being affected. Advanced topics begin before prerequisites are revised. Address the issue consistently instead of leaving it unresolved.
+NA2-0820: Repeated concern: Advanced topics begin before prerequisites are revised. Review the teaching plan and make the necessary changes.
+NA2-0821: There is no revision before major examinations. Start from the fundamentals and explain the topic step by step.
+NA2-0822: Problem reported: There is no revision before major examinations. Use relevant examples and show the reasoning behind each step.
+NA2-0823: This issue is affecting learning: There is no revision before major examinations. Check understanding before moving to the next concept.
+NA2-0824: Complaint: There is no revision before major examinations. Allocate time for questions and clarification.
+NA2-0825: Students are facing difficulty because there is no revision before major examinations. Provide complete, clear, unit-wise learning material.
+NA2-0826: This needs attention: There is no revision before major examinations. Include more hands-on practice and individual problem-solving.
+NA2-0827: The following problem remains unresolved: There is no revision before major examinations. Explain mistakes and give actionable feedback.
+NA2-0828: Learning is being affected. There is no revision before major examinations. Share instructions and study material before the relevant class.
+NA2-0829: Repeated concern: There is no revision before major examinations. Address the issue consistently instead of leaving it unresolved.
+NA2-0830: Correction required: There is no revision before major examinations. Review the teaching plan and make the necessary changes.
+NA2-0831: Problem reported: Theory and lab schedules are not coordinated. Start from the fundamentals and explain the topic step by step.
+NA2-0832: This issue is affecting learning: Theory and lab schedules are not coordinated. Use relevant examples and show the reasoning behind each step.
+NA2-0833: Complaint: Theory and lab schedules are not coordinated. Check understanding before moving to the next concept.
+NA2-0834: Students are facing difficulty because theory and lab schedules are not coordinated. Allocate time for questions and clarification.
+NA2-0835: This needs attention: Theory and lab schedules are not coordinated. Provide complete, clear, unit-wise learning material.
+NA2-0836: The following problem remains unresolved: Theory and lab schedules are not coordinated. Include more hands-on practice and individual problem-solving.
+NA2-0837: Learning is being affected. Theory and lab schedules are not coordinated. Explain mistakes and give actionable feedback.
+NA2-0838: Class mein doubts poochne par students comfortable feel nahi karte.
+NA2-0839: Correction required: Theory and lab schedules are not coordinated. Address the issue consistently instead of leaving it unresolved.
+NA2-0840: Theory and lab schedules are not coordinated. Review the teaching plan and make the necessary changes.
+NA2-0841: This issue is affecting learning: Important units are left until the end of the semester. Start from the fundamentals and explain the topic step by step.
+NA2-0842: Complaint: Important units are left until the end of the semester. Use relevant examples and show the reasoning behind each step.
+NA2-0843: Students are facing difficulty because important units are left until the end of the semester. Check understanding before moving to the next concept.
+NA2-0844: This needs attention: Important units are left until the end of the semester. Allocate time for questions and clarification.
+NA2-0845: The following problem remains unresolved: Important units are left until the end of the semester. Provide complete, clear, unit-wise learning material.
+NA2-0846: Learning is being affected. Important units are left until the end of the semester. Include more hands-on practice and individual problem-solving.
+NA2-0847: Repeated concern: Important units are left until the end of the semester. Explain mistakes and give actionable feedback.
+NA2-0848: Correction required: Important units are left until the end of the semester. Share instructions and study material before the relevant class.
+NA2-0849: Important units are left until the end of the semester. Address the issue consistently instead of leaving it unresolved.
+NA2-0850: Problem reported: Important units are left until the end of the semester. Review the teaching plan and make the necessary changes.
+NA2-0851: Complaint: Course objectives are not explained. Start from the fundamentals and explain the topic step by step.
+NA2-0852: Students are facing difficulty because course objectives are not explained. Use relevant examples and show the reasoning behind each step.
+NA2-0853: This needs attention: Course objectives are not explained. Check understanding before moving to the next concept.
+NA2-0854: The following problem remains unresolved: Course objectives are not explained. Allocate time for questions and clarification.
+NA2-0855: Learning is being affected. Course objectives are not explained. Provide complete, clear, unit-wise learning material.
+NA2-0856: Repeated concern: Course objectives are not explained. Include more hands-on practice and individual problem-solving.
+NA2-0857: Correction required: Course objectives are not explained. Explain mistakes and give actionable feedback.
+NA2-0858: Course objectives are not explained. Share instructions and study material before the relevant class.
+NA2-0859: Problem reported: Course objectives are not explained. Address the issue consistently instead of leaving it unresolved.
+NA2-0860: This issue is affecting learning: Course objectives are not explained. Review the teaching plan and make the necessary changes.
+NA2-0861: Students are facing difficulty because there are too few practice sessions before examinations. Start from the fundamentals and explain the topic step by step.
+NA2-0862: This needs attention: There are too few practice sessions before examinations. Use relevant examples and show the reasoning behind each step.
+NA2-0863: The following problem remains unresolved: There are too few practice sessions before examinations. Check understanding before moving to the next concept.
+NA2-0864: Learning is being affected. There are too few practice sessions before examinations. Allocate time for questions and clarification.
+NA2-0865: Repeated concern: There are too few practice sessions before examinations. Provide complete, clear, unit-wise learning material.
+NA2-0866: Correction required: There are too few practice sessions before examinations. Include more hands-on practice and individual problem-solving.
+NA2-0867: There are too few practice sessions before examinations. Explain mistakes and give actionable feedback.
+NA2-0868: Problem reported: There are too few practice sessions before examinations. Share instructions and study material before the relevant class.
+NA2-0869: Lab systems slow hain aur kai computers working condition mein nahi hain.
+NA2-0870: Complaint: There are too few practice sessions before examinations. Review the teaching plan and make the necessary changes.
+NA2-0871: This needs attention: Course schedule changes are communicated too late. Start from the fundamentals and explain the topic step by step.
+NA2-0872: The following problem remains unresolved: Course schedule changes are communicated too late. Use relevant examples and show the reasoning behind each step.
+NA2-0873: Learning is being affected. Course schedule changes are communicated too late. Check understanding before moving to the next concept.
+NA2-0874: Repeated concern: Course schedule changes are communicated too late. Allocate time for questions and clarification.
+NA2-0875: Correction required: Course schedule changes are communicated too late. Provide complete, clear, unit-wise learning material.
+NA2-0876: Course schedule changes are communicated too late. Include more hands-on practice and individual problem-solving.
+NA2-0877: Problem reported: Course schedule changes are communicated too late. Explain mistakes and give actionable feedback.
+NA2-0878: This issue is affecting learning: Course schedule changes are communicated too late. Share instructions and study material before the relevant class.
+NA2-0879: Complaint: Course schedule changes are communicated too late. Address the issue consistently instead of leaving it unresolved.
+NA2-0880: Students are facing difficulty because course schedule changes are communicated too late. Review the teaching plan and make the necessary changes.
+NA2-0881: The following problem remains unresolved: The teaching plan leaves too little time for difficult topics. Start from the fundamentals and explain the topic step by step.
+NA2-0882: Learning is being affected. The teaching plan leaves too little time for difficult topics. Use relevant examples and show the reasoning behind each step.
+NA2-0883: Repeated concern: The teaching plan leaves too little time for difficult topics. Check understanding before moving to the next concept.
+NA2-0884: Correction required: The teaching plan leaves too little time for difficult topics. Allocate time for questions and clarification.
+NA2-0885: The teaching plan leaves too little time for difficult topics. Provide complete, clear, unit-wise learning material.
+NA2-0886: Problem reported: The teaching plan leaves too little time for difficult topics. Include more hands-on practice and individual problem-solving.
+NA2-0887: This issue is affecting learning: The teaching plan leaves too little time for difficult topics. Explain mistakes and give actionable feedback.
+NA2-0888: Complaint: The teaching plan leaves too little time for difficult topics. Share instructions and study material before the relevant class.
+NA2-0889: Students are facing difficulty because the teaching plan leaves too little time for difficult topics. Address the issue consistently instead of leaving it unresolved.
+NA2-0890: This needs attention: The teaching plan leaves too little time for difficult topics. Review the teaching plan and make the necessary changes.
+NA2-0891: Learning is being affected. Students are not informed about syllabus progress. Start from the fundamentals and explain the topic step by step.
+NA2-0892: Repeated concern: Students are not informed about syllabus progress. Use relevant examples and show the reasoning behind each step.
+NA2-0893: Correction required: Students are not informed about syllabus progress. Check understanding before moving to the next concept.
+NA2-0894: Students are not informed about syllabus progress. Allocate time for questions and clarification.
+NA2-0895: Problem reported: Students are not informed about syllabus progress. Provide complete, clear, unit-wise learning material.
+NA2-0896: This issue is affecting learning: Students are not informed about syllabus progress. Include more hands-on practice and individual problem-solving.
+NA2-0897: Complaint: Students are not informed about syllabus progress. Explain mistakes and give actionable feedback.
+NA2-0898: Students are facing difficulty because students are not informed about syllabus progress. Share instructions and study material before the relevant class.
+NA2-0899: This needs attention: Students are not informed about syllabus progress. Address the issue consistently instead of leaving it unresolved.
+NA2-0900: Sir ready-made code copy karne ko kehte hain, khud code likhna nahi sikhate.
+NA2-0901: Correction required: The instructor responds impatiently to student questions. Start from the fundamentals and explain the topic step by step.
+NA2-0902: The instructor responds impatiently to student questions. Use relevant examples and show the reasoning behind each step.
+NA2-0903: Problem reported: The instructor responds impatiently to student questions. Check understanding before moving to the next concept.
+NA2-0904: This issue is affecting learning: The instructor responds impatiently to student questions. Allocate time for questions and clarification.
+NA2-0905: Complaint: The instructor responds impatiently to student questions. Provide complete, clear, unit-wise learning material.
+NA2-0906: Students are facing difficulty because the instructor responds impatiently to student questions. Include more hands-on practice and individual problem-solving.
+NA2-0907: This needs attention: The instructor responds impatiently to student questions. Explain mistakes and give actionable feedback.
+NA2-0908: The following problem remains unresolved: The instructor responds impatiently to student questions. Share instructions and study material before the relevant class.
+NA2-0909: Learning is being affected. The instructor responds impatiently to student questions. Address the issue consistently instead of leaving it unresolved.
+NA2-0910: Repeated concern: The instructor responds impatiently to student questions. Review the teaching plan and make the necessary changes.
+NA2-0911: Students receive unclear guidance when struggling academically. Start from the fundamentals and explain the topic step by step.
+NA2-0912: Problem reported: Students receive unclear guidance when struggling academically. Use relevant examples and show the reasoning behind each step.
+NA2-0913: This issue is affecting learning: Students receive unclear guidance when struggling academically. Check understanding before moving to the next concept.
+NA2-0914: Complaint: Students receive unclear guidance when struggling academically. Allocate time for questions and clarification.
+NA2-0915: Students are facing difficulty because students receive unclear guidance when struggling academically. Provide complete, clear, unit-wise learning material.
+NA2-0916: This needs attention: Students receive unclear guidance when struggling academically. Include more hands-on practice and individual problem-solving.
+NA2-0917: The following problem remains unresolved: Students receive unclear guidance when struggling academically. Explain mistakes and give actionable feedback.
+NA2-0918: Learning is being affected. Students receive unclear guidance when struggling academically. Share instructions and study material before the relevant class.
+NA2-0919: Repeated concern: Students receive unclear guidance when struggling academically. Address the issue consistently instead of leaving it unresolved.
+NA2-0920: Correction required: Students receive unclear guidance when struggling academically. Review the teaching plan and make the necessary changes.
+NA2-0921: Problem reported: Assignment requirements change without clear announcement. Start from the fundamentals and explain the topic step by step.
+NA2-0922: This issue is affecting learning: Assignment requirements change without clear announcement. Use relevant examples and show the reasoning behind each step.
+NA2-0923: Complaint: Assignment requirements change without clear announcement. Check understanding before moving to the next concept.
+NA2-0924: Students are facing difficulty because assignment requirements change without clear announcement. Allocate time for questions and clarification.
+NA2-0925: This needs attention: Assignment requirements change without clear announcement. Provide complete, clear, unit-wise learning material.
+NA2-0926: The following problem remains unresolved: Assignment requirements change without clear announcement. Include more hands-on practice and individual problem-solving.
+NA2-0927: Learning is being affected. Assignment requirements change without clear announcement. Explain mistakes and give actionable feedback.
+NA2-0928: Repeated concern: Assignment requirements change without clear announcement. Share instructions and study material before the relevant class.
+NA2-0929: Correction required: Assignment requirements change without clear announcement. Address the issue consistently instead of leaving it unresolved.
+NA2-0930: Assignment requirements change without clear announcement. Review the teaching plan and make the necessary changes.
+NA2-0931: This issue is affecting learning: Assignment deadlines are announced with little notice. Start from the fundamentals and explain the topic step by step.
+NA2-0932: Complaint: Assignment deadlines are announced with little notice. Use relevant examples and show the reasoning behind each step.
+NA2-0933: Students are facing difficulty because assignment deadlines are announced with little notice. Check understanding before moving to the next concept.
+NA2-0934: This needs attention: Assignment deadlines are announced with little notice. Allocate time for questions and clarification.
+NA2-0935: The following problem remains unresolved: Assignment deadlines are announced with little notice. Provide complete, clear, unit-wise learning material.
+NA2-0936: Learning is being affected. Assignment deadlines are announced with little notice. Include more hands-on practice and individual problem-solving.
+NA2-0937: Repeated concern: Assignment deadlines are announced with little notice. Explain mistakes and give actionable feedback.
+NA2-0938: Correction required: Assignment deadlines are announced with little notice. Share instructions and study material before the relevant class.
+NA2-0939: Assignment deadlines are announced with little notice. Address the issue consistently instead of leaving it unresolved.
+NA2-0940: Problem reported: Assignment deadlines are announced with little notice. Review the teaching plan and make the necessary changes.
+NA2-0941: Complaint: Classroom interactions sometimes feel disrespectful. Start from the fundamentals and explain the topic step by step.
+NA2-0942: Students are facing difficulty because classroom interactions sometimes feel disrespectful. Use relevant examples and show the reasoning behind each step.
+NA2-0943: This needs attention: Classroom interactions sometimes feel disrespectful. Check understanding before moving to the next concept.
+NA2-0944: The following problem remains unresolved: Classroom interactions sometimes feel disrespectful. Allocate time for questions and clarification.
+NA2-0945: Learning is being affected. Classroom interactions sometimes feel disrespectful. Provide complete, clear, unit-wise learning material.
+NA2-0946: Repeated concern: Classroom interactions sometimes feel disrespectful. Include more hands-on practice and individual problem-solving.
+NA2-0947: Correction required: Classroom interactions sometimes feel disrespectful. Explain mistakes and give actionable feedback.
+NA2-0948: Classroom interactions sometimes feel disrespectful. Share instructions and study material before the relevant class.
+NA2-0949: Problem reported: Classroom interactions sometimes feel disrespectful. Address the issue consistently instead of leaving it unresolved.
+NA2-0950: This issue is affecting learning: Classroom interactions sometimes feel disrespectful. Review the teaching plan and make the necessary changes.
+NA2-0951: Students are facing difficulty because academic concerns are raised but never followed up. Start from the fundamentals and explain the topic step by step.
+NA2-0952: This needs attention: Academic concerns are raised but never followed up. Use relevant examples and show the reasoning behind each step.
+NA2-0953: The following problem remains unresolved: Academic concerns are raised but never followed up. Check understanding before moving to the next concept.
+NA2-0954: Learning is being affected. Academic concerns are raised but never followed up. Allocate time for questions and clarification.
+NA2-0955: Repeated concern: Academic concerns are raised but never followed up. Provide complete, clear, unit-wise learning material.
+NA2-0956: Correction required: Academic concerns are raised but never followed up. Include more hands-on practice and individual problem-solving.
+NA2-0957: Academic concerns are raised but never followed up. Explain mistakes and give actionable feedback.
+NA2-0958: Problem reported: Academic concerns are raised but never followed up. Share instructions and study material before the relevant class.
+NA2-0959: This issue is affecting learning: Academic concerns are raised but never followed up. Address the issue consistently instead of leaving it unresolved.
+NA2-0960: Complaint: Academic concerns are raised but never followed up. Review the teaching plan and make the necessary changes.
+NA2-0961: This needs attention: Students do not know how to contact the instructor for help. Start from the fundamentals and explain the topic step by step.
+NA2-0962: The following problem remains unresolved: Students do not know how to contact the instructor for help. Use relevant examples and show the reasoning behind each step.
+NA2-0963: Learning is being affected. Students do not know how to contact the instructor for help. Check understanding before moving to the next concept.
+NA2-0964: Repeated concern: Students do not know how to contact the instructor for help. Allocate time for questions and clarification.
+NA2-0965: Correction required: Students do not know how to contact the instructor for help. Provide complete, clear, unit-wise learning material.
+NA2-0966: Students do not know how to contact the instructor for help. Include more hands-on practice and individual problem-solving.
+NA2-0967: Problem reported: Students do not know how to contact the instructor for help. Explain mistakes and give actionable feedback.
+NA2-0968: This issue is affecting learning: Students do not know how to contact the instructor for help. Share instructions and study material before the relevant class.
+NA2-0969: Complaint: Students do not know how to contact the instructor for help. Address the issue consistently instead of leaving it unresolved.
+NA2-0970: Students are facing difficulty because students do not know how to contact the instructor for help. Review the teaching plan and make the necessary changes.
+NA2-0971: The following problem remains unresolved: Student feedback is repeatedly ignored. Start from the fundamentals and explain the topic step by step.
+NA2-0972: Learning is being affected. Student feedback is repeatedly ignored. Use relevant examples and show the reasoning behind each step.
+NA2-0973: Repeated concern: Student feedback is repeatedly ignored. Check understanding before moving to the next concept.
+NA2-0974: Correction required: Student feedback is repeatedly ignored. Allocate time for questions and clarification.
+NA2-0975: Student feedback is repeatedly ignored. Provide complete, clear, unit-wise learning material.
+NA2-0976: Problem reported: Student feedback is repeatedly ignored. Include more hands-on practice and individual problem-solving.
+NA2-0977: This issue is affecting learning: Student feedback is repeatedly ignored. Explain mistakes and give actionable feedback.
+NA2-0978: Complaint: Student feedback is repeatedly ignored. Share instructions and study material before the relevant class.
+NA2-0979: Students are facing difficulty because student feedback is repeatedly ignored. Address the issue consistently instead of leaving it unresolved.
+NA2-0980: This needs attention: Student feedback is repeatedly ignored. Review the teaching plan and make the necessary changes.
+NA2-0981: Learning is being affected. Submission instructions are incomplete. Start from the fundamentals and explain the topic step by step.
+NA2-0982: Repeated concern: Submission instructions are incomplete. Use relevant examples and show the reasoning behind each step.
+NA2-0983: Correction required: Submission instructions are incomplete. Check understanding before moving to the next concept.
+NA2-0984: Submission instructions are incomplete. Allocate time for questions and clarification.
+NA2-0985: Problem reported: Submission instructions are incomplete. Provide complete, clear, unit-wise learning material.
+NA2-0986: This issue is affecting learning: Submission instructions are incomplete. Include more hands-on practice and individual problem-solving.
+NA2-0987: Complaint: Submission instructions are incomplete. Explain mistakes and give actionable feedback.
+NA2-0988: Students are facing difficulty because submission instructions are incomplete. Share instructions and study material before the relevant class.
+NA2-0989: This needs attention: Submission instructions are incomplete. Address the issue consistently instead of leaving it unresolved.
+NA2-0990: The following problem remains unresolved: Submission instructions are incomplete. Review the teaching plan and make the necessary changes.
+NA2-0991: Repeated concern: Students receive no useful feedback on how to improve. Start from the fundamentals and explain the topic step by step.
+NA2-0992: Correction required: Students receive no useful feedback on how to improve. Use relevant examples and show the reasoning behind each step.
+NA2-0993: Students receive no useful feedback on how to improve. Check understanding before moving to the next concept.
+NA2-0994: Problem reported: Students receive no useful feedback on how to improve. Allocate time for questions and clarification.
+NA2-0995: This issue is affecting learning: Students receive no useful feedback on how to improve. Provide complete, clear, unit-wise learning material.
+NA2-0996: Complaint: Students receive no useful feedback on how to improve. Include more hands-on practice and individual problem-solving.
+NA2-0997: Students are facing difficulty because students receive no useful feedback on how to improve. Explain mistakes and give actionable feedback.
+NA2-0998: This needs attention: Students receive no useful feedback on how to improve. Share instructions and study material before the relevant class.
+NA2-0999: The following problem remains unresolved: Students receive no useful feedback on how to improve. Address the issue consistently instead of leaving it unresolved.
+NA2-1000: Learning is being affected. Students receive no useful feedback on how to improve. Review the teaching plan and make the necessary changes.

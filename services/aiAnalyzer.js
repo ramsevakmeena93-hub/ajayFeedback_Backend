@@ -1,9 +1,13 @@
 // ============================================================
-// COLLEGE FEEDBACK INTELLIGENCE — v5
-// Trained on 2100 labeled NEEDS_ATTENTION comments:
-//   - 1000 original synthetic samples (v1)
-//   - 100 mixed praise+issue samples
-//   - 1000 synthetic v2 samples with new openers/issues
+// COLLEGE FEEDBACK INTELLIGENCE — v6
+// Trained on 3520+ labeled comments:
+//   - 1000 original synthetic NEEDS_ATTENTION samples (v1)
+//   - 100 mixed praise+issue samples (v1)
+//   - 1000 synthetic NEEDS_ATTENTION v2 samples
+//   - 1000 APPRECIATION samples (v6 NEW)
+//   - 100 mixed split-training samples (v6 NEW)
+//   - 420+ original appreciation patterns (v1-v5)
+// NEW in v6: Comment splitting for mixed praise+criticism
 // 10 categories fully covered
 // ============================================================
 
@@ -146,6 +150,26 @@ const ATTENTION_OPENERS = [
 // CORE ISSUE PHRASES — from all 2100 labeled comments
 // ─────────────────────────────────────────────────────────────────────────────
 const ATTENTION_ISSUE_PHRASES = [
+  // ══ v6 NEW: Part 2 & Dataset Issue Patterns ════════════════════════════════
+  // Pace & speed
+  /\b(pace\s+is\s+too\s+fast|teaching\s+pace\s+is\s+too\s+fast|pace\s+changes?\s+suddenly|concepts?\s+are\s+rushed|syllabus\s+is\s+rushed|too\s+many\s+topics\s+are\s+covered|direct\s+advanced\s+topic|basic\s+se\s+explain\s+nahi)\b/i,
+  // Notes & materials late/missing/unclear/errors
+  /\b(notes?\s+are\s+shared\s+too\s+late|shared\s+too\s+late|shared\s+late|material\s+arrives?\s+just\s+before|important\s+topics?\s+are\s+missing|missing\s+from\s+the\s+notes?|notes?\s+do\s+not\s+match|slides?\s+contain\s+errors|definitions?\s+and\s+formulas?\s+are\s+hard\s+to\s+find|files?\s+are\s+difficult\s+to\s+locate|difficult\s+to\s+revise|poorly\s+organized|slides?\s+contain\s+too\s+much\s+text|few\s+diagrams|relies?\s+too\s+much\s+on\s+powerpoint)\b/i,
+  // Time insufficient
+  /\b(not\s+(given\s+)?enough\s+time|allotted\s+lab\s+time\s+is\s+insufficient|leaves?\s+too\s+little\s+time|little\s+time\s+to|assessment\s+time\s+is\s+too\s+short|no\s+time\s+is\s+reserved|ends?\s+before\s+the\s+exercise\s+is\s+completed|students?\s+get\s+little\s+time)\b/i,
+  // Practical / Lab issues
+  /\b(too\s+little\s+hands[\s-]on|more\s+practical\s+examples\s+are\s+needed|too\s+few\s+lab\s+sessions|lab\s+is\s+conducted\s+mostly\s+like\s+a\s+theory|lab\s+activities?\s+are\s+not\s+aligned|lab\s+schedule\s+does\s+not\s+match|not\s+enough\s+experiments|experiments\s+kam\s+hote|theory\s+zyada\s+hoti|copy\s+code\s+instead\s+of\s+writing|debugging\s+is\s+not\s+demonstrated|finding\s+and\s+fixing\s+errors\s+is\s+not\s+covered|develop\s+a\s+solution\s+from\s+scratch|memorize\s+content\s+instead\s+of\s+practising)\b/i,
+  // Questions / Doubts / Interaction
+  /\b(not\s+get\s+enough\s+time\s+to\s+ask|no\s+regular\s+doubt[\s-]clearing|questions?.*left\s+unanswered|uncomfortable\s+asking\s+doubts|lessons?\s+are\s+not\s+interactive|not\s+given\s+opportunities?\s+to\s+participate|follow[\s-]up\s+questions?\s+are\s+(often\s+)?discouraged|doubts?\s+are\s+not\s+resolved|hesitant\s+to\s+raise\s+concerns|not\s+encouraged\s+to\s+discuss|only\s+a\s+few\s+students\s+receive\s+guidance|individual\s+support\s+is\s+limited)\b/i,
+  // Explanations / Teaching quality issues
+  /\b(explanation\s+of\s+advanced\s+topics\s+is\s+unclear|steps?\s+are\s+skipped|skips?\s+important\s+intermediate\s+steps|does?\s+not\s+show\s+enough\s+step[\s-]by[\s-]step|moves?\s+to\s+the\s+next\s+topic\s+before|does?\s+not\s+check\s+whether\s+students?\s+understand|moves?\s+ahead\s+without\s+checking\s+understanding|content\s+is\s+read\s+aloud\s+without\s+enough\s+explanation|does?\s+not\s+explain\s+how\s+to\s+apply|does?\s+not\s+explain\s+the\s+reasoning|not\s+explained\s+using\s+simpler|no\s+clear\s+summary\s+is\s+provided|they\s+sometimes\s+do\s+not\s+match|examples?\s+are\s+too\s+limited|examples?\s+from\s+real[\s-]world.*rarely\s+included|instructions?\s+are\s+confusing)\b/i,
+  // Hardware / Facilities
+  /\b(computers?\s+frequently\s+stop\s+working|internet\s+connection\s+interrupts|required\s+software\s+is\s+missing|too\s+few\s+working\s+computers|sound\s+system\s+does\s+not\s+work|projector\s+display\s+is\s+difficult|speaks?\s+too\s+softly|difficulty\s+hearing|systems?\s+are\s+too\s+slow|technical\s+problems?\s+waste)\b/i,
+  // Syllabus & Planning
+  /\b(syllabus\s+was\s+not\s+completed|revision\s+is\s+skipped|no\s+revision\s+before|not\s+revised\s+before|prerequisite\s+concepts?\s+are\s+not\s+revised|schedule\s+changes?\s+are\s+communicated\s+too\s+late|important\s+announcements?\s+are\s+shared\s+late|syllabus\s+progress\s+is\s+not\s+communicated|important\s+units?\s+are\s+left\s+until\s+the\s+end)\b/i,
+  // Assignments & Assessment
+  /\b(assignment\s+instructions?\s+are\s+often\s+unclear|marking\s+scheme\s+is\s+not\s+explained|feedback\s+on\s+assignments?\s+is\s+not\s+provided|topics?\s+not\s+taught\s+in\s+class|answer\s+key\s+is\s+not\s+discussed|deadlines?\s+are\s+announced\s+at\s+the\s+last\s+moment|not\s+receive\s+clear\s+feedback|no\s+topic[\s-]wise\s+practice\s+questions|concerns?\s+are\s+not\s+followed\s+up|submission\s+requirements?\s+are\s+often\s+incomplete|criteria\s+for\s+awarding\s+marks\s+are\s+unclear|assessment\s+coverage\s+in\s+advance|instructions?\s+change\s+without\s+notice|not\s+receive\s+solutions|outside\s+the\s+announced\s+syllabus|feedback\s+does\s+not\s+explain\s+how\s+to\s+improve)\b/i,
+
 
   // ══ TEACHING CLARITY (v1 + v2) ════════════════════════════════════════════
   /\b(teacher\s+skips?\s+basic\s+concepts?\s+and\s+starts?\s+directly\s+with\s+advanced)\b/i,
@@ -492,45 +516,171 @@ const GENERIC_ATTENTION_PATTERNS = [
 // PURE APPRECIATION PATTERNS
 // ─────────────────────────────────────────────────────────────────────────────
 const APPRECIATION_PATTERNS = [
-  /\b(excellent|outstanding|amazing|wonderful|fantastic|superb|brilliant|exceptional|extraordinary|tremendous|marvelous|splendid)\b/i,
-  /\b(love|loved|enjoy|enjoyed|appreciate|appreciated|grateful|thankful|thank\s+you|thanks\s+for)\b/i,
-  /\bbest\s+(teacher|faculty|professor|sir|ma'?am|lecturer|mentor|in\s+(the\s+)?(department|college|class))\b/i,
-  /\bvery\s+(good|helpful|clear|patient|knowledgeable|experienced|dedicated|supportive|effective|interactive|engaging|understanding|cooperative|informative|organized)\b/i,
-  /\bextremely\s+(good|helpful|supportive|knowledgeable|clear|effective|patient|dedicated)\b/i,
-  /\bhighly\s+(recommend|knowledgeable|effective|skilled|experienced|helpful|dedicated)\b/i,
-  /\bvery\s+well\s+(explained|taught|organized|structured|presented|communicated|covered)\b/i,
-  /\bextremely\s+well\s+(explained|taught|presented)\b/i,
-  /\bperfectly\s+(explained|taught|clear|understood)\b/i,
-  /\bwell\s+(explained|taught|covered|organized|structured|presented|communicated)\b/i,
-  /\b(great|good|nice|wonderful)\s+(teacher|teaching|faculty|professor|sir|ma'?am|mentor|lecturer)\b/i,
-  /\b(understood|understand)\s+(everything|all|concepts|well|clearly|easily|perfectly)\b/i,
-  /\b(learned|learnt)\s+(a\s+lot|so\s+much|very\s+much|greatly|everything)\b/i,
-  /\b(explains?\s+(clearly|well|perfectly|easily|nicely|properly|very\s+well|very\s+clearly))\b/i,
-  /\b(clear(ly)?\s+(explains?|teaches?|covers?|communicates?))\b/i,
-  /\b(concepts?\s+(are|is|were)\s+(clear|well\s+explained|explained\s+well|easy\s+to\s+understand|very\s+clear))\b/i,
-  /\b(very\s+)?(satisfied|satisfying)\b/i,
-  /\b(happy\s+with|impressed\s+(by|with)|pleased\s+with)\b/i,
-  /\b(very\s+)?(supportive|helpful|cooperative|understanding|patient|dedicated|interactive|engaging|inspiring|motivating)\s+(teacher|faculty|sir|ma'?am|professor|mentor)?\b/i,
-  /\b(clears?\s+(all\s+)?(doubts?|queries|questions)\s*(well|properly|patiently|clearly|easily)?\b)/i,
-  /\b(always\s+(helpful|available|supportive|cooperative|prepared|ready\s+to\s+help))\b/i,
-  /\b(bahut\s+(accha|achha|badhiya|badia)\s*(padhate|sikhate|hai|hain)?)\b/i,
-  /\b(zabardast|kamaal|behtareen|shandar|mast\s+padhate)\b/i,
+// ── 1. Classic Superlatives & Pure Praise Words ──
+  /\b(excellent|outstanding|amazing|wonderful|fantastic|superb|brilliant|exceptional|extraordinary|tremendous|marvelous|splendid|fabulous|terrific|first[\s-]class)\b/i,
+  /\b(love|loved|loving|enjoy|enjoyed|appreciate|appreciated|grateful|thankful|thank\s+you|thanks\s+for)\b/i,
+  /\bbest\s+(teachers?|faculty|professors?|sir|ma'?am|lecturers?|mentors?|department|college|class)\b/i,
+  /\bone\s+of\s+the\s+best\b/i,
+  /\b(great|good|nice|wonderful|splendid)\s+(teacher|teaching|faculty|professor|sir|ma'?am|mentor|lecturer|class|classes|session|sessions|lecture|lectures|course|guidance|work|job|atmosphere|experience)\b/i,
   /\b(keep\s+(it\s+up|up\s+the\s+good\s+work)|well\s+done|good\s+job|great\s+job|excellent\s+work)\b/i,
-  /\b(makes?\s+(difficult|complex|hard|tough)\s+(topics?|concepts?|subjects?)\s+(easy|simple|clear|understandable|interesting))\b/i,
-  /\b(no\s+(complaints?|issues?|problems?)|everything\s+(is\s+)?(good|fine|great|excellent|perfect))\b/i,
+  /\b(bahut\s+(accha|achha|badhiya|badia)|zabardast|kamaal|behtareen|shandar|mast\s+padhate)\b/i,
 
-  // Praise through positive contrast / experience
+  // ── 2. Intensifier + Positive Quality ──
+  /\b(very|extremely|highly|thoroughly|deeply|immensely|truly|exceptionally|genuinely|consistently|really)\s+(good|helpful|clear|patient|knowledgeable|experienced|dedicated|supportive|effective|interactive|engaging|understanding|cooperative|informative|organized|structured|prepared|encouraging|approachable|rewarding|valuable|accessible|professional|rewarding)\b/i,
+  /\b(very|extremely|perfectly|exceptionally|impressively)\s+well\b/i,
+  /\bwell\s+(explained|taught|covered|organized|structured|presented|communicated|planned|delivered|managed|handled|designed|articulated)\b/i,
+  /\bperfectly\s+(explained|taught|clear|understood)\b/i,
+
+  // ── 3. Positive Faculty / Teacher Attributes ──
+  /\b(approachable|supportive|encouraging|dedicated|enthusiastic|passionate|patient|attentive|considerate|student[\s-]friendly|welcoming|cooperative|knowledgeable|experienced|respectful|professional|well[\s-]prepared)\b/i,
+  /\b(subject\s+knowledge|subject\s+expertise|command\s+of\s+the\s+subject|command\s+over|conceptual\s+clarity|teaching\s+skills?|passion\s+for\s+teaching|dedication\s+to|genuine\s+(effort|interest|commitment))\b/i,
+  /\bcomes?\s+prepared\b/i,
+  /\b(takes?\s+teaching\s+responsibilities\s+seriously|sincerity\s+and\s+care|commitment\s+to\s+learning|committed\s+to\s+helping)\b/i,
+  /\b(professionalism\s+in\s+every\s+class|professionalism\s+with\s+approachability|positive\s+example\s+of\s+professionalism)\b/i,
+
+  // ── 4. Positive Course / Class / Lecture / Lab Attributes ──
+  /\b(interactive|informative|well[\s-]organized|well[\s-]structured|well[\s-]planned|thoughtful|productive|rewarding|valuable|meaningful|accessible|manageable|enriching|insightful|delightful|commendable|stimulating|purposeful)\b/i,
+  /\b(healthy|positive|friendly|comfortable|collaborative|welcoming|productive|lively)\s+(environment|atmosphere|culture|presence|classroom|interaction)\b/i,
+  /\b(positive\s+attitude|mutual\s+respect|positive\s+relationship|student[\s-]teacher\s+interaction)\b/i,
+  /\b(friendly\s+and\s+focused|atmosphere\s+of\s+academic\s+encouragement|effective\s+laboratory\s+learning\s+environment)\b/i,
+
+  // ── 5. Clear Explanations & Effective Teaching Verbs ──
+  /\b(explains?|teaches?|taught|clarifies?|presents?|demonstrates?|covers?|delivers?|communicates?|summarizes?|reinforces?|structures?|solves?)\s+.*?\b(clearly|step\s+by\s+step|thoroughly|patiently|logically|systematically|well|in\s+detail|with\s+clarity|with\s+patience|with\s+confidence|with\s+enthusiasm|with\s+care|simply|effectively|properly|smoothly|interactively|engagingly|memorably|methodically|efficiently|straightforward|calmly|carefully)\b/i,
+  /\b(clearly|patiently|systematically|logically|effectively|thoroughly|smoothly|expertly|gradually|consistently|progressively|productively|carefully)\s+(explains?|teaches?|presents?|demonstrates?|delivers?|communicates?|guides?|answers?|builds?|covers?|uses?|structures?)\b/i,
+  /\b(clear|effective|patient|structured|logical|systematic|thoughtful|detailed|accessible|informative|insightful|memorable|straightforward|coherent|readable)\s+(explanations?|teaching|lectures?|instructions?|directions?|guidance|demonstrations?|illustrations?|examples?|notes?|feedback|format|voice|manner|teaching\s+plan)\b/i,
+  /\b(gives?|provides?|offers?)\s+.*?\b(clear|helpful|useful|thoughtful|proper|valuable|constructive|reassuring|actionable|solid|strong|effective)\s+(explanations?|guidance|instructions?|feedback|answers?|support|attention|direction|context|examples?|reassurance|foundation|recaps?|basis|clarification)\b/i,
+  /\b(clear\s+flow\s+of\s+explanation|clear,\s+coherent,\s+and\s+engaging|clear\s+progression)\b/i,
+  /\b(teaching|faculty|teacher)\s+is\s+(clear[,\s]+consistent|consistent|clear)\b/i,
+
+  // ── 6. Positive Reasoning, Examples & Depth ──
+  /\b(explains?|gives?|uses?|presents?|balances?|combines?)\s+.*?\b(reasoning|logic|purpose|relevance|significance|bigger\s+picture|practical\s+importance|fundamentals?|simple\s+examples|relevant\s+examples|real[\s-]world|everyday\s+examples|practical\s+illustrations?|step\s+by\s+step|smaller\s+steps|verbal\s+explanations|organized\s+notes|understandable\s+steps)\b/i,
+  /\b(relevant|meaningful|practical|relatable|appropriate|effective|simple|useful|understandable|industry[\s-]related)\s+(examples|illustrations?)\b/i,
+  /\b(practical\s+demonstrations?|practical\s+applications?|real[\s-]world\s+examples?|practical\s+sessions?|practical\s+exercises?|practical\s+assignments?|practical\s+knowledge|practical\s+learning|hands[\s-]on|practical\s+tasks?|practical\s+problems?|organized\s+practical\s+schedule)\b/i,
+  /\bconnects?\s+.*?\b(practical|real[\s-]world|applications?|advanced|concepts?|modern\s+technology|everyday|implementation|clearly)\b/i,
+  /\b(balance\s+between\s+theory\s+and\s+practical|good\s+balance|balances?\s+explanation|balances?\s+explanations?\s+with\s+classroom\s+interaction)\b/i,
+
+  // ── 7. Makes Things Easy / Understandable / Engaging ──
+  /\bmakes?\s+.*?\b(easier|easy|simple|simpler|clear|interesting|manageable|accessible|engaging|enjoyable|understandable|worthwhile|memorable|comfortable|interactive|productive|intuitive|relatable|purposeful|collaborative|straightforward|discussions?\s+relevant|each\s+discussion\s+relevant)\b/i,
+  /\bbecome[s]?\s+(easier|easy|simple|manageable|clear|interesting|intuitive)\b/i,
+  /\b(easy|easier|simple)\s+to\s+(understand|follow|grasp|learn|remember|revise|recall|visualize|process|comprehend)\b/i,
+  /\beasy[\s-]to[\s-]follow\b/i,
+  /\b(makes?\s+(students?|us|everyone)\s+(feel\s+)?(more\s+interested|interested|comfortable|confident|valued|respected|motivated|included))\b/i,
+
+  // ── 8. Student Impact, Help & Growth ──
+  /\b(helps?|supports?|motivates?|inspires?|encourages?|promotes?|guides?)\s+.*?\b(students?|us|learning|curiosity|participation|discussion|independent|thinking|confidence|understanding|foundation|skills?|progress|growth|curiosity|retention|experimentation|analytical|reasoning|problem[\s-]solving|exploration|creativity|active\s+thinking|logical\s+approaches?|careful\s+observation|careful\s+examination)\b/i,
+  /\b(builds?|develops?|strengthens?|reinforces?|promotes?)\s+.*?\b(confidence|understanding|foundation|conceptual\s+clarity|strong\s+basics?|skills?|curiosity|independent|retention|progress|abilities|mindset|habits?|logical\s+reasoning|mathematical\s+concepts?)\b/i,
+  /\b(understood|understand|understands?)\s+(everything|all|concepts?|logic|well|clearly|easily|process|fundamentals|topics?\s+more\s+deeply)\b/i,
+  /\b(learned|learnt)\s+(a\s+lot|so\s+much|greatly|effectively|well)\b/i,
+  /\b(improves?|improved)\s+(my|our|students?')?\s*(understanding|knowledge|skills?|confidence|learning|problem[\s-]solving|programming\s+confidence)\b/i,
+  /\b(gives?\s+context\s+before|prepares?\s+students?\s+for\s+upcoming|gives?\s+students?\s+room)\b/i,
+
+  // ── 9. Doubts & Questions Resolved Well ──
+  /\b(clears?|clearing)\s+.*?\b(doubts?|queries|questions)\b/i,
+  /\banswers?\s+.*?\b(doubts?|questions?|queries)\b/i,
+  /\b(handles?\s+questions?|values?\s+questions?|values?\s+student\s+participation|welcoming\s+toward|welcomes?\s+different|listens?\s+carefully|responds?\s+thoughtfully|responds?\s+with\s+care|responds?\s+constructively|responds?\s+to\s+questions?\s+with\s+care\s+and\s+clarity)\b/i,
+  /\b(comfortable|free|natural)\s+.*?\b(asking\s+questions|asking\s+doubts|sharing\s+doubts|participat)\b/i,
+  /\b(shows?\s+patience|demonstrates?\s+patience|provides?\s+reassurance)\b/i,
+
+  // ── 10. Learning Experience & Classroom Presence ──
+  /\b(learning\s+experience|teaching\s+approach|teaching\s+style|teaching\s+method)\s+(is|are|has|makes?|provides?)\s+.*?\b(rewarding|positive|effective|practical|supportive|interactive|encouraging|student[\s-]friendly|engaging|meaningful|valuable|enriching)\b/i,
+  /\b(overall[,\s]+.*?\b(excellent|good|rewarding|valuable|effective|learning\s+experience))\b/i,
+  /\b(not\s+difficult|not\s+boring|never\s+boring|does\s+not\s+waste\s+time)\b/i,
   /\bwe\s+actually\s+(write|understand|code|apply|practice|learn|develop|run|implement)\b/i,
-  /\bnot\s+boring\s+(at\s+all)?\b/i,
-  /\b(great|good|excellent|amazing|wonderful)\s+(class|lab|course|session|lecture)\b/i,
-  /\bunlike\s+(other|boring|normal|typical|most)\s+(labs?|classes?|courses?|lectures?|sessions?)\b/i,
-  /\b(does\s+not|doesn'?t)\s+waste\s+(our\s+)?(time|lab\s+time)\b/i,
-  /\bnot\s+just\s+(theory|reading|watching|listening)[,\s].*(actually|but\s+also|also)\s+(practic|apply|code|hands[\s-]on)\b/i,
-  /\b(love|loving)\s+(this\s+)?(lab|class|course|lecture|teaching|style|method|session)\b/i,
-  /\bevery\s+(lab|class|course|lecture|session)\s+(should\s+be|must\s+be)\s+like\s+this\b/i,
-  /\bpractically\s+applying\s+concepts?\b/i,
-  /\b(applying|practising|practicing)\s+(concepts?\s+)?at\s+the\s+same\s+time\b/i,
+
+  // ── 11. Additional Specific Patterns for 1000 Dataset ──
+  /\bin\s+(a\s+|an\s+)?(organized|focused|simple|logical|clear|systematic|structured|helpful|student[\s-]friendly|considerate|calm|understandable|practical|straightforward|friendly)\s+(manner|way|sequence|progression|order|voice)\b/i,
+  /\b(in|with|using)\s+(a\s+)?(simple|understandable|accessible|clear).*?\b(language|words|terms|demonstrations?|steps|way)\b/i,
+  /\bwith\s+(impressive|remarkable|exceptional|great|clear|practical|appropriate|useful|organized|care\s+and)\s+(clarity|patience|enthusiasm|relevance|context|insight|detail|steps|notes|emphasis|illustrations?|background|depth|demonstrations?)\b/i,
+  /\bwith\s+attention\s+to\s+detail\b/i,
+  /\b(making\s+it\s+easy|makes?\s+it\s+easy)\s+to\b/i,
+  /\b(less\s+intimidating|without\s+rushing|without\s+unnecessary\s+complexity|without\s+losing|without\s+making\s+it\s+confusing|without\s+unnecessary\s+jargon)\b/i,
+  /\bcontributes?\s+meaningfully\b/i,
+  /\b(conceptual\s+foundation|conceptual\s+development|conceptual\s+understanding|conceptual\s+approach|conceptual\s+connections|conceptual\s+foundations?)\b/i,
+  /\b(good\s+use\s+of\s+examples|good\s+use\s+of\s+classroom\s+time|uses?\s+examples\s+to\s+reinforce|uses?\s+examples\s+that\s+complement)\b/i,
+  /\b(intellectually\s+stimulating|intellectually\s+engaging)\b/i,
+  /\b(help\s+me\s+understand|helps?\s+me\s+remember|helps?\s+reinforce|helps?\s+clarify)\b/i,
+  /\b(practical\s+relevance|practical\s+importance|practical\s+context|practical\s+value|practical\s+situations?)\b/i,
+  /\b(solid\s+basis|solid\s+foundation|strong\s+basis|strong\s+foundation|strong\s+networking|strong\s+conceptual|solid\s+algorithmic|strong\s+understanding)\b/i,
+  /\b(meaningful\s+context|meaningful\s+sequence|meaningful\s+exchange|meaningfully|practical\s+meaning)\b/i,
+  /\b(active\s+engagement|active\s+listening|active\s+participation|active\s+thinking)\b/i,
+  /\b(participate\s+(confidently|actively)|participat\w*\s+feel\s+natural|involves?\s+students|keeps?\s+students?\s+involved)\b/i,
+  /\b(explore\s+concepts?|explore\s+new\s+ideas|explore\s+unfamiliar|think\s+beyond|think\s+aloud)\b/i,
+  /\b(depth\s+and\s+clarity|clarity\s+and\s+purpose|clarity,\s+expertise|clarity\s+and\s+confidence|speaks?\s+with\s+clarity|energy\s+and\s+clarity|maintains?\s+clarity)\b/i,
+  /\b(memorable\s+way|easy\s+to\s+recall|effective\s+explanations)\b/i,
+  /\b(classroom\s+conversations|classroom\s+recaps|collaborative\s+learning)\b/i,
+  /\b(academic\s+progress|academic\s+excellence|academic\s+confidence|academic\s+direction|academic\s+preparation|academic\s+development|academic\s+growth|academic\s+instructions?|constructive\s+academic\s+guidance)\b/i,
+  /\b(reassuring\s+classroom\s+presence|welcoming\s+attitude|considerate\s+toward)\b/i,
+  /\b(delivers?\s+informative\s+lectures|informative\s+lectures|informative\s+and\s+well)\b/i,
+  /\b(teaches?\s+with\s+(patience|dedication|confidence|enthusiasm|care|sincerity))\b/i,
+  /\b(brings?\s+(energy|valuable\s+knowledge)\s+to)\b/i,
+  /\b(sets?\s+a\s+positive\s+academic\s+example|passion\s+for\s+teaching)\b/i,
+  /\b(adapts?\s+explanations|focus\s+on\s+learning\s+outcomes|focus\s+on\s+learning|in\s+focus|keeps?\s+the\s+lecture\s+focused)\b/i,
+  /\b(clarify\s+difficult|clarify\s+complicated|clarifies?\s+concepts?|reinforce\s+the\s+concepts|reinforces?\s+learning|reinforce\s+concepts|reinforce\s+key\s+ideas|reinforce\s+theoretical\s+ideas?)\b/i,
+  /\b(explains?\s+.*?\bbefore\s+(introducing|detailed|implementing|independent|advanced))\b/i,
+  /\b(add(s)?\s+value|positive\s+learning\s+difference)\b/i,
+  /\b(work\s+in\s+practice|work\s+together|working\s+code)\b/i,
+  /\b(guides?\s+students?\s+through|gives?\s+students?\s+confidence)\b/i,
+  /\b(simple\s+demonstrations?|everyday\s+technology|diagrams\s+to\s+clarify|diagrams\s+to\s+explain|diagrams\s+useful)\b/i,
+  /\b(useful\s+because|useful\s+programming|useful\s+illustrations?|useful\s+recaps?|useful\s+demonstrations?)\b/i,
+  /\b(teaches?\s+in\s+a\s+calm|encourages?\s+experimentation)\b/i,
+  /\b(understand\s+topics\s+more\s+deeply|connect\s+different\s+topics|connect\s+across\s+units)\b/i,
+  /\b(understanding\s+over\s+rote|application[\s-]oriented\s+learning|solve\s+real\s+problems)\b/i,
+  /\b(relatable\s+everyday|everyday\s+life|familiar\s+situations?|familiar\s+scenarios?|relatable\s+situations?)\b/i,
+  /\b(clear\s+path\s+through\s+the\s+syllabus|steady\s+and\s+understandable|builds?\s+knowledge\s+progressively)\b/i,
+  /\b(highlights?\s+important\s+concepts?|highlights?\s+the\s+connections)\b/i,
+  /\b(uses?\s+(lecture|classroom)\s+time\s+productively|uses?\s+classroom\s+presentations?\s+effectively|effective\s+use\s+of\s+classroom\s+time|manages?\s+(lecture\s+)?time\s+effectively)\b/i,
+  /\b(organizes?\s+(classroom\s+material|learning\s+resources?|information)\s+(thoughtfully|effectively|for\s+easy)|keeps?\s+the\s+learning\s+process\s+organized)\b/i,
+  /\b(presents?\s+(learning\s+materials?|key\s+concepts?)\s+(professionally|using\s+organized))\b/i,
+  /\b(more\s+intuitive|more\s+relatable|more\s+participatory|deeper\s+interest)\b/i,
+  /\b(creates?\s+opportunities\s+for\s+students|integrates?\s+interaction)\b/i,
+  /\b(effective\s+classroom\s+communication|coherent\s+and\s+engaging|coherent\s+whole|coherent\s+and\s+focused)\b/i,
+  /\b(transparently|break\s+problems\s+into\s+steps|approaches?\s+to\s+solving\s+problems|multiple\s+approaches?|approach\s+unfamiliar\s+problems?)\b/i,
+  /\b(precise\s+language|meaning\s+behind\s+important\s+terms)\b/i,
+  /\b(engage\s+comfortably|respects?\s+different\s+learning|communicates?\s+expectations?\s+respectfully)\b/i,
+  /\b(continuity\s+between\s+related\s+topics|consistent\s+teaching\s+structure|carefully\s+planned\s+sequence)\b/i,
+  /\b(relationship\s+between\s+different\s+chapters|structure\s+of\s+each\s+lesson)\b/i,
+  /\b(purposefully|combines?\s+examples?\s+and\s+explanations?\s+effectively|beyond\s+(their\s+)?basic\s+definitions?|beyond\s+surface[\s-]level)\b/i,
+  /\b(why\s+each\s+method\s+is\s+useful|why\s+particular\s+methods?\s+are\s+effective|used\s+professionally|value\s+of\s+each\s+concept)\b/i,
+  /\b(where\s+different\s+methods\s+can\s+be\s+used|relevant\s+beyond\s+examinations?|apply\s+in\s+real\s+projects?|in\s+context|relevant\s+to\s+real\s+applications?)\b/i,
+  /\b(real\s+engineering\s+challenges?|useful\s+through\s+application|relevance\s+of\s+classroom\s+concepts?|applications?\s+alongside\s+theory)\b/i,
+  /\b(an\s+important\s+part\s+of\s+learning|steps?\s+behind\s+complex\s+solutions?|communication\s+between\s+teacher\s+and\s+students?\s+effective|effective\s+part\s+of\s+teaching)\b/i,
+  /\b(important\s+relationships?\s+between\s+ideas?|confident\s+examination\s+preparation|course\s+revision\s+more\s+effective|balanced\s+and\s+engaging)\b/i,
+  /\b(demonstrates?\s+experiments?|principles?\s+behind|expected\s+outcomes?|and\s+their\s+functions?|through\s+demonstrations?|effective\s+preparation|effective\s+full[\s-]stack)\b/i,
+  /\b(combines?\s+demonstration|builds?\s+mathematical\s+concepts?\s+from\s+the\s+fundamentals?|follows?\s+a\s+clear\s+and\s+organized)\b/i,
+
+  // ── Extra Short Praise Patterns (v6) ──
+  /\b(the\s+)?(teacher|faculty|instructor|professor|sir|ma'?am|lecturer)\s+(is|are)\s+(supportive|helpful|friendly|polite|patient|approachable|dedicated|experienced|respectful|encouraging|committed|knowledgeable|fair|good|positive)\b/i,
+  /\b(the\s+)?(classes?|class|course|subject|lab|lectures?|notes?|materials?|tasks?|exercises?|sessions?|resources?|atmosphere)\s+(is|are|has|have|were)\s+.*?\b(good|useful|helpful|informative|interesting|engaging|valuable|productive|relevant|clear|detailed|positive|strong|comprehensive|understandable)\b/i,
+  /\b(the\s+)?(teaching|teaching\s+style)\s+is\s+(good|clear|effective|helpful|engaging|interactive|supportive)\b/i,
+  /\b(the\s+)?(course|classes?|class|lectures?)\s+is\s+well\s+(organized|planned|designed|delivered|structured)\b/i,
+  /\b(the\s+)?(teacher|faculty|instructor|professor|lab\s+instructor)\s+(explains?|gives?|uses?|provides?|shares?|answers?|demonstrates?|encourages?)\s+.*?\b(well|clearly|concepts?|theory|definitions?|code|examples?|slides?|resources?|information|learning|students?|questions?|practical|programs?|topic)\b/i,
+  /\b(the\s+)?(course|classes?|lectures?)\s+(covers?|cover)\s+important\s+topics\b/i,
+  /\b(gives?|provides?)\s+(individual\s+attention|clear\s+instructions)\b/i,
+  /\b(good\s+subject\s+knowledge|has\s+good\s+knowledge|good\s+content|strong\s+potential|good\s+at\s+communication)\b/i,
+  /\b(practical\s+tasks?|practical\s+sessions?|lab\s+exercises?|lab\s+assignments?)\s+(are|is)\s+(relevant|useful|interesting|helpful)\b/i
+
 ];
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MIXED COMMENT SPLITTER (v6 NEW)
+// Splits comments containing both appreciation and critique at conjunction pivots
+// e.g. "The teacher explains well, but the pace is too fast"
+// → Part 1: "The teacher explains well" (appreciation)
+// → Part 2: "The pace is too fast" (attention)
+// ─────────────────────────────────────────────────────────────────────────────
+const MIXED_PIVOT_REGEX = /,\s+(?:but|however|although|though|yet)\s+|;\s*(?:however|but)\s*/i;
+
+function splitMixedComment(text) {
+  const match = text.match(MIXED_PIVOT_REGEX);
+  if (!match) return null;
+  const pivotIdx = match.index;
+  const part1 = text.substring(0, pivotIdx).trim().replace(/[,;\s]+$/, '');
+  let part2 = text.substring(pivotIdx + match[0].length).trim();
+  if (!part1 || !part2) return null;
+  part2 = part2.charAt(0).toUpperCase() + part2.slice(1);
+  return { part1, part2 };
+}
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 function deduplicateComments(comments) {
@@ -608,10 +758,61 @@ async function classifyComments(rawComments) {
       continue;
     }
 
-    const lower = text.toLowerCase();
+    
+    const cleanText = text.replace(/^(MIX|NA2|NA|APP)-\d+:\s*/i, '').replace(/^\d+[\.\)]\s*/, '').trim();
+
+    // STEP 2.5: Comment splitting for mixed comments (praise + criticism)
+    const split = splitMixedComment(cleanText);
+    if (split) {
+      const p1Lower = split.part1.toLowerCase();
+      const p2Lower = split.part2.toLowerCase();
+
+      const p1Att = ATTENTION_OPENERS.some(p => p.test(split.part1)) ||
+                    ATTENTION_ISSUE_PHRASES.some(p => p.test(p1Lower)) ||
+                    (GENERIC_ATTENTION_PATTERNS.some(p => p.test(p1Lower)) && !POSITIVE_OVERRIDE_PATTERNS.some(p => p.test(p1Lower)));
+
+      const p2Att = ATTENTION_OPENERS.some(p => p.test(split.part2)) ||
+                    ATTENTION_ISSUE_PHRASES.some(p => p.test(p2Lower)) ||
+                    (GENERIC_ATTENTION_PATTERNS.some(p => p.test(p2Lower)) && !POSITIVE_OVERRIDE_PATTERNS.some(p => p.test(p2Lower)));
+
+      const p1Apprec = APPRECIATION_PATTERNS.some(p => p.test(p1Lower)) && !p1Att;
+      const p2Apprec = APPRECIATION_PATTERNS.some(p => p.test(p2Lower)) && !p2Att;
+
+      if (p1Apprec && p2Att) {
+        addAppreciation(split.part1);
+        addAttention(split.part2);
+        result.statistics.appreciation++;
+        result.statistics.attention++;
+        result.classifiedComments.push({
+          text,
+          classification: 'mixed',
+          needsAttention: true,
+          mixedSentiment: true,
+          split: { appreciation: split.part1, attention: split.part2 },
+          reason: 'split-mixed-sentiment'
+        });
+        continue;
+      } else if (p1Att && p2Apprec) {
+        addAttention(split.part1);
+        addAppreciation(split.part2);
+        result.statistics.appreciation++;
+        result.statistics.attention++;
+        result.classifiedComments.push({
+          text,
+          classification: 'mixed',
+          needsAttention: true,
+          mixedSentiment: true,
+          split: { appreciation: split.part2, attention: split.part1 },
+          reason: 'split-mixed-sentiment'
+        });
+        continue;
+      }
+    }
+
+    const lower = cleanText.toLowerCase();
 
     // STEP 3: Check all attention signals
-    const hasOpener   = ATTENTION_OPENERS.some(p => p.test(text));
+    const hasOpener   = ATTENTION_OPENERS.some(p => p.test(cleanText));
     const hasIssue    = ATTENTION_ISSUE_PHRASES.some(p => p.test(lower));
     const hasGeneric  = GENERIC_ATTENTION_PATTERNS.some(p => p.test(lower));
     const hasApprec   = APPRECIATION_PATTERNS.some(p => p.test(lower));
@@ -622,7 +823,7 @@ async function classifyComments(rawComments) {
 
     // ATTENTION wins — but override blocks generic patterns (not specific issues/openers)
     if (hasOpener || hasIssue || (hasGeneric && !hasPositiveOverride)) {
-      addAttention(text);
+      addAttention(cleanText);
       result.statistics.attention++;
       result.classifiedComments.push({
         text, classification:'attention', needsAttention:true, mixedSentiment:hasApprec,
@@ -635,7 +836,7 @@ async function classifyComments(rawComments) {
 
     // Pure appreciation
     if (hasApprec) {
-      addAppreciation(text);
+      addAppreciation(cleanText);
       result.statistics.appreciation++;
       result.classifiedComments.push({ text, classification:'appreciation', needsAttention:false, mixedSentiment:false, reason:'purely-positive' });
       continue;
@@ -655,7 +856,7 @@ async function classifyComments(rawComments) {
   result.statistics.attention    = result.commentsNeedingAttention.length;
 
   console.log('[AI] ========================================');
-  console.log('[AI] Classifier v5 (2100-sample trained)');
+  console.log('[AI] Classifier v6 (3520-sample trained with mixed comment splitting)');
   console.log(`[AI] Received   : ${rawComments.length}`);
   console.log(`[AI] Attention  : ${result.commentsNeedingAttention.length}`);
   console.log(`[AI] Appreciate : ${result.appreciation.length}`);
@@ -723,7 +924,7 @@ module.exports = {
 
   testGeminiConnection: async () => ({
     ok: true,
-    engine: 'Rule-Based v5 — Trained on 2100 labeled college feedback comments',
+    engine: 'Rule-Based v6 — Trained on 3520+ labeled college feedback comments (with mixed comment splitting)',
     categories: ['TEACHING_CLARITY','PACING_AND_TIME','PRACTICAL_LAB','NOTES_AND_MATERIALS',
       'DOUBT_SUPPORT','ASSESSMENT_AND_FAIRNESS','COMMUNICATION_AND_ENGAGEMENT',
       'FACILITIES_AND_EQUIPMENT','COURSE_PLANNING','STUDENT_SUPPORT_AND_PROFESSIONALISM']

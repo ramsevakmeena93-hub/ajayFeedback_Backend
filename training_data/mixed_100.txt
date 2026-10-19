@@ -1,0 +1,100 @@
+MIX-001: The teacher explains the concepts well, but the lecture pace is too fast to follow.
+MIX-002: The faculty is supportive, but the notes are shared too late for exam preparation.
+MIX-003: The classes are informative, but more practical examples are needed to understand difficult topics.
+MIX-004: The teacher is knowledgeable, but important steps are skipped while solving problems.
+MIX-005: The subject is interesting, but the lab sessions include too little hands-on practice.
+MIX-006: The instructor is helpful, but students do not get enough time to ask questions.
+MIX-007: The teaching style is good, but the slides contain too much text and few diagrams.
+MIX-008: The teacher is friendly, but the explanation of advanced topics is unclear.
+MIX-009: The course is useful, but the syllabus was not completed before the central quiz.
+MIX-010: The lab is helpful, but the computers frequently stop working.
+MIX-011: The teacher explains theory clearly, but debugging is not demonstrated in lab.
+MIX-012: The classes are engaging, but there is not enough time to write notes.
+MIX-013: The faculty is cooperative, but assignment instructions are often unclear.
+MIX-014: The teacher gives useful examples, but they sometimes do not match the topic.
+MIX-015: The lectures are informative, but the class moves to the next topic before everyone understands.
+MIX-016: The instructor is dedicated, but there is no regular doubt-clearing session.
+MIX-017: The course material is useful, but several important topics are missing from the notes.
+MIX-018: The teacher is polite, but questions raised during class are sometimes left unanswered.
+MIX-019: The lab assignments are relevant, but students are expected to copy code instead of writing it themselves.
+MIX-020: The faculty has good subject knowledge, but the marking scheme is not explained clearly.
+MIX-021: The teacher is patient, but the teaching pace is too fast for beginners.
+MIX-022: The class is well organized, but revision is skipped before major assessments.
+MIX-023: The instructor is approachable, but feedback on assignments is not provided.
+MIX-024: The subject is valuable, but there are too few lab sessions to practise the concepts.
+MIX-025: The teacher explains definitions well, but does not show enough step-by-step solutions.
+MIX-026: The faculty is supportive, but the projector display is difficult to read from the back rows.
+MIX-027: The lectures are useful, but the examples are too limited for exam-level preparation.
+MIX-028: The teacher is experienced, but the lab is conducted mostly like a theory class.
+MIX-029: The course has good content, but the schedule changes are communicated too late.
+MIX-030: The instructor encourages learning, but does not check whether students understand the topic.
+MIX-031: The teacher is excellent at explaining basics, but advanced concepts are rushed.
+MIX-032: The class is generally interesting, but students are not given opportunities to participate.
+MIX-033: The faculty is helpful, but the internet connection interrupts lab work repeatedly.
+MIX-034: The notes are detailed, but they are difficult to revise because they are poorly organized.
+MIX-035: The teacher explains the code, but the process of finding and fixing errors is not covered.
+MIX-036: The course is well designed, but assessment questions include topics not taught in class.
+MIX-037: The teacher is respectful, but students feel uncomfortable asking doubts during lectures.
+MIX-038: The practical tasks are relevant, but the allotted lab time is insufficient.
+MIX-039: The faculty shares useful information, but the study material arrives just before the examination.
+MIX-040: The lectures are clear, but the instructor speaks too softly for students at the back.
+MIX-041: The teacher gives individual attention, but only a few students receive guidance during lab.
+MIX-042: The course is useful, but the answer key is not discussed after quizzes.
+MIX-043: The teacher uses good slides, but the content is read aloud without enough explanation.
+MIX-044: The instructor is cooperative, but assignment deadlines are announced at the last moment.
+MIX-045: The classes cover important topics, but prerequisite concepts are not revised first.
+MIX-046: The faculty is knowledgeable, but the syllabus is rushed near the end of the semester.
+MIX-047: The teacher is encouraging, but students do not receive clear feedback on their mistakes.
+MIX-048: The lab exercises are interesting, but required software is missing from several computers.
+MIX-049: The instructor explains the topic, but no time is reserved for questions at the end.
+MIX-050: The teacher is supportive, but the course notes do not match the lectures.
+MIX-051: The class atmosphere is positive, but the lessons are not interactive enough.
+MIX-052: The faculty explains formulas well, but does not explain how to apply them in problems.
+MIX-053: The teacher is committed, but the assessment time is too short for the number of questions.
+MIX-054: The course has useful resources, but there are no topic-wise practice questions.
+MIX-055: The instructor is approachable, but academic concerns are not followed up consistently.
+MIX-056: The teaching is good overall, but the class skips important intermediate steps.
+MIX-057: The teacher gives clear instructions sometimes, but submission requirements are often incomplete.
+MIX-058: The lab instructor demonstrates programs, but students get little time to run them independently.
+MIX-059: The subject is interesting, but examples from real-world applications are rarely included.
+MIX-060: The faculty is friendly, but classroom instructions are confusing.
+MIX-061: The teacher explains concepts well, but there is no revision before the test.
+MIX-062: The course material is helpful, but several slides contain errors.
+MIX-063: The instructor is fair, but the criteria for awarding marks are unclear.
+MIX-064: The class is useful, but the teaching plan leaves too little time for difficult units.
+MIX-065: The teacher answers questions, but follow-up questions are often discouraged.
+MIX-066: The faculty is dedicated, but the available lab systems are too slow for practical tasks.
+MIX-067: The lectures are understandable, but the pace changes suddenly between topics.
+MIX-068: The teacher is helpful, but students are not told the assessment coverage in advance.
+MIX-069: The lab has useful tasks, but too few working computers are available.
+MIX-070: The instructor gives examples, but does not explain the reasoning behind the answers.
+MIX-071: The teacher is polite, but the classroom sound system does not work properly.
+MIX-072: The course is informative, but there is little time to practise before examinations.
+MIX-073: The faculty is supportive, but difficult concepts are not explained using simpler alternatives.
+MIX-074: The teacher uses practical examples, but the lab activities are not aligned with theory.
+MIX-075: The class is productive, but the lecture often ends before the exercise is completed.
+MIX-076: The instructor encourages students, but doubts are not resolved before moving ahead.
+MIX-077: The teacher is good at communication, but important announcements are shared late.
+MIX-078: The course has strong potential, but the syllabus progress is not communicated clearly.
+MIX-079: The teacher explains the topic, but students are not given enough time to take notes.
+MIX-080: The faculty is helpful, but some assignment instructions change without notice.
+MIX-081: The lectures are informative, but students mostly memorize content instead of practising it.
+MIX-082: The teacher is patient, but individual support is limited when students struggle.
+MIX-083: The subject is useful, but the lab schedule does not match the theory schedule.
+MIX-084: The instructor has good knowledge, but the class relies too much on PowerPoint slides.
+MIX-085: The teacher is encouraging, but students do not receive solutions after practice tests.
+MIX-086: The course is well planned, but important units are left until the end.
+MIX-087: The faculty is respectful, but students have difficulty hearing the explanation.
+MIX-088: The class is interesting, but no clear summary is provided at the end.
+MIX-089: The instructor explains code, but does not teach how to develop a solution from scratch.
+MIX-090: The teacher provides resources, but the files are difficult to locate by unit.
+MIX-091: The teaching is clear, but too many topics are covered in a single lecture.
+MIX-092: The faculty is cooperative, but technical problems waste a large part of the lab period.
+MIX-093: The course is helpful, but quiz questions are sometimes outside the announced syllabus.
+MIX-094: The instructor is knowledgeable, but students are not encouraged to discuss alternative solutions.
+MIX-095: The class is supportive, but the teacher moves ahead without checking understanding.
+MIX-096: The notes are comprehensive, but the important definitions and formulas are hard to find.
+MIX-097: The teacher explains well, but the classroom environment makes students hesitant to raise concerns.
+MIX-098: The practical sessions are useful, but there are not enough experiments to build confidence.
+MIX-099: The faculty is dedicated, but the assignment feedback does not explain how to improve.
+MIX-100: The lectures are well delivered, but the course is not revised before the final assessment.
