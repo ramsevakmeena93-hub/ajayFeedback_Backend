@@ -259,6 +259,45 @@ mongoose.connect(MONGO_URI)
         if (r.ok) console.log('[AI] Model ready:', r.engine);
         else console.warn('[AI] Model not ready:', r.error);
       }).catch(() => {});
+
+      // ── HF API connectivity check ──────────────────────────────────────────
+      const hfToken = process.env.HF_API_TOKEN;
+      if (!hfToken) {
+        console.warn('[HF API] ⚠️  HF_API_TOKEN not set — classifier will use keyword fallback only');
+      } else {
+        console.log('[HF API] ✅ Token set:', hfToken.slice(0, 8) + '...');
+        // Quick ping to verify API is reachable
+        const https = require('https');
+        const pingReq = https.request({
+          hostname: 'api-inference.huggingface.co',
+          path: '/models/MoritzLaurer/deberta-v3-base-zeroshot-v1',
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${hfToken}`,
+            'Content-Length': Buffer.byteLength('{"inputs":"test","parameters":{"candidate_labels":["a","b"]}}')
+          }
+        }, (res) => {
+          let d = '';
+          res.on('data', c => d += c);
+          res.on('end', () => {
+            try {
+              const parsed = JSON.parse(d);
+              if (parsed.error && parsed.error.includes('load')) {
+                console.log('[HF API] ✅ Reachable — model warming up (~20s first request)');
+              } else if (parsed.labels || parsed.scores) {
+                console.log('[HF API] ✅ Reachable and model ready');
+              } else {
+                console.log('[HF API] ✅ Reachable, response:', d.slice(0, 80));
+              }
+            } catch { console.log('[HF API] ✅ Reachable (status:', res.statusCode + ')'); }
+          });
+        });
+        pingReq.on('error', (e) => console.error('[HF API] ❌ Cannot reach HF API:', e.message));
+        pingReq.setTimeout(10000, () => { pingReq.destroy(); console.warn('[HF API] ⚠️  Ping timeout'); });
+        pingReq.write('{"inputs":"test","parameters":{"candidate_labels":["a","b"]}}');
+        pingReq.end();
+      }
     } catch {}
 
     httpServer.listen(PORT, () => {
