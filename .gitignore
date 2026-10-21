@@ -4,3 +4,11 @@ node_modules/
 .cache/
 *.pdf
 *.png
+
+# HuggingFace model weights (large binary — run backend/scripts/download_model.py to get these)
+models/deberta-zeroshot/model.safetensors
+models/deberta-zeroshot/spm.model
+models/deberta-zeroshot/tokenizer.json
+
+# Training data (large text files)
+training_data/
