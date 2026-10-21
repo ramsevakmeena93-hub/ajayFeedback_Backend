@@ -363,6 +363,11 @@ function classifySingle(text) {
     return 'attention';
   }
 
+  // Broad Complaint & Grievance indicators (when no explicit appreciation matched)
+  if (/\b(never|n't|doesn't|does not|didn't|cannot|can't|unable|waste|cancel|cancelled|unfair|bias|partial|irregular|rush|rushed|boring|confus|unclear|inaudible|without notice|not updated|not fair|not clear|not audible|not good|not sufficient|too fast|too slow|too strict|very strict|too late|too low|too lengthy|very lengthy|lengthy|speed of teaching|internal assessment|timing is not sufficient|no proper notes|strict in giving marks)\b/i.test(text)) {
+    return 'attention';
+  }
+
   if (/\b(teacher|faculty|instructor|sir|ma'?am|classes?|lectures?|learning|subject)\b/i.test(text) &&
       /\b(explains?|demonstrates?|helps?|provides?|makes?|shares?|supports?|encourages?|presents?|guides?|teaches?)\b/i.test(text)) {
     return 'appreciation';

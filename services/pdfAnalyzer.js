@@ -972,29 +972,27 @@ async function analyzePDFBuffer(buffer) {
             console.error('[PDF] AI analysis failed:', aiErr.message);
             console.log('[PDF] Falling back to rule-based classification...');
 
-            // Fallback: simple keyword-based sorting
-            allComments.forEach(comment => {
-                const lower = comment.toLowerCase();
-                if (/excellent|outstanding|superb|brilliant|best|very good|great|nice|helpful|clear|understand|perfect/i.test(lower)) {
-                    pushUnique(appreciation, comment);
-                } else if (/poor|bad|worst|slow|fast|audible|voice|doubt|problem|issue|improve|confus|unclear/i.test(lower)) {
-                    pushUnique(commentsNeedingAttention, comment);
-                } else {
-                    // Neutral comments go to appreciation by default (general feedback)
-                    pushUnique(appreciation, comment);
-                }
-            });
+            const { classifyCommentsWithHF } = require('./hfClassifierService');
+            const fbResult = await classifyCommentsWithHF(allComments, { forceFallback: true });
+            appreciation = fbResult.appreciation || [];
+            commentsNeedingAttention = fbResult.commentsNeedingAttention || [];
+            commentCategories = fbResult.commentCategories || {};
         }
     }
 
     // STEP 6: Guarantee highlighted comments are in final classification
     // (Priority: Highlighted > AI classification)
+    (highlights?.commentsNeedingAttention || []).forEach(c => {
+        pushUnique(commentsNeedingAttention, c);
+    });
+
     (highlights?.appreciation || []).forEach(c => {
-        pushUnique(appreciation, c);
+        if (!commentsNeedingAttention.includes(c)) {
+            pushUnique(appreciation, c);
+        }
     });
 
     (highlights?.commentsNeedingAttention || []).forEach(c => {
-        pushUnique(commentsNeedingAttention, c);
 
         // Auto-categorize "Need Attention" comments
         if (commentCategories) {
@@ -1017,6 +1015,9 @@ async function analyzePDFBuffer(buffer) {
             }
         }
     });
+
+    // Final strict filter: ensure zero attention comments in appreciation
+    appreciation = appreciation.filter(c => !commentsNeedingAttention.includes(c));
 
     // STEP 7: Calculate comment percentages (Excellent, Very Good, Good)
     const commentPercentages = calculateCommentPercentages(allComments, meta?.responseCount);
