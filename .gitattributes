@@ -1,0 +1,2 @@
+# Model weights are excluded from git — backend uses HF Inference API on Render
+# Local development only: download model manually via scripts/download_model.py

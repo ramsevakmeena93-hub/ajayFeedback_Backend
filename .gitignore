@@ -12,3 +12,7 @@ models/deberta-zeroshot/tokenizer.json
 
 # Training data (large text files)
 training_data/
+
+# Entire model folder - not needed on Render
+models/deberta-zeroshot/
+
