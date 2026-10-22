@@ -1080,6 +1080,14 @@ router.post(
             DESIGNATED_HOD_DEPARTMENT;
         }
 
+        // Ajay Meena - HOD of Industrial Production
+        if (
+          cleanEmail === '25tc1aj7@mitsgwl.ac.in'
+        ) {
+          assignedRole = 'hod';
+          assignedDepartment = 'Industrial Production';
+        }
+
         const randomPassword =
           await bcrypt.hash(
             Math.random().toString(36),
@@ -1195,6 +1203,14 @@ router.post(
             'hod';
           correctedDept =
             DESIGNATED_HOD_DEPARTMENT;
+        }
+
+        // Ajay Meena - HOD of Industrial Production
+        if (
+          cleanEmail === '25tc1aj7@mitsgwl.ac.in'
+        ) {
+          correctedRole = 'hod';
+          correctedDept = 'Industrial Production';
         }
 
         /*
