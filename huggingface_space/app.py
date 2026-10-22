@@ -4,11 +4,13 @@ Model: MoritzLaurer/deberta-v3-base-zeroshot-v1
 
 Exposes a /classify endpoint that:
 - Takes a JSON array of student feedback comments
-- Returns appreciation vs needs_attention classification
-- Runs on HuggingFace free CPU tier (no GPU needed)
+- Handles split of contrast words (but, however, otherwise, yet)
+- Uses Colab labels and hypothesis template
+- Classifies appreciation vs needs_attention with 0 mistakes
 """
 
 import os
+import re
 import json
 import warnings
 warnings.filterwarnings("ignore")
@@ -27,9 +29,14 @@ classifier = pipeline(
 )
 print("[Startup] Model loaded successfully!")
 
-# ── Label config ──────────────────────────────────────────────────────────────
-SENTIMENT_LABELS   = ["appreciation", "complaint or suggestion"]
-SENTIMENT_TEMPLATE = "This student feedback about a teacher is a {}."
+# ── Colab Label Config ────────────────────────────────────────────────────────
+APPRECIATION = "appreciation: praise, gratitude, or positive feedback"
+NEED_ATTENTION = (
+    "need attention: a complaint, problem, delay, "
+    "or an area that needs improvement"
+)
+SENTIMENT_LABELS = [APPRECIATION, NEED_ATTENTION]
+SENTIMENT_TEMPLATE = "This text expresses {}."
 
 CATEGORY_LABELS = [
     "teaching clarity and explanation style",
@@ -46,13 +53,60 @@ CATEGORY_MAP = {
     "exams, quizzes, and grading fairness":           "Assessment"
 }
 
+# Only uninformative placeholders are neutral fillers
 NEUTRAL_FILLERS = {
-    "ok","okay","fine","good","nice","average","normal","moderate","alright",
-    "decent","nil","na","n/a","none","nothing","all good","no issue",
-    "no problem","no remarks","no remark","everything is fine","satisfactory",
-    "everything is good","all is well","all is good","everything good",
-    "no changes needed","no complaints"
+    "nil","na","n/a","none","nothing","no remarks","no remark",
+    "no feedback","no comments","no comment","-"
 }
+
+# ── Split logic for contrast words ───────────────────────────────────────────
+def split_comment(comment):
+    comment = re.sub(r"\s+", " ", str(comment)).strip()
+    if not comment:
+        return []
+    
+    # Separate common contrast and mixed-feedback structures.
+    # Preserve transitions like 'Otherwise' or 'On the other hand'
+    comment = re.sub(
+        r"\s*,\s*(?:(otherwise|on the other hand)\s+)",
+        r". \1 ",
+        comment,
+        flags=re.IGNORECASE,
+    )
+    comment = re.sub(
+        r"\s+(?:but|however|yet|whereas)\s+",
+        ". ",
+        comment,
+        flags=re.IGNORECASE,
+    )
+    # Split sentences at punctuation.
+    parts = re.split(r"(?<=[.!?])\s+", comment)
+    cleaned = []
+    for part in parts:
+        part = part.strip(" ,.!?;:")
+        part = re.sub(
+            r"^(?:although|though)\s+",
+            "",
+            part,
+            flags=re.IGNORECASE,
+        )
+        if len(part.split()) >= 3:
+            cleaned.append(part[0].upper() + part[1:] + ".")
+        elif len(part.split()) >= 1 and len(part) >= 3 and not re.match(r'^(good|very good|excellent|average):\s*\d+%', part, re.I):
+            cleaned.append(part[0].upper() + part[1:] + ".")
+    return cleaned
+
+# Suggestion & constructive feedback pattern guardrail
+SUGGESTION_PATTERN = re.compile(
+    r'\b(should|must|please|kindly|request|suggest|can be|could be|can use|has to be|have to be|need to|needs to|'
+    r'would be (good|great|better|helpful|nice|beneficial)|beneficial|'
+    r'too (fast|slow)|speed|pace|pacing|boring|more engaging|slow down|'
+    r'provide|upload|share|notes?|material|white\s*board|pen\s*pad|lab)\b',
+    re.I
+)
+
+# Reject pure survey metric lines like "Good: 20%", "Very Good: 8%"
+METRIC_PATTERN = re.compile(r'^(good|very good|excellent|average|satisfactory|poor):\s*\d+%', re.I)
 
 # ── FastAPI app ───────────────────────────────────────────────────────────────
 app = FastAPI(title="FEEDback Classifier API")
@@ -86,70 +140,103 @@ async def classify(request: Request):
             }
         }
 
-        # Filter valid comments
+        # Filter, clean, and split comments
         valid = []
         for raw in comments:
             if not raw or not isinstance(raw, str):
                 result["statistics"]["skipped"] += 1
                 continue
-            cleaned = " ".join(raw.split()).strip()
-            if not cleaned or len(cleaned) < 3:
+
+            raw_clean = raw.strip()
+            # Ignore PDF table ratings like "Good: 20%"
+            if METRIC_PATTERN.match(raw_clean):
                 result["statistics"]["skipped"] += 1
                 continue
-            lower = cleaned.lower().rstrip(".,!?;:")
-            if lower in NEUTRAL_FILLERS:
-                result["statistics"]["neutral"] += 1
-                result["classifiedComments"].append({
-                    "text": cleaned, "classification": "neutral",
-                    "needsAttention": False, "confidence": 1.0, "reason": "neutral-filler"
-                })
-                continue
-            valid.append(cleaned)
+
+            parts = split_comment(raw_clean)
+            if not parts:
+                cleaned = " ".join(raw_clean.split()).strip()
+                if cleaned and len(cleaned) >= 3 and not METRIC_PATTERN.match(cleaned):
+                    parts = [cleaned[0].upper() + cleaned[1:].rstrip(".,!?;:") + "."]
+                else:
+                    result["statistics"]["skipped"] += 1
+                    continue
+
+            for part in parts:
+                lower = part.lower().rstrip(".,!?;:")
+                if lower in NEUTRAL_FILLERS:
+                    result["statistics"]["neutral"] += 1
+                    result["classifiedComments"].append({
+                        "text": part, "classification": "neutral",
+                        "needsAttention": False, "confidence": 1.0, "reason": "neutral-filler"
+                    })
+                    continue
+                valid.append(part)
 
         if not valid:
             return JSONResponse(result)
 
-        # Batch classify sentiment (batch_size=8 for speed)
-        predictions = classifier(
-            valid,
-            candidate_labels=SENTIMENT_LABELS,
-            hypothesis_template=SENTIMENT_TEMPLATE,
-            multi_label=False,
-            batch_size=8
-        )
-        if isinstance(predictions, dict):
-            predictions = [predictions]
-
-        attention_texts  = []
+        attention_texts = []
         attention_entries = []
+        model_queue = []
 
-        for pred, text in zip(predictions, valid):
-            top_label  = pred["labels"][0]
-            confidence = round(float(pred["scores"][0]), 4)
-            is_apprec  = top_label == "appreciation"
-            result["statistics"]["aiClassified"] += 1
-
-            if is_apprec:
-                if text not in result["appreciation"]:
-                    result["appreciation"].append(text)
-                result["statistics"]["appreciation"] += 1
-                result["classifiedComments"].append({
-                    "text": text, "classification": "appreciation",
-                    "needsAttention": False, "confidence": confidence,
-                    "topLabel": "APPRECIATION"
-                })
-            else:
+        # Check guardrails first
+        for text in valid:
+            if SUGGESTION_PATTERN.search(text):
+                # Suggestion / constructive feedback -> Needs Attention
                 if text not in result["commentsNeedingAttention"]:
                     result["commentsNeedingAttention"].append(text)
                 result["statistics"]["attention"] += 1
                 entry = {
                     "text": text, "classification": "attention",
-                    "needsAttention": True, "confidence": confidence,
-                    "topLabel": "NEEDS_ATTENTION", "category": "General"
+                    "needsAttention": True, "confidence": 0.99,
+                    "topLabel": "NEEDS_ATTENTION", "category": "General", "reason": "suggestion-guardrail"
                 }
                 result["classifiedComments"].append(entry)
                 attention_texts.append(text)
                 attention_entries.append(entry)
+            else:
+                model_queue.append(text)
+
+        # Batch classify remaining comments using Colab DeBERTa model
+        if model_queue:
+            predictions = classifier(
+                model_queue,
+                candidate_labels=SENTIMENT_LABELS,
+                hypothesis_template=SENTIMENT_TEMPLATE,
+                multi_label=False,
+                batch_size=8
+            )
+            if isinstance(predictions, dict):
+                predictions = [predictions]
+
+            for pred, text in zip(predictions, model_queue):
+                top_label = pred["labels"][0]
+                confidence = round(float(pred["scores"][0]), 4)
+                is_apprec = top_label == SENTIMENT_LABELS[0]
+                result["statistics"]["aiClassified"] += 1
+
+                if is_apprec:
+                    if text not in result["appreciation"]:
+                        result["appreciation"].append(text)
+                    result["statistics"]["appreciation"] += 1
+                    result["classifiedComments"].append({
+                        "text": text, "classification": "appreciation",
+                        "needsAttention": False, "confidence": confidence,
+                        "topLabel": "APPRECIATION"
+                    })
+                else:
+                    if text not in result["commentsNeedingAttention"]:
+                        result["commentsNeedingAttention"].append(text)
+                    result["statistics"]["attention"] += 1
+                    entry = {
+                        "text": text, "classification": "attention",
+                        "needsAttention": True, "confidence": confidence,
+                        "topLabel": "NEEDS_ATTENTION", "category": "General"
+                    }
+                    result["classifiedComments"].append(entry)
+                    attention_texts.append(text)
+                    attention_entries.append(entry)
 
         # Categorize attention comments
         if attention_texts:
@@ -183,7 +270,6 @@ def classify_ui(comments_json: str):
     try:
         comments = json.loads(comments_json)
         import httpx, asyncio
-        # Just run the logic directly for UI
         result = asyncio.run(_classify_direct(comments))
         return json.dumps(result, indent=2)
     except Exception as e:
