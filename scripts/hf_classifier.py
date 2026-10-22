@@ -44,6 +44,40 @@ def is_neutral_filler(text):
     fillers = {"ok", "okay", "fine", "good", "nice", "average", "normal", "moderate", "alright", "decent", "nil", "na", "n/a", "none", "nothing", "all good", "no issue", "no problem", "everything is fine", "satisfactory"}
     return t in fillers
 
+import re
+
+# Pre-rules: patterns that always mean NEEDS_ATTENTION regardless of model
+ATTENTION_PRE_RULES = [
+    re.compile(r'\b(need|needs?|needed)\b.{0,50}\b(more|better|proper|clear|improve|example|explanation|practice|time|notes?|material|lab|session|interact)\b', re.I),
+    re.compile(r'\b(more\s+)(example|explanation|practice|time|interact|detail|lab|session|hands.?on|real.?world|problem|discussion)\b', re.I),
+    re.compile(r'\b(better\s+)(notes?|material|explanation|teaching|slides?|ppt|approach|method|pace|content)\b', re.I),
+    re.compile(r'\b(can be|could be|should be|must be)\b.{0,30}\b(better|improve|more|interactive|clear|effective|helpful|engaging)\b', re.I),
+    re.compile(r'\b(should|must|please|kindly|request|suggest)\b', re.I),
+    re.compile(r'\b(too fast|too slow|very fast|very slow|fast pace|slow pace|speed (is|of|too)|pace (is|too)|pacing (is|too))\b', re.I),
+    re.compile(r'\b(speed of teaching|teaching speed|pace of (teaching|lecture))\b', re.I),
+    re.compile(r'\bsometimes feel fast\b', re.I),
+    re.compile(r'\bnotes?\b.{0,30}\b(not|never|should|must|need|early|timely|missing|incomplete|late|delay)\b', re.I),
+    re.compile(r'\b(not (clear|understandable|able to follow|audible)|can\'?t (understand|follow|hear))\b', re.I),
+    re.compile(r'\b(not (interactive|engaging|interesting)|less (interactive|engaging)|boring|monoton)\b', re.I),
+    re.compile(r'\b(not much interact|2.?way|two.?way)\b', re.I),
+    re.compile(r'\b(can be more interactive|more interactive|make (it|class|lecture) (more )?interactive)\b', re.I),
+    re.compile(r'\b(voice|audible|volume|mic|hear|loud|speak)\b.{0,20}\b(low|issue|problem|not|more|louder|clearly)\b', re.I),
+    re.compile(r'\b(out of syllabus|marks? not justified|unfair|change (faculty|teacher)|fear (in|of) class)\b', re.I),
+    re.compile(r'\b(improve(ment)?( needed)?|needs? (to )?improve|could be better)\b', re.I),
+    re.compile(r'\b(issue|problem|concern|complain(t)?|dissatisf)\b', re.I),
+    re.compile(r'\b(provide|share|upload|give)\b.{0,30}\b(notes?|material|slides?|ppt|handout)\b', re.I),
+    re.compile(r'\b(direct(ly)? jump|jumping (into|to) (code|advance|topic))\b', re.I),
+    re.compile(r'\b(teach basics? first|start from basics?|explain from scratch)\b', re.I),
+    re.compile(r'\b(beneficial for class|beneficial if|would be (good|helpful|better|great) if)\b', re.I),
+]
+
+def apply_pre_rule(text):
+    """Returns 'attention' if text matches attention patterns, else None."""
+    for rx in ATTENTION_PRE_RULES:
+        if rx.search(text):
+            return 'attention'
+    return None
+
 def classify_batch(comments):
     classifier = get_classifier()
 
@@ -89,6 +123,23 @@ def classify_batch(comments):
                 "needsAttention": False,
                 "confidence": 1.0,
                 "reason": "neutral-filler"
+            })
+            continue
+
+        # Apply pre-rules before sending to model
+        pre = apply_pre_rule(cleaned)
+        if pre == 'attention':
+            if cleaned not in result["commentsNeedingAttention"]:
+                result["commentsNeedingAttention"].append(cleaned)
+            result["statistics"]["attention"] += 1
+            result["classifiedComments"].append({
+                "text": cleaned,
+                "classification": "attention",
+                "needsAttention": True,
+                "confidence": 0.97,
+                "topLabel": "NEEDS_ATTENTION",
+                "reason": "pre-rule",
+                "category": "General"
             })
             continue
 
