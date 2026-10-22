@@ -7,6 +7,44 @@ const { testGeminiConnection, analyzeCommentsWithAI } = require('../services/aiA
 const { log } = require('../services/logger');
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Comment filter — strip short / meaningless comments before sending to client
+// Applied to every report object before res.json so the frontend never sees junk
+// ─────────────────────────────────────────────────────────────────────────────
+const FILLER_PHRASES = new Set([
+  'ok','okay','good','nice','fine','great','excellent','awesome',
+  'bad','poor','no','yes','na','n/a','nothing','none','nil',
+  'satisfactory','average','moderate','alright','cool',
+  'thanks','thank you','thank','no comments','no comment',
+  'no suggestion','no suggestions','nothing to say','all good',
+  'all ok','all fine','no issues','no problem','no problems','no feedback',
+]);
+
+function filterShortComments(list) {
+  if (!Array.isArray(list)) return [];
+  return list.filter(c => {
+    if (!c || typeof c !== 'string') return false;
+    const t = c.trim();
+    if (t.length < 10) return false;                          // too short
+    if (FILLER_PHRASES.has(t.toLowerCase().replace(/[.,!?]+$/, ''))) return false;
+    return t.split(/\s+/).length >= 5;                        // less than 5 words → skip
+  });
+}
+
+/** Apply comment filter to a plain report object */
+function cleanReport(r) {
+  if (!r) return r;
+  const obj = typeof r.toObject === 'function' ? r.toObject() : r;
+  obj.commentsNeedingAttention = filterShortComments(obj.commentsNeedingAttention);
+  obj.appreciation             = filterShortComments(obj.appreciation);
+  return obj;
+}
+
+/** Apply to an array of reports */
+function cleanReports(arr) {
+  return (arr || []).map(cleanReport);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -343,7 +381,7 @@ router.patch('/:id/edit', authMiddleware, requireAnyRole('hod'), async (req, res
       } catch {}
     }
 
-    res.json(report);
+    res.json(cleanReport(report));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -442,7 +480,7 @@ router.get('/faculty/my', authMiddleware, requireAnyRole('faculty', 'hod'), asyn
 
     const query = await buildFacultyQuery(req.user.id, extra, true);
     const reports = await FacultyReport.find(query).sort({ createdAt: -1 });
-    res.json(reports);
+    res.json(cleanReports(reports));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -565,7 +603,7 @@ router.post('/:id/acknowledge', authMiddleware, requireAnyRole('faculty', 'hod')
       });
     } catch {}
 
-    res.json(report);
+    res.json(cleanReport(report));
     log(report.hodId, 'faculty_approved', `Faculty acknowledged: ${report.facultyName}`, { reportId: report._id }, 'success');
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -592,7 +630,7 @@ router.get('/my', authMiddleware, requireAnyRole('hod'), async (req, res) => {
     }
 
     const reports = await FacultyReport.find(query).sort({ createdAt: -1 });
-    res.json(reports);
+    res.json(cleanReports(reports));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -631,7 +669,7 @@ router.get('/:id', authMiddleware, async (req, res) => {
       }
     }
 
-    res.json(report);
+    res.json(cleanReport(report));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -649,7 +687,7 @@ router.patch('/:id/remarks', authMiddleware, requireAnyRole('hod'), async (req, 
       { new: true }
     );
     if (!report) return res.status(404).json({ error: 'Report not found' });
-    res.json(report);
+    res.json(cleanReport(report));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
