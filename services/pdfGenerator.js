@@ -137,17 +137,17 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
   function calcLines(text, colW, fontSize) {
     if (!text) return 1;
     
-    const maxWidth = colW - 14; // Match actual rendering: 14px total padding (7 on each side)
+    const maxWidth = colW - 14;
     const segments = text.split("\n");
     let totalLines = 0;
     
     segments.forEach(seg => {
       if (!seg.trim()) {
-        totalLines++;
+        // blank spacer between bullets — counts as 0.5 lines
+        totalLines += 0.5;
         return;
       }
       
-      // Split on any whitespace and filter empty strings
       const words = seg.split(/\s+/).filter(w => w);
       let currentLine = "";
       let lineCount = 0;
@@ -157,7 +157,6 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
         if (!cleanWord) return;
         
         const testLine = currentLine ? currentLine + " " + cleanWord : cleanWord;
-        // Use actual font measurement with appropriate factor
         const charWidthFactor = fontSize < 10 ? 0.56 : 0.58;
         const testWidth = testLine.length * fontSize * charWidthFactor;
         
@@ -570,10 +569,10 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
   // ── Data rows ─────────────────────────────────────────────────────────────
   const ROW_GAP    = 1;  // Minimal gap between rows (reduced from 2pt)
   // BOTTOM_MARGIN and TOP_MARGIN already defined above for comment section
-  const FS = 9.5;           // Reduced font size to fit more text (was 10)
-  const LH = 10.5;          // Reduced line height (was 11)
-  const MIN_ROW_HEIGHT = 38; // Reduced minimum (was 42)
-  const ROW_PADDING = 10;    // Reduced padding (was 12)
+  const FS = 8.5;           // Font size — readable but compact
+  const LH = 11.5;          // Line height — enough breathing room between wrapped lines
+  const MIN_ROW_HEIGHT = 40; // Minimum row height
+  const ROW_PADDING = 16;    // Top+bottom padding inside each row
 
   let pageNumber = 1;
   let isFirstDataRow = true; // Track if this is the first data row
@@ -593,8 +592,13 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
       ? codeParts[0].trim() + "\n" + codeParts.slice(1).join("-").trim()
       : cleanedSubjectCode;
 
-    const attText = (r.commentsNeedingAttention || []).length > 0
-      ? r.commentsNeedingAttention.map(x => "\u2022 " + x).join("\n")
+    const attText = (r.commentsNeedingAttention || [])
+      .filter(c => c && c.trim().split(/\s+/).length >= 5)
+      .length > 0
+      ? (r.commentsNeedingAttention || [])
+          .filter(c => c && c.trim().split(/\s+/).length >= 5)
+          .map(x => "\u2022 " + x.trim())
+          .join("\n\n")   // blank line between bullets for readability
       : "None";
 
     const pcts = r.commentPercentages || {};
@@ -605,9 +609,9 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
       .join("\n");
     // Preserve ALL appreciation comments (no filtering)
     const allAppreciations = (r.appreciation || [])
-      .filter(c => typeof c === "string" && c.trim())
+      .filter(c => typeof c === "string" && c.trim() && c.trim().split(/\s+/).length >= 5)
       .map(x => "\u2022 " + x.trim());
-    const appText = [pctLines, ...allAppreciations].filter(Boolean).join("\n") || "-";
+    const appText = [pctLines, ...allAppreciations].filter(Boolean).join("\n\n") || "-";
 
     // Action Taken - check multiple possible field names
     const actionText = r.actionTaken || r.action_taken || r.hodAction || r.hodActionTaken || "-";
@@ -750,46 +754,46 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
       if (val.noWrap) {
         allLines = [textValue];
       } else {
-        // Apply word wrapping
-        allLines = textValue.split("\n").filter(seg => seg.trim()).flatMap(seg => {
+        // Split by \n — empty segments (\n\n between bullets) become spacer lines
+        allLines = textValue.split("\n").flatMap((seg, segIdx, segs) => {
+          if (seg.trim() === "") {
+            // Empty line between bullets — add a half-height spacer
+            return [""];
+          }
+
+          const isBulletLine = seg.startsWith("\u2022 ");
+          const bulletIndent = isBulletLine ? 10 : 0; // extra indent for wrapped continuation of bullet
           const words = seg.split(/\s+/).filter(w => w);
           const wrappedLines = [];
           let currentLine = "";
-          
+
           const fontToUse = val.bold ? boldFont : timesFont;
-          const maxWidth = col.w - 14;
-        
+          const maxWidth = col.w - 14 - bulletIndent;
+
           words.forEach((word) => {
             const cleanWord = word.trim();
             if (!cleanWord) return;
-            
+
             const testLine = currentLine ? currentLine + " " + cleanWord : cleanWord;
             const testWidth = fontToUse.widthOfTextAtSize(testLine, FS);
-            
+
             if (testWidth <= maxWidth) {
               currentLine = testLine;
             } else {
-              if (currentLine) {
-                wrappedLines.push(currentLine);
-              }
-              
-              // Check if single word is too long
+              if (currentLine) wrappedLines.push(currentLine);
+
               const wordWidth = fontToUse.widthOfTextAtSize(cleanWord, FS);
               if (wordWidth > maxWidth) {
-                // Break long word
                 let remaining = cleanWord;
                 while (remaining.length > 0) {
                   let breakPoint = remaining.length;
                   let testStr = remaining;
-                  
                   while (fontToUse.widthOfTextAtSize(testStr, FS) > maxWidth && testStr.length > 1) {
                     breakPoint--;
                     testStr = remaining.substring(0, breakPoint);
                   }
-                  
                   if (breakPoint > 0) {
-                    const chunk = remaining.substring(0, breakPoint);
-                    wrappedLines.push(chunk + (breakPoint < remaining.length ? "-" : ""));
+                    wrappedLines.push(remaining.substring(0, breakPoint) + (breakPoint < remaining.length ? "-" : ""));
                     remaining = remaining.substring(breakPoint);
                   } else {
                     wrappedLines.push(remaining.substring(0, 1));
@@ -802,10 +806,19 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
               }
             }
           });
-          
+
           if (currentLine) wrappedLines.push(currentLine);
-          return wrappedLines.length > 0 ? wrappedLines : [""];
-        });
+
+          // Tag each wrapped line with its bullet indent so renderer knows
+          return wrappedLines.map((l, li) => ({
+            text: l,
+            indent: li === 0 ? 0 : bulletIndent, // first line keeps bullet, continuation indented
+            isSpacer: false,
+          }));
+        }).map(l => typeof l === "string"
+          ? { text: l, indent: 0, isSpacer: l === "" }
+          : l
+        );
       }
       
       // Render ALL lines for this cell (no truncation)
@@ -814,18 +827,21 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
       
       // Render lines on current page
       for (let li = 0; li < visibleLines.length; li++) {
-        const l = visibleLines[li];
+        const lineObj = visibleLines[li];
+        const l = typeof lineObj === "object" ? lineObj.text : lineObj;
+        const indent = typeof lineObj === "object" ? (lineObj.indent || 0) : 0;
+        const isSpacer = typeof lineObj === "object" ? lineObj.isSpacer : false;
+        const spacerH = isSpacer ? LH * 0.5 : LH; // spacer lines use half height
+
         const fontToUse = val.bold ? boldFont : timesFont;
-        const lw = fontToUse.widthOfTextAtSize(l, FS);
-        const tX = val.center ? col.x + (col.w - lw) / 2 : col.x + 6;
+        const lw = l ? fontToUse.widthOfTextAtSize(l, FS) : 0;
+        const tX = val.center ? col.x + (col.w - lw) / 2 : col.x + 6 + indent;
         const lineY = y - 12 - li * LH;
         
         // Only render if line is within current row bounds (not below page bottom)
-        const lineBottomY = lineY - LH;
         if (lineY >= BOTTOM_MARGIN) {
-          txt(coverPage, l, tX, lineY, FS, fontToUse, val.color || black);
+          if (!isSpacer && l) txt(coverPage, l, tX, lineY, FS, fontToUse, val.color || black);
         } else if (needsContinuation && lineY < BOTTOM_MARGIN) {
-          // This line goes to continuation - don't render now
           break;
         }
       }
@@ -888,12 +904,15 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
           const { lines, val, col } = cellData;
           
           // Render remaining lines
-          lines.forEach((l, li) => {
+          lines.forEach((lineObj, li) => {
+            const l = typeof lineObj === "object" ? lineObj.text : lineObj;
+            const indent = typeof lineObj === "object" ? (lineObj.indent || 0) : 0;
+            const isSpacer = typeof lineObj === "object" ? lineObj.isSpacer : false;
+            if (isSpacer || !l) return;
             const fontToUse = val.bold ? boldFont : timesFont;
             const lw = fontToUse.widthOfTextAtSize(l, FS);
-            const tX = val.center ? col.x + (col.w - lw) / 2 : col.x + 6;
+            const tX = val.center ? col.x + (col.w - lw) / 2 : col.x + 6 + indent;
             const lineY = y - 12 - li * LH;
-            
             txt(coverPage, l, tX, lineY, FS, fontToUse, val.color || black);
           });
           
