@@ -189,6 +189,12 @@ function isValidComment(text) {
     const words = clean.split(/\s+/).filter(w => /[a-zA-Z]/.test(w));
     if (words.length < 3) return false;
 
+    // Reject survey questions with score distributions (e.g., "1 The weekly quiz... 0 1 9 28 28 4.26")
+    if (/\b\d+\s+\d+\s+\d+\s+\d+\s+\d+(\s+\d+\.\d+)?\b/.test(clean)) return false;
+    if (/\b\d+\s+\d+\s+\d+\b/.test(clean) && /\d+\.\d+/.test(clean)) return false;
+    if (/^\d{1,2}\s+[A-Za-z].*\b\d+\.\d{1,2}\b/i.test(clean)) return false;
+    if (/^\d{1,2}\s+(the\s+weekly|demonstrates|the\s+classes|performance\s+in|overall\s+rating|evaluation|rate\s+the|whether|the\s+concepts|coverage\s+of|course\s+outcomes)/i.test(clean)) return false;
+
     // Reject survey percentages & score metrics (e.g. "Good: 20%", "Very Good: 8%", "5/5")
     if (/\b(good|very\s+good|excellent|average|satisfactory|below\s+average|poor)\s*:\s*\d+%/i.test(clean)) return false;
     if (/^\d+(\.\d+)?\s*(%|\/\s*\d+)/.test(clean)) return false;
