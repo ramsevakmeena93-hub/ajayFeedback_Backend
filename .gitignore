@@ -18,3 +18,4 @@ models/deberta-zeroshot/
 __pycache__/
 *.pyc
 
+.venv

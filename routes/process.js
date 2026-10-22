@@ -555,4 +555,22 @@ router.delete('/clear-all', authMiddleware, async (req, res) => {
   }
 });
 
+// ─── CLASSIFY COMMENTS (Direct AI Classification Endpoint) ───────────────
+router.post('/classify', async (req, res) => {
+  try {
+    const raw = req.body?.comments !== undefined ? req.body.comments : req.body;
+    const comments = Array.isArray(raw) ? raw : [raw];
+    if (!comments || comments.length === 0 || (comments.length === 1 && !comments[0])) {
+      return res.status(400).json({ error: 'Please provide an array of comments or { comments: [...] }' });
+    }
+
+    const { classifyComments } = require('../services/aiAnalyzer');
+    const result = await classifyComments(comments);
+    return res.json(result);
+  } catch (err) {
+    console.error('[/api/process/classify] Error:', err.message);
+    return res.status(500).json({ error: err.message || 'Classification failed' });
+  }
+});
+
 module.exports = router;

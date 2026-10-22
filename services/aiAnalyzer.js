@@ -5,16 +5,59 @@
 // Replaces the old rule-based v6 engine
 // ============================================================
 
+const axios = require('axios');
 const { classifyCommentsWithHF } = require('./hfClassifierService');
 
-// ── MAIN CLASSIFIER (async, powered by HuggingFace DeBERTa) ─────────────────
-async function classifyComments(rawComments) {
-  console.log('[AI] ========================================');
-  console.log('[AI] HuggingFace DeBERTa Zero-Shot Classifier');
-  console.log(`[AI] Received: ${(rawComments || []).length} comments`);
+const FASTAPI_URL = process.env.FASTAPI_CLASSIFIER_URL || 'http://localhost:7860';
 
+async function testFastAPIConnection() {
   try {
-    const result = await classifyCommentsWithHF(rawComments);
+    const res = await axios.get(`${FASTAPI_URL}/health`, { timeout: 3000 });
+    return { ok: res.data?.status === 'ok', url: FASTAPI_URL };
+  } catch (err) {
+    return { ok: false, url: FASTAPI_URL, error: err.message };
+  }
+}
+
+// ── MAIN CLASSIFIER (async, powered by FastAPI / HuggingFace DeBERTa) ────────
+async function classifyComments(rawComments) {
+  const comments = (rawComments || []).filter(c => c !== null && c !== undefined);
+  console.log('[AI] ========================================');
+  console.log('[AI] Feedback Intelligence Classifier');
+  console.log(`[AI] Received: ${comments.length} comments`);
+
+  if (!comments.length) {
+    return {
+      appreciation: [],
+      commentsNeedingAttention: [],
+      commentCategories: { Teaching: [], Communication: [], Availability: [], Materials: [], Assessment: [], General: [] },
+      classifiedComments: [],
+      statistics: { totalReceived: 0, appreciation: 0, attention: 0, neutral: 0, skipped: 0, aiClassified: 0 }
+    };
+  }
+
+  // 1. Try redirecting to FastAPI DeBERTa server if reachable
+  if (FASTAPI_URL) {
+    try {
+      console.log(`[AI] Forwarding to FastAPI classifier at ${FASTAPI_URL}/classify...`);
+      const payload = comments.map(c => typeof c === 'object' && c !== null ? (c.text || c.comment || '') : String(c));
+      const response = await axios.post(`${FASTAPI_URL}/classify`, payload, {
+        headers: { 'Content-Type': 'application/json' },
+        timeout: 60000
+      });
+
+      const result = response.data;
+      console.log(`[AI] FastAPI Success: ${result.commentsNeedingAttention?.length || 0} attention, ${result.appreciation?.length || 0} appreciation`);
+      console.log('[AI] ========================================');
+      return result;
+    } catch (err) {
+      console.warn(`[AI] FastAPI unavailable (${err.message}) — falling back to local HF/rule engine`);
+    }
+  }
+
+  // 2. Fallback to HF service / high-precision rule engine
+  try {
+    const result = await classifyCommentsWithHF(comments);
     console.log(`[AI] Attention  : ${result.commentsNeedingAttention.length}`);
     console.log(`[AI] Appreciate : ${result.appreciation.length}`);
     console.log(`[AI] Neutral    : ${result.statistics.neutral}`);
@@ -22,15 +65,14 @@ async function classifyComments(rawComments) {
     console.log('[AI] ========================================');
     return result;
   } catch (err) {
-    console.error('[AI] HuggingFace classifier error:', err.message);
-    // Return safe empty result on failure
+    console.error('[AI] Classifier fallback error:', err.message);
     return {
       appreciation: [],
       commentsNeedingAttention: [],
       commentCategories: { Teaching: [], Communication: [], Availability: [], Materials: [], Assessment: [], General: [] },
       classifiedComments: [],
       statistics: {
-        totalReceived: (rawComments || []).length,
+        totalReceived: comments.length,
         appreciation: 0, attention: 0, neutral: 0, skipped: 0, aiClassified: 0
       }
     };
@@ -40,6 +82,7 @@ async function classifyComments(rawComments) {
 module.exports = {
   classifyComments,
   analyzeCommentsWithAI: classifyComments,
+  testFastAPIConnection,
 
   // ── AI-POWERED ACTION TAKEN SUGGESTION ──────────────────────────────────
   // Analyzes commentsNeedingAttention and generates a professional

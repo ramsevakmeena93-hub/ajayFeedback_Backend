@@ -86,6 +86,7 @@ try {
   app.use('/api/reports',       require('./routes/reports'));
   app.use('/api/submissions',   require('./routes/submissions'));
   app.use('/api/process',       require('./routes/process'));
+  app.post('/api/classify',      (req, res, next) => { req.url = '/classify'; require('./routes/process')(req, res, next); });
   app.use('/api/logs',          require('./routes/logs'));
   app.use('/api/notifications', require('./routes/notifications'));
   app.use('/api/admin',         require('./routes/admin'));
@@ -254,10 +255,18 @@ mongoose.connect(MONGO_URI)
 
     // Preload AI model in background so it's ready for first request
     try {
-      const { testGeminiConnection } = require('./services/aiAnalyzer');
+      const { testGeminiConnection, testFastAPIConnection } = require('./services/aiAnalyzer');
       testGeminiConnection().then(r => {
-        if (r.ok) console.log('[AI] Model ready:', r.engine);
+        if (r.ok) console.log('[AI] Model engine:', r.engine);
         else console.warn('[AI] Model not ready:', r.error);
+      }).catch(() => {});
+
+      testFastAPIConnection().then(status => {
+        if (status.ok) {
+          console.log('[AI] ✅ Connected to FastAPI DeBERTa Classifier at', status.url);
+        } else {
+          console.warn('[AI] ⚠️  FastAPI Classifier not reachable at', status.url, `(${status.error}) — local fallback active`);
+        }
       }).catch(() => {});
 
       // ── HF API connectivity check ──────────────────────────────────────────
