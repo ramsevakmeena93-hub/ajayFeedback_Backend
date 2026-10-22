@@ -159,7 +159,7 @@ async function extractHighlightedText(buffer) {
       if (inside.length === 0) continue;
 
       const text = inside.map(t => t.str).join(' ').trim().replace(/\s+/g, ' ');
-      if (text.length < 3) continue;
+      if (!isValidComment(text)) continue;
 
       // RED is Attention (needs attention / problems), YELLOW is Appreciation (positive feedback)
       if (rect.color === 'red') pushUnique(commentsNeedingAttention, text);
@@ -184,14 +184,28 @@ function isValidComment(text) {
     if (!text || typeof text !== 'string') return false;
     const clean = text.trim();
 
-    // Minimum length to be considered a real comment (increased to filter more garbage)
-    if (clean.length < 10) return false;
+    // Must be at least 15 characters and at least 3 meaningful words
+    if (clean.length < 15) return false;
+    const words = clean.split(/\s+/).filter(w => /[a-zA-Z]/.test(w));
+    if (words.length < 3) return false;
+
+    // Reject survey percentages & score metrics (e.g. "Good: 20%", "Very Good: 8%", "5/5")
+    if (/\b(good|very\s+good|excellent|average|satisfactory|below\s+average|poor)\s*:\s*\d+%/i.test(clean)) return false;
+    if (/^\d+(\.\d+)?\s*(%|\/\s*\d+)/.test(clean)) return false;
+    if (/\b\d+%\b/.test(clean) && words.length < 5) return false;
+
+    // Reject meaningless fillers and short non-informative phrases
+    const FILLERS = [
+        /^(ok|okay|fine|good|nice|average|normal|moderate|alright|decent|nil|na|n\/a|none|nothing|all good|no issue|no problem|no remarks|no remark|everything is fine|satisfactory|everything is good|all is well|all is good|everything good|no changes needed|no complaints|no issues|all fine|all ok|nothing to say|no feedback)\.?$/i,
+        /^(yes|no|none|na|nil|not\s+applicable|n\/?a)\.?$/i
+    ];
+    if (FILLERS.some(r => r.test(clean))) return false;
 
     // Reject page numbers like "1 / 3", "2/3", "about:blank 1 / 2"
     if (/^\d+\s*\/\s*\d+$/.test(clean)) return false;
     if (/about:blank/i.test(clean)) return false;
 
-    // Reject dates (e.g. "04/07/2026 17:03:01 PM")
+    // Reject dates
     if (/\d{1,2}\/\d{1,2}\/\d{2,4}/.test(clean) && clean.length < 40) return false;
 
     // Reject URLs
@@ -211,7 +225,6 @@ function isValidComment(text) {
         /feedback\s+submitted/i,
         /report\s+generated/i
     ];
-
     if (headerPatterns.some(p => p.test(clean))) return false;
 
     // Reject table header keywords and metadata
@@ -221,38 +234,15 @@ function isValidComment(text) {
         'signature', 'hod', 'pro - vc', 'ffi & suggestion', 'student feedback comments',
         'below average', 'course outcomes', 'qv 1', 'qv 2', 'needs attention', 'appreciation',
         'question', 'answer', 'response count', 'total responses', 'feedback form',
-        'submit', 'label', 'requirement', 'operating system', 'real world', 'purchased'
+        'submit', 'label', 'operating system', 'purchased'
     ];
     const lower = clean.toLowerCase();
     if (tableKeywords.some(kw => lower.includes(kw))) return false;
-    
-    // Reject if it looks like a course/subject name followed by an answer
-    // e.g. "Software Engineering 45" or "Data Structures Yes" or "operating system purchased"
-    if (/^[A-Z][A-Za-z\s&]+\s+(?:\d+|yes|no|n\.?a\.?|purchased|required)$/i.test(clean)) return false;
-    
-    // Reject lines that look like questions or prompts
-    if (/\brequirement\b|\boperating system\b|\breal world\b|\bpurchased\b|\bproblem\b.*\bsoftware\b/i.test(clean)) return false;
-    
-    // Reject if it contains multiple tab-separated or pipe-separated values (table data)
-    if (clean.split(/\t|\|/).length > 3) return false;
 
-    // Reject pure numbers or punctuation
+    // Reject pure numbers, punctuation or repeated characters
     if (/^[\d\s.,\-–/\\%]+$/.test(clean)) return false;
-
-    // Reject survey questions with numerical rating tables
-    if (/^\d+\s+[A-Za-z]/.test(clean) && /\b\d+\s+\d+\s+\d+\b/.test(clean)) return false;
-    if (/^\d+\s+Total\b/i.test(clean)) return false;
-    if (/\b(Below Average|Very good|Average)\b/i.test(clean) && /\d+/.test(clean)) return false;
-
-    // Must have at least 1 letter
     if (!/[a-zA-Z]/.test(clean)) return false;
-
-    // Reject if it's ONLY a rating word with no additional content
-    const ratingOnlyPatterns = [
-        /^(good|nice|excellent|poor|best|worst|average|ok|okay)\.?$/i,
-        /^(very\s+good|very\s+nice|very\s+bad)\.?$/i
-    ];
-    if (ratingOnlyPatterns.some(p => p.test(clean))) return false;
+    if (/(.)\1{4,}/.test(clean)) return false;
 
     return true;
 }
