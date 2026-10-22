@@ -122,9 +122,9 @@ async function extractHighlightedText(buffer) {
             if (bounds) {
               const w = bounds.x2 - bounds.x1;
               const h = bounds.y2 - bounds.y1;
-              // Only capture single-line highlight rects (height 5-40px)
-              // Ignore large container rects (table backgrounds, section boxes)
-              if (w > 20 && h >= 5 && h <= 60) {
+              // Only capture highlight rects (height 5-120px — increased to catch multi-line highlights)
+              // Ignore large container rects (table backgrounds, section boxes) > 120
+              if (w > 20 && h >= 5 && h <= 120) {
                 coloredRects.push({ color: pendingColor, ...bounds });
               }
             }
@@ -276,8 +276,15 @@ async function extractAllStudentComments(buffer, targetCourseCode) {
         const hasQuestionsTable = fullText.includes('label') && fullText.includes('question') && fullText.includes('qv');
 
         // Prefer pages dedicated to comments, but keep all potential pages
+        // Include ALL pages that don't look like pure question/score tables
         if (hasSubmitted || hasStudentFeedbackHeader || !hasQuestionsTable) {
             rawCommentPages.push({ pageNum: p, page, tc, fullText, hasQuestionsTable });
+        } else {
+            // Still include pages that have any student-like text, even without keyword match
+            const hasLongText = tc.items.some(i => i.str && i.str.trim().split(/\s+/).length >= 4);
+            if (hasLongText && !hasQuestionsTable) {
+                rawCommentPages.push({ pageNum: p, page, tc, fullText, hasQuestionsTable });
+            }
         }
     }
 
@@ -311,7 +318,10 @@ async function extractAllStudentComments(buffer, targetCourseCode) {
             let commentStartY = 750;
             for (const y of yKeys) {
                 const line = rowMap[y].sort((a, b) => a.transform[4] - b.transform[4]).map(i => i.str).join(' ').toLowerCase();
-                if ((line.includes('submitted') && (line.includes('answer') || line.includes('response'))) || (line.includes('student') && line.includes('feedback'))) {
+                if ((line.includes('submitted') && (line.includes('answer') || line.includes('response'))) ||
+                    (line.includes('student') && line.includes('feedback')) ||
+                    (line.includes('s.no') || line.includes('s. no') || line.includes('sr.no') || line.includes('sr. no')) ||
+                    (line.includes('comment') && line.includes('suggestion'))) {
                     commentStartY = y;
                     break;
                 }
@@ -329,7 +339,8 @@ async function extractAllStudentComments(buffer, targetCourseCode) {
                 let curr = commentRows[i].text;
 
                 // Merge continuation rows (line breaks within same comment)
-                while (i + 1 < commentRows.length && (commentRows[i].y - commentRows[i + 1].y) <= 16) {
+                // Use 22pt gap — handles larger fonts and tighter spacing
+                while (i + 1 < commentRows.length && (commentRows[i].y - commentRows[i + 1].y) <= 22) {
                     curr += ' ' + commentRows[i + 1].text;
                     i++;
                 }
