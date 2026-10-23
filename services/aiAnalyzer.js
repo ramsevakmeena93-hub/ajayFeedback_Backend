@@ -100,18 +100,19 @@ module.exports = {
 
     // Build a concise prompt
     const commentsList = comments.slice(0, 20).map((c, i) => `${i + 1}. ${c}`).join('\n');
-    const prompt = `<s>[INST] You are a Head of Department (HOD) writing official instructions to a faculty member${facultyName ? ` named "${facultyName}"` : ''} based on student feedback complaints.
+    const prompt = `<s>[INST] You are a Head of Department giving written improvement instructions to faculty${facultyName ? ` ${facultyName}` : ''}.
 
-Student complaints received:
+Student complaints:
 ${commentsList}
 
-Write a formal 3-4 sentence instruction paragraph addressed directly to the faculty. Use:
-- First person HOD voice ("I have reviewed...", "You are hereby directed...", "It is expected that...")
-- Direct, authoritative but professional tone
-- Specific improvement actions the faculty must take
-- Future tense for what the faculty must do going forward
+Write 3-4 direct improvement instructions to the faculty. Rules:
+- Start directly with the instruction, no intro sentence like "I have reviewed..." or "Based on feedback..."
+- Each instruction on a new line
+- Use direct tone: "Ensure...", "Upload...", "Conduct...", "Improve...", "Provide..."
+- Be specific to the actual complaints
+- No bullet points, no numbering, just plain sentences
 
-Write only the instruction paragraph. No headings, no bullet points, no extra explanation. [/INST]`;
+[/INST]`;
 
     try {
       const https = require('https');
