@@ -276,6 +276,7 @@ def classify_ui(comments_json: str):
         return f"Error: {e}"
 
 async def _classify_direct(comments):
+    import json
     from fastapi.testclient import TestClient
     client = TestClient(app)
     resp = client.post("/classify", json=comments)
@@ -294,5 +295,24 @@ demo = gr.Interface(
 )
 
 if __name__ == "__main__":
+    import threading
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=7860)
+
+    # Run FastAPI in background thread
+    def run_api():
+        uvicorn.run(app, host="0.0.0.0", port=7861)
+
+    threading.Thread(target=run_api, daemon=True).start()
+
+    # Gradio on main thread (required by HuggingFace Spaces Gradio SDK)
+    demo.launch(server_name="0.0.0.0", server_port=7860)
+else:
+    # When imported by Gradio SDK runtime, launch automatically
+    import threading
+    import uvicorn
+
+    def run_api():
+        uvicorn.run(app, host="0.0.0.0", port=7861)
+
+    threading.Thread(target=run_api, daemon=True).start()
+    demo.launch(server_name="0.0.0.0", server_port=7860)

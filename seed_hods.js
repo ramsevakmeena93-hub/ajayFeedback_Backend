@@ -28,11 +28,12 @@ const systemAccounts = [
   { name: "System Administrator", email: "admin@mits.ac.in", password: "admin123", role: "admin", department: "Administration" },
   { name: "System Administrator", email: "admin@mitsgwalior.in", password: "admin123", role: "admin", department: "Administration" },
   { name: "Prof. R. K. Pandit (VC)", email: "vc@mits.ac.in", password: "vc123", role: "vc", department: "Vice Chancellor Office" },
+  { name: "ProvC", email: "25tc1aj7@mitsgwl.ac.in", password: "vc123", role: "vc", department: "Vice Chancellor Office" },
 ];
 
 // These emails are given special roles by the system — exclude them from the HOD demotion sweep
+// Email 25tc1aj7@mitsgwl.ac.in is now allowed to be a VC
 const protectedEmails = [
-  '25tc1aj7@mitsgwl.ac.in',    // HOD of Industrial Production
   '25mc1sh132@mitsgwl.ac.in',  // HOD account
 ];
 
