@@ -100,19 +100,18 @@ module.exports = {
 
     // Build a concise prompt
     const commentsList = comments.slice(0, 20).map((c, i) => `${i + 1}. ${c}`).join('\n');
-    const prompt = `<s>[INST] You are an academic HOD (Head of Department) writing an official "Action Taken" report entry.
+    const prompt = `<s>[INST] You are a Head of Department (HOD) writing official instructions to a faculty member${facultyName ? ` named "${facultyName}"` : ''} based on student feedback complaints.
 
-Student feedback complaints about faculty${facultyName ? ` "${facultyName}"` : ''}:
+Student complaints received:
 ${commentsList}
 
-Write a formal, professional 3-4 sentence "Action Taken by HOD" paragraph that:
-- Acknowledges the specific issues raised
-- States concrete corrective actions taken
-- Is written in past tense (actions already taken)
-- Sounds official and institutional
-- Does NOT repeat the complaints verbatim
+Write a formal 3-4 sentence instruction paragraph addressed directly to the faculty. Use:
+- First person HOD voice ("I have reviewed...", "You are hereby directed...", "It is expected that...")
+- Direct, authoritative but professional tone
+- Specific improvement actions the faculty must take
+- Future tense for what the faculty must do going forward
 
-Write only the paragraph, no headings or bullet points. [/INST]`;
+Write only the instruction paragraph. No headings, no bullet points, no extra explanation. [/INST]`;
 
     try {
       const https = require('https');
