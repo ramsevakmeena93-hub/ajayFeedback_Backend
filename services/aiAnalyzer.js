@@ -85,55 +85,124 @@ module.exports = {
   testFastAPIConnection,
 
   // ── AI-POWERED ACTION TAKEN SUGGESTION ──────────────────────────────────
-  // Analyzes commentsNeedingAttention and generates a professional
-  // "Action Taken by HOD" paragraph the HOD can use or edit.
-  generateActionSuggestion: function(commentsNeedingAttention, facultyName) {
+  // Calls HuggingFace Inference API (Mistral-7B) to generate a professional
+  // "Action Taken by HOD" paragraph based on actual student comments.
+  generateActionSuggestion: async function(commentsNeedingAttention, facultyName) {
     const comments = (commentsNeedingAttention || []).filter(Boolean);
 
-    // Default when no attention comments — short positive note
+    // Default when no attention comments
     if (comments.length === 0) {
-      return 'Performance is satisfactory. Encouraged to maintain quality teaching and continue student engagement.';
+      return 'Performance is satisfactory. Faculty is encouraged to maintain quality teaching standards and continue positive student engagement.';
     }
 
-    // Detect which issue categories are present
-    const RX = {
-      pace:       /\b(fast|slow|pace|speed|rushed|jaldi|slides\s+change|lengthy\s+code|topics?\s+jaldi|notes?\s+complete\s+nahi)\b/i,
-      clarity:    /\b(unclear|confus|not\s+clear|explain|basics?|advanced|steps?\s+skip|concept|understand|samajh|slides?\s+read|terminology)\b/i,
-      lab:        /\b(lab|practical|code|copy.?paste|debug|hands.?on|program|run|implement)\b/i,
-      notes:      /\b(notes?|slides?|material|formula|definition|missing|incomplete|late|share|upload|pdf|diagrams?)\b/i,
-      doubts:     /\b(doubt|question|hesitat|ignored|unanswer|doubt\s+session|samajh\s+nahi|clear.*doubt)\b/i,
-      assessment: /\b(quiz|marks?|assessment|marking|criteria|answer\s+key|evaluation|transparent|test\s+time)\b/i,
-      engagement: /\b(interact|boring|monoton|engage|participat|discussion|real.world|examples?|voice|microphone)\b/i,
-      facilities: /\b(computer|internet|software|projector|equipment|system|network|hardware)\b/i,
-      planning:   /\b(plan|schedul|syllabus.*complet|revision|prerequisit|timetable|units?\s+left|practice\s+sessions?)\b/i,
-      support:    /\b(support|guidance|deadline|assignment.*instruct|disrespect|impatient|respond|feedback.*ignor)\b/i,
-    };
+    const HF_TOKEN = process.env.HF_API_TOKEN || '';
+    const MODEL    = 'mistralai/Mistral-7B-Instruct-v0.3';
 
-    const found = new Set();
-    comments.forEach(c => {
-      let matched = false;
-      for (const [key, rx] of Object.entries(RX)) {
-        if (rx.test(c)) { found.add(key); matched = true; }
+    // Build a concise prompt
+    const commentsList = comments.slice(0, 20).map((c, i) => `${i + 1}. ${c}`).join('\n');
+    const prompt = `<s>[INST] You are an academic HOD (Head of Department) writing an official "Action Taken" report entry.
+
+Student feedback complaints about faculty${facultyName ? ` "${facultyName}"` : ''}:
+${commentsList}
+
+Write a formal, professional 3-4 sentence "Action Taken by HOD" paragraph that:
+- Acknowledges the specific issues raised
+- States concrete corrective actions taken
+- Is written in past tense (actions already taken)
+- Sounds official and institutional
+- Does NOT repeat the complaints verbatim
+
+Write only the paragraph, no headings or bullet points. [/INST]`;
+
+    try {
+      const https = require('https');
+      const body  = JSON.stringify({
+        inputs: prompt,
+        parameters: {
+          max_new_tokens: 200,
+          temperature: 0.4,
+          do_sample: true,
+          return_full_text: false,
+        }
+      });
+
+      const result = await new Promise((resolve, reject) => {
+        const req = https.request({
+          hostname: 'api-inference.huggingface.co',
+          path:     `/models/${MODEL}`,
+          method:   'POST',
+          headers: {
+            'Content-Type':   'application/json',
+            'Content-Length': Buffer.byteLength(body),
+            'Authorization':  `Bearer ${HF_TOKEN}`,
+          }
+        }, (res) => {
+          let data = '';
+          res.on('data', c => { data += c; });
+          res.on('end', () => {
+            try { resolve(JSON.parse(data)); }
+            catch (e) { reject(new Error('BAD_JSON')); }
+          });
+        });
+        req.on('error', e => reject(e));
+        req.setTimeout(30000, () => { req.destroy(); reject(new Error('TIMEOUT')); });
+        req.write(body);
+        req.end();
+      });
+
+      // HF returns array: [{ generated_text: "..." }]
+      let text = '';
+      if (Array.isArray(result) && result[0]?.generated_text) {
+        text = result[0].generated_text.trim();
+      } else if (result?.generated_text) {
+        text = result.generated_text.trim();
+      } else if (result?.error) {
+        throw new Error(result.error);
       }
-      if (!matched) found.add('clarity');
-    });
 
-    // Short, direct action per detected issue
-    const actionMap = {
-      pace:       'Advised to slow down teaching pace and allow time for students to take notes.',
-      clarity:    'Directed to explain concepts step-by-step from basics before moving to advanced topics.',
-      lab:        'Instructed to ensure students write and run code themselves; demonstrate debugging in every lab.',
-      notes:      'Asked to upload complete notes, diagrams, and solved examples before each class.',
-      doubts:     'Assigned weekly doubt-clearing sessions; advised to pause and check understanding in class.',
-      assessment: 'Reminded to share assessment criteria in advance and discuss quiz answers with students.',
-      engagement: 'Suggested to use real-world examples, board work, and interactive Q&A to improve engagement.',
-      facilities: 'Lab infrastructure issues escalated to department; maintenance requested.',
-      planning:   'Reviewed teaching plan; advised to complete syllabus at least two weeks before assessments.',
-      support:    'Counselled to maintain a respectful environment and communicate assignment details clearly.',
-    };
+      if (text) {
+        // Clean up any leftover instruction markers
+        text = text.replace(/<\/s>|<s>|\[INST\]|\[\/INST\]/g, '').trim();
+        return text;
+      }
+      throw new Error('empty response');
 
-    const actions = [...found].map((key, i) => `${i + 1}. ${actionMap[key]}`);
-    return actions.join('\n');
+    } catch (err) {
+      console.warn('[AI Action Suggest] HF API failed:', err.message, '— using rule fallback');
+      // ── Rule-based fallback ───────────────────────────────────────────────
+      const RX = {
+        pace:       /\b(fast|slow|pace|speed|rushed)\b/i,
+        clarity:    /\b(unclear|confus|not\s+clear|explain|concept|understand)\b/i,
+        lab:        /\b(lab|practical|code|hands.?on|program)\b/i,
+        notes:      /\b(notes?|slides?|material|missing|incomplete|late|share|upload)\b/i,
+        doubts:     /\b(doubt|question|hesitat|ignored|unanswer)\b/i,
+        assessment: /\b(quiz|marks?|assessment|marking|criteria)\b/i,
+        engagement: /\b(interact|boring|monoton|engage|examples?|voice)\b/i,
+        planning:   /\b(plan|schedul|syllabus|revision)\b/i,
+        support:    /\b(support|guidance|disrespect|impatient)\b/i,
+      };
+      const actionMap = {
+        pace:       'The faculty was advised to moderate teaching pace and allow adequate time for note-taking.',
+        clarity:    'The faculty was directed to explain concepts step-by-step, starting from fundamentals before advancing.',
+        lab:        'The faculty was instructed to ensure hands-on coding practice and live debugging demonstrations in every lab session.',
+        notes:      'The faculty was asked to upload complete notes, diagrams, and solved examples on the portal before each class.',
+        doubts:     'Weekly doubt-clearing sessions were assigned; the faculty was advised to periodically check student understanding.',
+        assessment: 'The faculty was reminded to share assessment criteria in advance and review quiz answers with the class.',
+        engagement: 'The faculty was suggested to incorporate real-world examples, interactive Q&A, and board demonstrations.',
+        planning:   'The teaching plan was reviewed; the faculty was advised to complete the syllabus at least two weeks before assessments.',
+        support:    'The faculty was counselled on maintaining a respectful, supportive classroom environment.',
+      };
+      const found = new Set();
+      comments.forEach(c => {
+        let matched = false;
+        for (const [key, rx] of Object.entries(RX)) {
+          if (rx.test(c)) { found.add(key); matched = true; }
+        }
+        if (!matched) found.add('clarity');
+      });
+      const actions = [...found].slice(0, 3).map(k => actionMap[k]).filter(Boolean);
+      return actions.join(' ');
+    }
   },
 
   testGeminiConnection: async () => ({

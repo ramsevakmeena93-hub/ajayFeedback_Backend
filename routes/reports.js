@@ -143,7 +143,7 @@ router.post('/:id/suggest-action', authMiddleware, requireAnyRole('hod'), async 
     const report = await FacultyReport.findOne({ _id: req.params.id, hodId: req.user.id });
     if (!report) return res.status(404).json({ error: 'Report not found' });
 
-    const suggestion = generateActionSuggestion(
+    const suggestion = await generateActionSuggestion(
       report.commentsNeedingAttention || [],
       report.facultyName
     );
