@@ -310,7 +310,7 @@ router.post('/users/:id/roles', ...adminOnly, async (req, res) => {
     // Sync User.roles[] cache
     const allActive = await UserRole.find({ userId: req.params.id, active: true }).select('role');
     const rolesCache = [...new Set(allActive.map(r => r.role))];
-    const PRIORITY   = ['admin','vc','hod','faculty'];
+    const PRIORITY   = ['admin','vc','provc','hod','faculty'];
     const primary    = PRIORITY.find(r => rolesCache.includes(r)) || role;
     await User.findByIdAndUpdate(req.params.id, { roles: rolesCache, role: primary });
 
@@ -342,7 +342,7 @@ router.delete('/users/:id/roles/:roleId', ...adminOnly, async (req, res) => {
 
     const allActive = await UserRole.find({ userId: req.params.id, active: true }).select('role');
     const rolesCache = [...new Set(allActive.map(r => r.role))];
-    const PRIORITY   = ['admin','vc','hod','faculty'];
+    const PRIORITY   = ['admin','vc','provc','hod','faculty'];
     const primary    = PRIORITY.find(r => rolesCache.includes(r)) || rolesCache[0] || 'faculty';
     await User.findByIdAndUpdate(req.params.id, { roles: rolesCache, role: primary });
 

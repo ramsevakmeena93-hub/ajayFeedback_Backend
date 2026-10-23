@@ -31,7 +31,7 @@ async function buildUserPayload(user) {
     if (!rolesArray.includes('hod')) rolesArray.push('hod');
     if (!rolesArray.includes('faculty')) rolesArray.push('faculty');
   }
-  const PRIORITY   = ['admin', 'vc', 'hod', 'faculty'];
+  const PRIORITY   = ['admin', 'vc', 'provc', 'hod', 'faculty'];
   const primaryRole = PRIORITY.find(r => rolesArray.includes(r)) || user.role || 'faculty';
   const activeWorkspace = user.activeWorkspace || primaryRole;
 
@@ -89,6 +89,7 @@ router.get('/me', authMiddleware, async (req, res) => {
       hod:     'HOD Workspace',
       faculty: 'Faculty Workspace',
       vc:      'VC Workspace',
+      provc:   'Pro VC Workspace',
       admin:   'Admin Workspace',
     };
 

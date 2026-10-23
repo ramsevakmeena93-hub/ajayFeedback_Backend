@@ -88,8 +88,7 @@ router.post('/user/:userId', ...adminOnly, async (req, res) => {
     const updates = { roles: rolesCache };
 
     // Keep legacy role field as the "primary" role (first assigned, or most privileged)
-    const PRIORITY = ['admin', 'vc', 'hod', 'faculty'];
-    const primary = PRIORITY.find(r => rolesCache.includes(r)) || role;
+    const PRIORITY = ['admin', 'vc', 'provc', 'hod', 'faculty'];
     updates.role = primary;
 
     // Set activeWorkspace on first role assignment if not already set
@@ -135,8 +134,7 @@ router.delete('/user/:userId/:roleId', ...adminOnly, async (req, res) => {
     // Sync User.roles[] cache
     const allActive = await UserRole.find({ userId: req.params.userId, active: true }).select('role');
     const rolesCache = [...new Set(allActive.map(r => r.role))];
-    const PRIORITY   = ['admin', 'vc', 'hod', 'faculty'];
-    const primary    = PRIORITY.find(r => rolesCache.includes(r)) || rolesCache[0] || 'faculty';
+    const PRIORITY   = ['admin', 'vc', 'provc', 'hod', 'faculty'];
 
     await User.findByIdAndUpdate(req.params.userId, { roles: rolesCache, role: primary });
 

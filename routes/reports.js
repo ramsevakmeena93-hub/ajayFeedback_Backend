@@ -656,7 +656,7 @@ router.get('/:id', authMiddleware, async (req, res) => {
       ...(req.user?.role ? [req.user.role] : []),
     ]);
 
-    if (!callerRoles.has('vc') && !callerRoles.has('admin')) {
+    if (!callerRoles.has('vc') && !callerRoles.has('provc') && !callerRoles.has('admin')) {
       const isHOD     = report.hodId?.toString() === req.user.id;
       const isFaculty = report.facultyUserId?.toString() === req.user.id;
       if (!isHOD && !isFaculty) {
@@ -859,7 +859,7 @@ router.get('/my/export-filters', authMiddleware, requireAnyRole('hod'), async (r
 // VC: Get submission reports
 // ─────────────────────────────────────────────────────────────────────────────
 
-router.get('/submission/:submissionId', authMiddleware, requireRole('vc'), async (req, res) => {
+router.get('/submission/:submissionId', authMiddleware, requireAnyRole('vc', 'provc'), async (req, res) => {
   try {
     const Submission = require('../models/Submission');
     const submission = await Submission.findById(req.params.submissionId)
@@ -1563,7 +1563,7 @@ router.post('/bulk-send-to-faculty', authMiddleware, requireAnyRole('hod'), asyn
 // ─────────────────────────────────────────────────────────────────────────────
 // ADMIN: Delete reports by faculty name and status
 // ─────────────────────────────────────────────────────────────────────────────
-router.delete('/admin/delete-by-faculty', authMiddleware, requireAnyRole('admin', 'vc'), async (req, res) => {
+router.delete('/admin/delete-by-faculty', authMiddleware, requireAnyRole('admin', 'vc', 'provc'), async (req, res) => {
   try {
     const { facultyName, statuses } = req.body;
     
@@ -1682,7 +1682,7 @@ router.post('/hod-comment', authMiddleware, requireAnyRole('hod', 'admin'), asyn
 // ─────────────────────────────────────────────────────────────────────────────
 // HOD: Get Department Comment
 // ─────────────────────────────────────────────────────────────────────────────
-router.get('/hod-comment', authMiddleware, requireAnyRole('hod', 'admin', 'vc'), async (req, res) => {
+router.get('/hod-comment', authMiddleware, requireAnyRole('hod', 'admin', 'vc', 'provc'), async (req, res) => {
   try {
     // Ensure model is loaded
     let HODComment;

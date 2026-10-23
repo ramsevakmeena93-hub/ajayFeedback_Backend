@@ -12,7 +12,7 @@ const userSchema = new mongoose.Schema({
    * This field is still used as the "primary" / "last-active" role
    * so existing queries don't break.
    */
-  role:         { type: String, enum: ['hod', 'vc', 'faculty', 'admin'], default: 'hod' },
+  role:         { type: String, enum: ['hod', 'vc', 'provc', 'faculty', 'admin'], default: 'hod' },
   department:   { type: String, default: '' },
 
   /**
@@ -22,7 +22,7 @@ const userSchema = new mongoose.Schema({
    */
   roles: [{
     type: String,
-    enum: ['hod', 'vc', 'faculty', 'admin'],
+    enum: ['hod', 'vc', 'provc', 'faculty', 'admin'],
   }],
 
   /**
@@ -30,7 +30,7 @@ const userSchema = new mongoose.Schema({
    * Stored server-side so it survives page refreshes.
    * Values: 'hod' | 'faculty' | 'vc' | 'admin'
    */
-  activeWorkspace: { type: String, enum: ['hod', 'vc', 'faculty', 'admin', ''], default: '' },
+  activeWorkspace: { type: String, enum: ['hod', 'vc', 'provc', 'faculty', 'admin', ''], default: '' },
 
   /**
    * Alternate approver — when this user (as HOD) has a self-conflict,

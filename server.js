@@ -295,6 +295,21 @@ mongoose.connect(MONGO_URI)
     httpServer.listen(PORT, () => {
       console.log('[Startup] ✅ Server running on port', PORT);
       console.log('[Startup] ✅ All systems operational');
+
+      // ── Keep HuggingFace Space alive — ping every 25 minutes ──────────────
+      // Prevents the free-tier Space from sleeping after 48hrs of inactivity
+      const FASTAPI_URL = process.env.FASTAPI_CLASSIFIER_URL;
+      if (FASTAPI_URL && FASTAPI_URL.includes('hf.space')) {
+        setInterval(async () => {
+          try {
+            await axios.get(`${FASTAPI_URL}/health`, { timeout: 10000 });
+            console.log('[KeepAlive] ✅ HuggingFace Space pinged');
+          } catch {
+            console.warn('[KeepAlive] ⚠️  HuggingFace Space ping failed — may be cold starting');
+          }
+        }, 25 * 60 * 1000); // every 25 minutes
+        console.log('[KeepAlive] 🔄 HuggingFace Space keep-alive started:', FASTAPI_URL);
+      }
     });
   })
   .catch(err => {

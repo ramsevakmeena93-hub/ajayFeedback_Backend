@@ -19,7 +19,7 @@ const userRoleSchema = new mongoose.Schema({
   /** Role name — must align with the legacy enum values */
   role: {
     type: String,
-    enum: ['hod', 'faculty', 'vc', 'admin'],
+    enum: ['hod', 'faculty', 'vc', 'provc', 'admin'],
     required: true,
   },
 

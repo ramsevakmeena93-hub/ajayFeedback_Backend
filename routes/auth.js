@@ -95,6 +95,7 @@ async function buildUserPayload(user) {
   const PRIORITY = [
     'admin',
     'vc',
+    'provc',
     'hod',
     'faculty'
   ];
@@ -215,10 +216,10 @@ router.post('/register', async (req, res) => {
       safeDepartment = '';
     }
 
-    // Ajay Meena — HOD of Industrial Production
+    // Ajay Meena — Pro-VC
     if (cleanEmail === '25tc1aj7@mitsgwl.ac.in') {
-      safeRole = 'hod';
-      safeDepartment = 'Industrial Production';
+      safeRole = 'provc';
+      safeDepartment = '';
     }
 
     // Designated HOD.
@@ -333,7 +334,7 @@ router.post('/login', async (req, res) => {
     // Domain restriction.
     if (
       !isAllowedDomain(cleanEmail) &&
-      !['admin', 'hod', 'vc'].includes(
+      !['admin', 'hod', 'vc', 'provc'].includes(
         user.role
       )
     ) {
@@ -419,14 +420,13 @@ router.post('/login', async (req, res) => {
 
     if (cleanEmail === '25tc1aj7@mitsgwl.ac.in') {
       await User.findByIdAndUpdate(user._id, {
-        role: 'hod', roles: ['hod','faculty'], activeWorkspace: 'hod', department: 'Industrial Production',
+        role: 'provc', roles: ['provc'], activeWorkspace: 'provc', department: '',
       });
       await UserRole.deleteMany({ userId: user._id });
       await UserRole.create([
-        { userId: user._id, role: 'hod',     departmentScope: 'Industrial Production', active: true },
-        { userId: user._id, role: 'faculty', departmentScope: 'Industrial Production', active: true },
+        { userId: user._id, role: 'provc', departmentScope: '', active: true },
       ]);
-      user.role = 'hod'; user.roles = ['hod','faculty']; user.activeWorkspace = 'hod'; user.department = 'Industrial Production';
+      user.role = 'provc'; user.roles = ['provc']; user.activeWorkspace = 'provc'; user.department = '';
     }
 
     // ---------------------------------------------------------
@@ -1080,12 +1080,12 @@ router.post(
             DESIGNATED_HOD_DEPARTMENT;
         }
 
-        // Ajay Meena - HOD of Industrial Production
+        // Ajay Meena - Pro-VC
         if (
           cleanEmail === '25tc1aj7@mitsgwl.ac.in'
         ) {
-          assignedRole = 'hod';
-          assignedDepartment = 'Industrial Production';
+          assignedRole = 'provc';
+          assignedDepartment = '';
         }
 
         const randomPassword =
@@ -1205,12 +1205,12 @@ router.post(
             DESIGNATED_HOD_DEPARTMENT;
         }
 
-        // Ajay Meena - HOD of Industrial Production
+        // Ajay Meena - Pro-VC
         if (
           cleanEmail === '25tc1aj7@mitsgwl.ac.in'
         ) {
-          correctedRole = 'hod';
-          correctedDept = 'Industrial Production';
+          correctedRole = 'provc';
+          correctedDept = '';
         }
 
         /*

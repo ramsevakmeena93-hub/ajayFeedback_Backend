@@ -134,7 +134,7 @@ function requireDepartmentScope(resourceDepartment) {
   return (req, res, next) => {
     const role = req.user?.role;
     // VC and admin have global scope — always allowed
-    if (role === 'vc' || role === 'admin') return next();
+    if (role === 'vc' || role === 'provc' || role === 'admin') return next();
 
     const scope = req.user?.departmentScope || req.user?.department || '';
     if (!scope) return next(); // no scope in token — allow (old tokens)
