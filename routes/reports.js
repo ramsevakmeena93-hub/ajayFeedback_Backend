@@ -1747,6 +1747,110 @@ router.get('/hod-comment', authMiddleware, requireAnyRole('hod', 'admin', 'vc', 
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Pro-VC: Generate a per-faculty Pro-VC Comments PDF report
+// GET /api/reports/provc-report/:submissionId/:facultyName
+// Query: ?subjectCode=optional  (if omitted → include ALL courses for this faculty in the submission)
+// ─────────────────────────────────────────────────────────────────────────────
+
+router.get('/provc-report/:submissionId/:facultyName',
+  authMiddleware,
+  async (req, res) => {
+    try {
+      const callerRoles = new Set([
+        ...(req.user?.roles || []),
+        ...(req.user?.role ? [req.user.role] : []),
+      ]);
+      // Faculty can also access their own report
+      const isFaculty = callerRoles.has('faculty');
+      const isVC      = callerRoles.has('provc') || callerRoles.has('vc');
+      const isAdmin   = callerRoles.has('admin');
+      const isHod     = callerRoles.has('hod');
+      if (!isVC && !isAdmin && !isFaculty && !isHod) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+
+      const Submission = require('../models/Submission');
+      const User = require('../models/User');
+
+      const submission = await Submission.findById(req.params.submissionId)
+        .populate('hodId', 'name email department')
+        .populate({
+          path: 'reports',
+          model: 'FacultyReport',
+          select: 'facultyName subjectCode programme semester ffiScore responseCount responsePercent registeredStudents linkSent appreciation commentsNeedingAttention hodRemarks actionTaken facultyUserId academicYear',
+        })
+        .lean();
+
+      if (!submission) return res.status(404).json({ error: 'Submission not found' });
+
+      // Check Pro-VC comment exists
+      const facultyNameParam = decodeURIComponent(req.params.facultyName);
+      const provcEntry = (submission.provcComments || []).find(
+        c => c.facultyName.toLowerCase() === facultyNameParam.toLowerCase()
+      );
+      if (!provcEntry) {
+        return res.status(404).json({ error: 'No Pro-VC comment found for this faculty. Write a comment first.' });
+      }
+
+      // Filter reports for this faculty
+      let facultyReports = (submission.reports || []).filter(
+        r => r.facultyName && r.facultyName.toLowerCase() === facultyNameParam.toLowerCase()
+      );
+
+      const subjectCodeParam = req.query.subjectCode;
+      if (subjectCodeParam) {
+        facultyReports = facultyReports.filter(r => r.subjectCode === subjectCodeParam);
+      }
+
+      if (!facultyReports.length) {
+        return res.status(404).json({ error: 'No reports found for this faculty in this submission.' });
+      }
+
+      // Look up VC user
+      const vcUser = await User.findOne({ $or: [{ role: 'vc' }, { role: 'provc' }] })
+        .select('name signatureImage').lean();
+
+      // Department stats
+      const allFFIs = (submission.reports || []).map(r => r.ffiScore).filter(Boolean);
+      const dfi = allFFIs.length ? (allFFIs.reduce((s, v) => s + v, 0) / allFFIs.length) : null;
+      const allPcts = (submission.reports || []).map(r => r.responsePercent).filter(v => v != null);
+      const avgResponse = allPcts.length ? (allPcts.reduce((s, v) => s + v, 0) / allPcts.length) : null;
+
+      const { generateProVCReport } = require('../services/provcReportGenerator');
+
+      const pdfBuffer = await generateProVCReport({
+        faculty    : {
+          name       : facultyNameParam,
+          designation: 'Faculty',
+          department : submission.hodId?.department || submission.department || '',
+        },
+        submission,
+        reports    : facultyReports,
+        hodUser    : submission.hodId,
+        vcUser,
+        approvedDate : submission.finalReportDate
+          ? new Date(submission.finalReportDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+          : new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+        avgResponse,
+        dfi,
+      });
+
+      const safeName = facultyNameParam.replace(/[^a-zA-Z0-9]/g, '_');
+      const filename = `ProVC_Report_${safeName}_${submission.academicYear || 'Report'}.pdf`;
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Length', pdfBuffer.length);
+      res.send(pdfBuffer);
+
+    } catch (err) {
+      console.error('[ProVC Report Error]', err);
+      res.status(500).json({ error: err.message });
+    }
+  }
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Export router
 // ─────────────────────────────────────────────────────────────────────────────
 

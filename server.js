@@ -85,6 +85,7 @@ try {
   app.use('/api/auth',          require('./routes/auth'));
   app.use('/api/reports',       require('./routes/reports'));
   app.use('/api/submissions',   require('./routes/submissions'));
+  app.use('/api/department-summary', require('./routes/departmentSummary'));
   app.use('/api/process',       require('./routes/process'));
   app.post('/api/classify',      (req, res, next) => { req.url = '/classify'; require('./routes/process')(req, res, next); });
   app.use('/api/logs',          require('./routes/logs'));
@@ -99,6 +100,7 @@ try {
   app.use('/api/roles',       require('./routes/roles'));       // role assignment + approval policy
   app.use('/api/assignments', require('./routes/assignments')); // teaching assignments
   app.use('/api/audit',       require('./routes/audit'));       // audit log (admin + /my)
+  app.use('/api/provc-reports', require('./routes/provcReports')); // Pro-VC report history
   
   console.log('[Startup] ✅ All routes loaded');
 } catch (err) {

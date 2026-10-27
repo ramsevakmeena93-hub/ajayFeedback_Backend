@@ -69,6 +69,19 @@ const submissionSchema = new mongoose.Schema({
    */
   submittedFromWorkspace: { type: String, default: 'hod' },
 
+  /**
+   * Pro-VC comments per faculty+course within this submission.
+   * Each entry: { facultyName, subjectCode, comment, savedAt }
+   */
+  provcComments: [
+    {
+      facultyName: { type: String, default: '' },
+      subjectCode:  { type: String, default: '' },
+      comment:      { type: String, default: '' },
+      savedAt:      { type: Date, default: Date.now },
+    }
+  ],
+
 }, { timestamps: true });
 
 module.exports = mongoose.model('Submission', submissionSchema);
