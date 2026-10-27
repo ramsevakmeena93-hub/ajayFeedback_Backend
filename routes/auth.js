@@ -35,7 +35,7 @@ function isAllowedDomain(email) {
 // -----------------------------------------------------------------------------
 
 const DESIGNATED_ADMIN_EMAIL =
-  'admin@mits.ac.in'; // changed — 25tc1aj7 is now Pro-VC
+  'admin@mits.ac.in';
 
 const DESIGNATED_HOD_EMAIL =
   '25mc1sh132@mitsgwl.ac.in';
@@ -216,9 +216,9 @@ router.post('/register', async (req, res) => {
       safeDepartment = '';
     }
 
-    // Ajay Meena — Pro-VC
+    // Ajay Meena — Admin
     if (cleanEmail === '25tc1aj7@mitsgwl.ac.in') {
-      safeRole = 'provc';
+      safeRole = 'admin';
       safeDepartment = '';
     }
 
@@ -414,20 +414,7 @@ router.post('/login', async (req, res) => {
       user.department = '';
     }
 
-    // ---------------------------------------------------------
-    // Ajay Meena — Pro-VC
-    // ---------------------------------------------------------
 
-    if (cleanEmail === '25tc1aj7@mitsgwl.ac.in') {
-      await User.findByIdAndUpdate(user._id, {
-        role: 'provc', roles: ['provc'], activeWorkspace: 'provc', department: '',
-      });
-      await UserRole.deleteMany({ userId: user._id });
-      await UserRole.create([
-        { userId: user._id, role: 'provc', departmentScope: '', active: true },
-      ]);
-      user.role = 'provc'; user.roles = ['provc']; user.activeWorkspace = 'provc'; user.department = '';
-    }
 
     // ---------------------------------------------------------
     // Designated HOD
@@ -1080,11 +1067,11 @@ router.post(
             DESIGNATED_HOD_DEPARTMENT;
         }
 
-        // Ajay Meena - Pro-VC
+        // Ajay Meena - Admin
         if (
           cleanEmail === '25tc1aj7@mitsgwl.ac.in'
         ) {
-          assignedRole = 'provc';
+          assignedRole = 'admin';
           assignedDepartment = '';
         }
 
@@ -1205,11 +1192,11 @@ router.post(
             DESIGNATED_HOD_DEPARTMENT;
         }
 
-        // Ajay Meena - Pro-VC
+        // Ajay Meena - Admin
         if (
           cleanEmail === '25tc1aj7@mitsgwl.ac.in'
         ) {
-          correctedRole = 'provc';
+          correctedRole = 'admin';
           correctedDept = '';
         }
 
