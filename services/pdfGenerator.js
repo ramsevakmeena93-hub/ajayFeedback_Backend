@@ -567,12 +567,12 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
   y = drawTableHeader(coverPage, y);
 
   // ── Data rows ─────────────────────────────────────────────────────────────
-  const ROW_GAP    = 1;  // Minimal gap between rows (reduced from 2pt)
+  const ROW_GAP    = 0;  // No gap between rows
   // BOTTOM_MARGIN and TOP_MARGIN already defined above for comment section
   const FS = 8.5;           // Font size — readable but compact
-  const LH = 11.5;          // Line height — enough breathing room between wrapped lines
-  const MIN_ROW_HEIGHT = 40; // Minimum row height
-  const ROW_PADDING = 16;    // Top+bottom padding inside each row
+  const LH = 10;            // Line height — tighter spacing
+  const MIN_ROW_HEIGHT = 28; // Minimum row height
+  const ROW_PADDING = 8;    // Top+bottom padding inside each row
 
   let pageNumber = 1;
   let isFirstDataRow = true; // Track if this is the first data row
