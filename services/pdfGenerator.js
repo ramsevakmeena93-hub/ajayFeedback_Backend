@@ -76,6 +76,7 @@ async function generateFeedbackReportPDF({
   const green = rgb(0.082, 0.325, 0.173);
   const amber = rgb(0.7, 0.4, 0);
   const darkBlue = rgb(0.05, 0.15, 0.4);
+  const headerFill = rgb(0.118, 0.227, 0.541);
 
   // ── Page geometry ─────────────────────────────────────────────────────────
   const PW = 842, PH = 595, ML = 20, MR = 20, CW = 802;
@@ -115,6 +116,7 @@ async function generateFeedbackReportPDF({
   }
 
   // ── Text layout constants (table body) ────────────────────────────────────
+  const MIN_COMMENT_WORDS = 5; // appreciation comments shorter than this many words are hidden
   const FS = 8;            // body font size
   const LH = 10;           // line height
   const SPACER_H = 3;      // blank line between paragraphs
@@ -314,9 +316,10 @@ async function generateFeedbackReportPDF({
   const TH = 30; // table header height
 
   function drawTableHeader(page, y) {
-    rect(page, ML, y - TH, CW, TH, { borderColor: black, borderWidth: 1, color: white });
+    // Highlighted header: dark-blue fill, white bold text, white dividers
+    rect(page, ML, y - TH, CW, TH, { borderColor: black, borderWidth: 1, color: headerFill });
     COLS.forEach((col, ci) => {
-      if (ci > 0) line(page, col.x, y, col.x, y - TH, 1, black);
+      if (ci > 0) line(page, col.x, y, col.x, y - TH, 0.8, white);
     });
     const HFS = 9;
     const HLH = 11;
@@ -327,7 +330,7 @@ async function generateFeedbackReportPDF({
       hLines.forEach((l, li) => {
         const lw = boldFont.widthOfTextAtSize(l, HFS);
         const lx = col.x + Math.max(1, (col.w - lw) / 2);
-        txt(page, l, lx, startY - li * HLH, HFS, boldFont, black);
+        txt(page, l, lx, startY - li * HLH, HFS, boldFont, white);
       });
     });
     return y - TH;
@@ -453,7 +456,7 @@ async function generateFeedbackReportPDF({
     // ---- cell texts ----
     const codeBatch = [r.subjectCode, r.batch].filter(Boolean).join("\n") || "-";
 
-    const attList = r.commentsNeedingAttention || r.needsAttention || r.needs_attention || r.attention || r.improvements || [];
+    const attList = r.needsAttention || r.needs_attention || r.attention || r.improvements || [];
     const attText = toBullets(attList).join("\n") || "-";
 
     const pcts = r.commentPercentages || {};
@@ -463,9 +466,11 @@ async function generateFeedbackReportPDF({
       .map(([k, v]) => "\u2022 " + k + ": " + v + "%")
       .join("\n");
     const allAppreciations = (r.appreciation || [])
-      .filter((c) => typeof c === "string" && c.trim())
+      .filter((c) => typeof c === "string" && c.trim().split(/\s+/).length >= MIN_COMMENT_WORDS)
       .map((x) => "\u2022 " + x.trim());
     const appText = [pctLines, ...allAppreciations].filter(Boolean).join("\n") || "-";
+
+    console.log(`[PDF] #${i + 1} ${r.facultyName}: appreciation in=${(r.appreciation || []).length} shown=${allAppreciations.length}, needsAttention shown=${attList.length}, keys=${Object.keys(r).join(",")}`);
 
     const actionText = r.actionTaken || r.action_taken || r.hodAction || r.hodActionTaken || "-";
 
