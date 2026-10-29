@@ -876,8 +876,21 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
         coverPage = pdfDoc.addPage([PW, PH]);
         pageNumber++;
         y = PH - 20;
+
+        // Recalculate actual continuation height from real remaining lines
+        let maxContLines = 1;
+        cellContinuationData.forEach(cellData => {
+          if (!cellData || cellData.isSig || !cellData.lines) return;
+          const realLines = cellData.lines.filter(l => {
+            const txt = typeof l === "object" ? l.text : l;
+            return txt && txt.trim();
+          }).length;
+          if (realLines > maxContLines) maxContLines = realLines;
+        });
+        const actualContHeight = Math.max(MIN_ROW_HEIGHT, maxContLines * LH + ROW_PADDING);
+        continuationHeight = actualContHeight;
         
-        // Draw continuation row structure (seamlessly continues from previous page)
+        // Draw continuation row structure using actual height
         rect(coverPage, ML, y - continuationHeight, CW, continuationHeight, { 
           borderColor: black, borderWidth: 0.5 
         });
@@ -953,27 +966,28 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
       // Faculty name below signature — split into two lines if too wide
       const nameStr = sigData.facultyName || "";
       const sigColW = sigData.col.w - 6; // usable width
-      const nameFontSize = 7;
+      const nameFontSize = 6;  // smaller font to fit better
       const rowH = needsContinuation ? continuationHeight : partialRowHeight;
 
-      if (rowH >= 35) {
+      if (rowH >= 28) {
         const fullNameW = timesFont.widthOfTextAtSize(nameStr, nameFontSize);
         if (fullNameW <= sigColW) {
-          // Fits in one line
+          // Fits in one line — centre it
           const nameX = sigData.col.x + Math.max(1, (sigData.col.w - fullNameW) / 2);
-          txt(coverPage, nameStr, nameX, sigY - 26, nameFontSize, timesFont, gray);
+          txt(coverPage, nameStr, nameX, sigY - 22, nameFontSize, timesFont, gray);
         } else {
-          // Split at middle word boundary
+          // Split at middle word boundary into two lines
           const words = nameStr.split(" ");
           const mid = Math.ceil(words.length / 2);
           const line1 = words.slice(0, mid).join(" ");
           const line2 = words.slice(mid).join(" ");
           const l1W = timesFont.widthOfTextAtSize(line1, nameFontSize);
           const l2W = timesFont.widthOfTextAtSize(line2, nameFontSize);
-          const l1X = sigData.col.x + Math.max(1, (sigData.col.w - l1W) / 2);
-          const l2X = sigData.col.x + Math.max(1, (sigData.col.w - l2W) / 2);
-          txt(coverPage, line1, l1X, sigY - 22, nameFontSize, timesFont, gray);
-          if (line2) txt(coverPage, line2, l2X, sigY - 31, nameFontSize, timesFont, gray);
+          // Clamp X so text never goes outside the column
+          const l1X = Math.max(sigData.col.x + 1, sigData.col.x + (sigData.col.w - Math.min(l1W, sigColW)) / 2);
+          const l2X = Math.max(sigData.col.x + 1, sigData.col.x + (sigData.col.w - Math.min(l2W, sigColW)) / 2);
+          txt(coverPage, line1, l1X, sigY - 20, nameFontSize, timesFont, gray);
+          if (line2) txt(coverPage, line2, l2X, sigY - 28, nameFontSize, timesFont, gray);
         }
       }
     }
