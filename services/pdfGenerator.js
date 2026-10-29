@@ -1,5 +1,6 @@
-﻿// pdfGenerator.js — clean rewrite with course name cleaning
-const { PDFDocument, rgb, StandardFonts } = require("pdf-lib");
+// pdfGenerator.js — rewrite: exact text measurement, tight row heights,
+// clean page splitting, signature names that always stay inside the cell.
+const { PDFDocument, rgb, StandardFonts, degrees } = require("pdf-lib");
 const fs2 = require("fs");
 const path = require("path");
 
@@ -11,87 +12,78 @@ try {
   }
 } catch (e) {}
 
-async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser, approvedAt, isPreview = false, withoutSignatures = false, hideVCSignature = false }) {
+function escapeRegExp(s) {
+  return String(s || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+async function generateFeedbackReportPDF({
+  submission,
+  reports,
+  hodUser,
+  vcUser,
+  approvedAt,
+  isPreview = false,
+  withoutSignatures = false,
+  hideVCSignature = false,
+}) {
   const User = require("../models/User");
   const HODComment = require("../models/HODComment");
-  const axios = require("axios");
 
-  // Fetch HOD comment for this department (department-level comment)
+  // ── HOD department-level comment ──────────────────────────────────────────
   let hodCommentText = null;
   try {
-    const HODComment = require('../models/HODComment');
     if (hodUser?.department) {
       const queryParams = {
         department: hodUser.department,
-        academicYear: submission?.academicYear || '2026-2027',
-        session: submission?.session || ''
+        academicYear: submission?.academicYear || "2026-2027",
+        session: submission?.session || "",
       };
-      console.log('[PDF] ========== HOD COMMENT FETCH ==========');
-      console.log('[PDF] Query parameters:', JSON.stringify(queryParams, null, 2));
-      
       const commentDoc = await HODComment.findOne(queryParams).lean();
-      
-      console.log('[PDF] Department-level HOD comment found:', commentDoc ? 'YES' : 'NO');
-      if (commentDoc) {
-        console.log('[PDF] Comment preview:', commentDoc.comment?.substring(0, 100) + '...');
-        console.log('[PDF] Comment full length:', commentDoc.comment?.length, 'characters');
-        console.log('[PDF] Saved by:', commentDoc.hodName, '(', commentDoc.hodUserId, ')');
-      } else {
-        console.log('[PDF] ❌ No department-level comment found');
-      }
+      console.log("[PDF] Department-level HOD comment found:", commentDoc ? "YES" : "NO");
       hodCommentText = commentDoc?.comment || null;
-    } else {
-      console.log('[PDF] ❌ No hodUser.department provided, skipping comment fetch');
-      console.log('[PDF] hodUser object:', JSON.stringify(hodUser, null, 2));
     }
   } catch (err) {
-    console.error('[PDF] ❌ Failed to fetch HOD comment:', err.message);
-    console.error('[PDF] Error stack:', err.stack);
-    hodCommentText = null; // Continue without comment
+    console.error("[PDF] Failed to fetch HOD comment:", err.message);
+    hodCommentText = null;
   }
 
-  // ALSO collect all individual report comments (hodRemarks field)
+  // ── Individual report remarks (hodRemarks) ────────────────────────────────
   const individualComments = [];
-  reports.forEach((r, idx) => {
+  reports.forEach((r) => {
     if (r.hodRemarks && r.hodRemarks.trim()) {
       individualComments.push({
-        facultyName: r.facultyName || 'Unknown',
-        subjectCode: r.subjectCode || '',
-        remark: r.hodRemarks.trim()
+        facultyName: r.facultyName || "Unknown",
+        subjectCode: r.subjectCode || "",
+        remark: r.hodRemarks.trim(),
       });
     }
   });
-  console.log('[PDF] Individual report comments found:', individualComments.length);
-  if (individualComments.length > 0) {
-    console.log('[PDF] Sample individual comments:');
-    individualComments.slice(0, 3).forEach((c, i) => {
-      console.log(`[PDF]   ${i+1}. ${c.facultyName} (${c.subjectCode}): ${c.remark.substring(0, 60)}...`);
-    });
-  }
-  console.log('[PDF] ========================================');
+  console.log("[PDF] Individual report comments found:", individualComments.length);
 
   // ── PDF document & fonts ──────────────────────────────────────────────────
   const pdfDoc = await PDFDocument.create();
-  const font          = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  const boldFont      = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-  const timesFont     = await pdfDoc.embedFont(StandardFonts.TimesRoman);
+  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  const timesFont = await pdfDoc.embedFont(StandardFonts.TimesRoman);
   const timesBoldFont = await pdfDoc.embedFont(StandardFonts.TimesRomanBold);
 
   // ── Colours ───────────────────────────────────────────────────────────────
-  const black    = rgb(0, 0, 0);
-  const white    = rgb(1, 1, 1);
-  const gray     = rgb(0.5, 0.5, 0.5);
-  const blue     = rgb(0.118, 0.227, 0.541);
-  const red      = rgb(0.8, 0.1, 0.1);
-  const green    = rgb(0.082, 0.325, 0.173);
-  const amber    = rgb(0.7, 0.4, 0);
+  const black = rgb(0, 0, 0);
+  const white = rgb(1, 1, 1);
+  const gray = rgb(0.5, 0.5, 0.5);
+  const blue = rgb(0.118, 0.227, 0.541);
+  const red = rgb(0.8, 0.1, 0.1);
+  const green = rgb(0.082, 0.325, 0.173);
+  const amber = rgb(0.7, 0.4, 0);
   const darkBlue = rgb(0.05, 0.15, 0.4);
 
   // ── Page geometry ─────────────────────────────────────────────────────────
   const PW = 842, PH = 595, ML = 20, MR = 20, CW = 802;
+  const TOP_MARGIN = 30;
+  const BOTTOM_MARGIN = 30;
 
   const today = new Date(approvedAt || Date.now()).toLocaleDateString("en-IN", {
-    day: "2-digit", month: "2-digit", year: "numeric"
+    day: "2-digit", month: "2-digit", year: "numeric",
   });
 
   // ── Drawing helpers ───────────────────────────────────────────────────────
@@ -101,106 +93,117 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
       page.drawText(String(text), { x, y, size, font: f || font, color: color || black });
     } catch (e) {}
   }
-
   function rect(page, x, y, w, h, opts) {
     page.drawRectangle({ x, y, width: w, height: h, ...opts });
   }
-
   function line(page, x1, y1, x2, y2, thickness, color) {
     page.drawLine({
       start: { x: x1, y: y1 },
-      end:   { x: x2, y: y2 },
+      end: { x: x2, y: y2 },
       thickness: thickness || 0.5,
-      color: color || black
+      color: color || black,
     });
   }
 
-  // Word-wrap text to fit within maxChars per line
-  function wrap(text, maxChars) {
-    const words = (text || "").split(" ");
-    const lines = [];
-    let cur = "";
-    words.forEach(w => {
-      const next = cur ? cur + " " + w : w;
-      if (next.length <= maxChars) {
-        cur = next;
-      } else {
-        if (cur) lines.push(cur);
-        cur = w.length > maxChars ? w.substring(0, maxChars - 1) + "…" : w;
-      }
-    });
-    if (cur) lines.push(cur);
-    return lines;
+  // Keep only characters the standard PDF fonts can encode (prevents crashes
+  // inside widthOfTextAtSize / drawText).
+  function sanitize(s) {
+    return String(s == null ? "" : s)
+      .replace(/\r/g, "")
+      .replace(/\t/g, " ")
+      .replace(/[^\n\x20-\x7E\u00A0-\u00FF\u2022\u2013\u2014\u2018\u2019\u201C\u201D\u2026]/g, "?");
   }
 
-  // Calculate how many wrapped lines a block of text needs - IMPROVED ALGORITHM
-  function calcLines(text, colW, fontSize) {
-    if (!text) return 1;
-    
-    const maxWidth = colW - 14;
-    const segments = text.split("\n");
-    let totalLines = 0;
-    
-    segments.forEach(seg => {
+  // ── Text layout constants (table body) ────────────────────────────────────
+  const FS = 8;            // body font size
+  const LH = 10;           // line height
+  const SPACER_H = 3;      // blank line between paragraphs
+  const PAD_TOP = 4;
+  const PAD_BOT = 4;
+  const CELL_PAD_X = 6;    // left & right padding inside a cell
+
+  // Wrap text using REAL font metrics -> returns [{text, indent, spacer, h}]
+  // The same lines are used to measure AND to draw, so the row height is exact.
+  function wrapCell(text, maxW, f, size, lh = LH, spacerH = SPACER_H, bulletIndent = 8) {
+    const out = [];
+    sanitize(text).split("\n").forEach((seg) => {
       if (!seg.trim()) {
-        // blank spacer between bullets — counts as 0.5 lines
-        totalLines += 0.5;
+        out.push({ text: "", indent: 0, spacer: true, h: spacerH });
         return;
       }
-      
-      const words = seg.split(/\s+/).filter(w => w);
-      let currentLine = "";
-      let lineCount = 0;
-      
-      words.forEach(word => {
-        const cleanWord = word.trim();
-        if (!cleanWord) return;
-        
-        const testLine = currentLine ? currentLine + " " + cleanWord : cleanWord;
-        const charWidthFactor = fontSize < 10 ? 0.56 : 0.58;
-        const testWidth = testLine.length * fontSize * charWidthFactor;
-        
-        if (testWidth <= maxWidth) {
-          currentLine = testLine;
-        } else {
-          if (currentLine) lineCount++;
-          
-          // Check if single word is too long
-          const wordWidth = cleanWord.length * fontSize * charWidthFactor;
-          if (wordWidth > maxWidth) {
-            // Long word will be broken across multiple lines
-            const charsPerLine = Math.floor(maxWidth / (fontSize * charWidthFactor));
-            const wordLines = Math.ceil(cleanWord.length / charsPerLine);
-            lineCount += wordLines;
-            currentLine = "";
-          } else {
-            currentLine = cleanWord;
-          }
+      const ind = seg.startsWith("\u2022 ") ? bulletIndent : 0;
+      const words = seg.split(/\s+/).filter(Boolean);
+      let cur = "";
+      let first = true;
+      const widthNow = () => maxW - (first ? 0 : ind);
+      const push = () => {
+        out.push({ text: cur, indent: first ? 0 : ind, spacer: false, h: lh });
+        first = false;
+        cur = "";
+      };
+      words.forEach((word0) => {
+        let word = word0;
+        const test = cur ? cur + " " + word : word;
+        if (f.widthOfTextAtSize(test, size) <= widthNow()) {
+          cur = test;
+          return;
         }
+        if (cur) push();
+        // a single word wider than the cell is broken with a hyphen
+        while (word.length > 1 && f.widthOfTextAtSize(word, size) > widthNow()) {
+          let n = word.length;
+          while (n > 1 && f.widthOfTextAtSize(word.slice(0, n) + "-", size) > widthNow()) n--;
+          cur = word.slice(0, n) + "-";
+          push();
+          word = word.slice(n);
+        }
+        cur = word;
       });
-      
-      if (currentLine) lineCount++;
-      totalLines += Math.max(1, lineCount);
+      if (cur) push();
     });
-    
-    return Math.max(1, totalLines);
+    while (out.length && out[out.length - 1].spacer) out.pop();
+    while (out.length && out[0].spacer) out.shift();
+    return out.length ? out : [{ text: "", indent: 0, spacer: false, h: lh }];
   }
 
-  // Embed a base-64 signature image (fallback — no crop)
+  // Wrap a person's name so it NEVER leaves its box: break on spaces
+  // (first / middle / last name), and only break inside a word as last resort.
+  function wrapName(name, maxW, f, size) {
+    const words = sanitize(name).split(/\s+/).filter(Boolean);
+    const out = [];
+    let cur = "";
+    words.forEach((w0) => {
+      let w = w0;
+      const t = cur ? cur + " " + w : w;
+      if (f.widthOfTextAtSize(t, size) <= maxW) {
+        cur = t;
+        return;
+      }
+      if (cur) out.push(cur);
+      cur = "";
+      while (w.length > 1 && f.widthOfTextAtSize(w, size) > maxW) {
+        let n = w.length;
+        while (n > 1 && f.widthOfTextAtSize(w.slice(0, n), size) > maxW) n--;
+        out.push(w.slice(0, n));
+        w = w.slice(n);
+      }
+      cur = w;
+    });
+    if (cur) out.push(cur);
+    return out;
+  }
+
+  // ── Signature embedding ───────────────────────────────────────────────────
   async function embedSig(b64) {
     if (!b64) return null;
     try {
       const d = b64.replace(/^data:image\/\w+;base64,/, "");
       const bytes = Buffer.from(d, "base64");
-      return b64.includes("image/png")
-        ? await pdfDoc.embedPng(bytes)
-        : await pdfDoc.embedJpg(bytes);
+      return b64.includes("image/png") ? await pdfDoc.embedPng(bytes) : await pdfDoc.embedJpg(bytes);
     } catch {
       return null;
     }
   }
-
-  // Auto-crop whitespace from signature using sharp, then embed
   async function cropAndEmbedSig(b64) {
     if (!b64) return null;
     try {
@@ -208,64 +211,38 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
       const d = b64.replace(/^data:image\/\w+;base64,/, "");
       const bytes = Buffer.from(d, "base64");
       const cropped = await sharp(bytes).trim({ threshold: 30 }).toBuffer();
-      return b64.includes("image/png")
-        ? await pdfDoc.embedPng(cropped)
-        : await pdfDoc.embedJpg(cropped);
+      return b64.includes("image/png") ? await pdfDoc.embedPng(cropped) : await pdfDoc.embedJpg(cropped);
     } catch (e) {
       return embedSig(b64);
     }
   }
 
-  // ── De-duplicate reports ──────────────────────────────────────────────────
-  const normalizeKey = value => String(value || "").toLowerCase().trim().replace(/\s+/g, " ");
-  
-  // ── Clean course name — remove "submitted answer" and similar text ─────────
+  // ── Clean course name ─────────────────────────────────────────────────────
   function cleanCourseName(name) {
     if (!name) return "";
     return String(name)
-      .replace(/\bsubmitted\s+answers?\s*:?\s*-?\s*/gi, "") // Remove "submitted answer(s):-" or variations
+      .replace(/\bsubmitted\s+answers?\s*:?\s*-?\s*/gi, "")
       .replace(/\bsubmitted\s+responses?\s*:?\s*-?\s*/gi, "")
       .replace(/\bstudent\s+feedback\s*:?\s*-?\s*/gi, "")
-      .replace(/\s+/g, " ") // Normalize whitespace
+      .replace(/\s+/g, " ")
       .trim();
   }
-  
-  console.log(`[PDF] Total reports received: ${reports.length}`);
-  
-  // DISABLE DEDUPLICATION - Show ALL reports from database
-  // If dashboard shows 38, PDF should show 38
-  const uniqueReports = [...reports]; // Keep all reports, no filtering
-  
-  console.log(`[PDF] Showing all ${uniqueReports.length} reports (deduplication disabled)`);
-  
-  // If you need deduplication in the future, use report._id as unique key:
-  // const seenIds = new Set();
-  // const uniqueReports = reports.filter(r => {
-  //   if (seenIds.has(String(r._id))) return false;
-  //   seenIds.add(String(r._id));
-  //   return true;
-  // });
 
-  // ── Sort reports by serial number (natural order) ──────────────────────────
-  // Removed content-size sorting as it's not a business requirement
-  // Pagination should be driven by actual row height, not artificial reordering
+  // ── Reports: keep all, sort by faculty then subject code ──────────────────
+  console.log(`[PDF] Total reports received: ${reports.length}`);
+  const uniqueReports = [...reports];
   uniqueReports.sort((a, b) => {
-    // Sort by faculty name as primary, then by subject code
     const nameA = (a.facultyName || "").toLowerCase();
     const nameB = (b.facultyName || "").toLowerCase();
     if (nameA !== nameB) return nameA.localeCompare(nameB);
-    
-    const codeA = (a.subjectCode || "").toLowerCase();
-    const codeB = (b.subjectCode || "").toLowerCase();
-    return codeA.localeCompare(codeB);
+    return (a.subjectCode || "").toLowerCase().localeCompare((b.subjectCode || "").toLowerCase());
   });
 
-  // ── Collect faculty signatures ────────────────────────────────────────────
+  // ── Faculty signatures ────────────────────────────────────────────────────
   const facultySigMap = {};
   for (const r of uniqueReports) {
     const key = (r.facultyName || "").toLowerCase().trim();
     if (facultySigMap[key]) continue;
-    // Try by userId first
     if (r.facultyUserId) {
       try {
         const fu = await User.findById(r.facultyUserId).select("signatureImage");
@@ -275,11 +252,10 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
         }
       } catch (e) {}
     }
-    // Fallback: search by name
     try {
       const fu = await User.findOne({
         role: "faculty",
-        name: new RegExp((r.facultyName || "").trim(), "i")
+        name: new RegExp(escapeRegExp((r.facultyName || "").trim()), "i"),
       }).select("signatureImage");
       if (fu && fu.signatureImage) {
         const img = await cropAndEmbedSig(fu.signatureImage);
@@ -289,9 +265,8 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
   }
 
   const hodSig = await cropAndEmbedSig(hodUser && hodUser.signatureImage);
-  const vcSig  = await cropAndEmbedSig(vcUser  && vcUser.signatureImage);
-  console.log("[PDF] Sigs — HOD:", !!hodSig, "VC:", !!vcSig,
-              "Faculty:", Object.keys(facultySigMap).length);
+  const vcSig = await cropAndEmbedSig(vcUser && vcUser.signatureImage);
+  console.log("[PDF] Sigs — HOD:", !!hodSig, "VC:", !!vcSig, "Faculty:", Object.keys(facultySigMap).length);
 
   // ── Header image (cached) ─────────────────────────────────────────────────
   let _embH = null;
@@ -301,75 +276,54 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
         try { _embH = await pdfDoc.embedPng(_headerBytes); } catch (e) {}
       }
       if (_embH) {
-        const iH = Math.round(CW * _embH.height / _embH.width);
+        const iH = Math.round((CW * _embH.height) / _embH.width);
         page.drawImage(_embH, { x: ML, y: y - iH, width: CW, height: iH });
         line(page, ML, y - iH - 4, PW - MR, y - iH - 4, 0.8, black);
         return y - iH - 14;
       }
     }
-    // Fallback text header
     line(page, ML, y, PW - MR, y, 1.5, blue);
-    txt(page, "MADHAV INSTITUTE OF TECHNOLOGY & SCIENCE, GWALIOR (M.P.), INDIA",
-        ML + 42, y - 10, 8.5, boldFont, blue);
-    txt(page, "(Deemed University) - NAAC A++ Grade",
-        ML + 42, y - 22, 7, font, red);
+    txt(page, "MADHAV INSTITUTE OF TECHNOLOGY & SCIENCE, GWALIOR (M.P.), INDIA", ML + 42, y - 10, 8.5, boldFont, blue);
+    txt(page, "(Deemed University) - NAAC A++ Grade", ML + 42, y - 22, 7, font, red);
     line(page, ML, y - 32, PW - MR, y - 32, 0.8, black);
     return y - 36;
   }
 
-  // ── Column definitions ────────────────────────────────────────────────────
-  // Total usable width = CW = 802, ML = 20
-  // FIXED: Widened Action Taken from 50pt to 100pt for better text wrapping
-  // S.No(24) | Faculty Name(80) | Code/Batch(58) | Course Name(88) | Sem(22) |
-  // FFI(35) | Resp.(48) | Needs Attention(148) | Appreciation(165) |
-  // Action Taken(100) | Faculty Signature(62)
-  // Sum = 24+80+58+88+22+35+48+148+165+100+62 = 830 → Adjust to 802
-  const COLS = [
-    { label: "S.No",              x: ML,        w: 24  },    
-    { label: "Faculty Name",      x: ML + 24,   w: 78  },    // -7 from 85
-    { label: "Code/Batch",        x: ML + 102,  w: 58  },    // -2 from 60
-    { label: "Course Name",       x: ML + 160,  w: 85  },    // -5 from 90
-    { label: "Sem",               x: ML + 245,  w: 22  },    
-    { label: "FFI",               x: ML + 267,  w: 35  },    
-    { label: "Resp. %",           x: ML + 302,  w: 48  },    // -2 from 50
-    { label: "Needs Attention",   x: ML + 350,  w: 145 },    // -10 from 155
-    { label: "Appreciation",      x: ML + 495,  w: 160 },    // -10 from 170
-    { label: "Action Taken",      x: ML + 655,  w: 100 },    // +50 from 50 ✓ MAJOR FIX
-    { label: "Faculty Signature", x: ML + 755,  w: 62  },    // Adjusted position (total: 817 - within bounds)
+  // ── Column definitions (widths add up to exactly CW = 802) ────────────────
+  const COL_DEFS = [
+    { label: "S.No",              w: 24,  hdr: ["S.No"] },
+    { label: "Faculty Name",      w: 76,  hdr: ["Faculty", "Name"] },
+    { label: "Code/Batch",        w: 56,  hdr: ["Code /", "Batch"] },
+    { label: "Course Name",       w: 80,  hdr: ["Course", "Name"] },
+    { label: "Sem",               w: 22,  hdr: ["Sem"] },
+    { label: "FFI",               w: 34,  hdr: ["FFI"] },
+    { label: "Resp. %",           w: 46,  hdr: ["Resp.", "%"] },
+    { label: "Needs Attention",   w: 142, hdr: ["Needs", "Attention"] },
+    { label: "Appreciation",      w: 156, hdr: ["Appreciation"] },
+    { label: "Action Taken",      w: 100, hdr: ["Action", "Taken"] },
+    { label: "Faculty Signature", w: 66,  hdr: ["Faculty", "Signature"] },
   ];
+  let _cx = ML;
+  const COLS = COL_DEFS.map((c) => {
+    const o = { ...c, x: _cx };
+    _cx += c.w;
+    return o;
+  });
+  const sigCol = COLS[COLS.length - 1];
 
-  const TH = 36; // table header height — 2-line for long labels
+  const TH = 30; // table header height
 
-  // Draw header row — light gray bg, NO border box, 11pt bold centred
   function drawTableHeader(page, y) {
-    // Clean black/white professional header
     rect(page, ML, y - TH, CW, TH, { borderColor: black, borderWidth: 1, color: white });
-    
-    // Draw vertical column dividers for header
     COLS.forEach((col, ci) => {
-      if (ci > 0) {
-        line(page, col.x, y, col.x, y - TH, 1, black);
-      }
+      if (ci > 0) line(page, col.x, y, col.x, y - TH, 1, black);
     });
-
-    const HFS = 10.5;
-    const HLH = 12.5;
-    COLS.forEach(col => {
-      let hLines;
-      if (col.label === "Course Name") {
-        hLines = ["Course", "Name"];
-      } else if (col.label === "Needs Attention") {
-        hLines = ["Needs", "Attention"];
-      } else if (col.label === "Action Taken") {
-        hLines = ["Action", "Taken"];
-      } else if (col.label === "Faculty Signature") {
-        hLines = ["Faculty", "Signature"];
-      } else {
-        const maxChars = Math.floor(col.w / (HFS * 0.55));
-        hLines = wrap(col.label, maxChars);
-      }
+    const HFS = 9;
+    const HLH = 11;
+    COLS.forEach((col) => {
+      const hLines = col.hdr;
       const totalH = hLines.length * HLH;
-      const startY = y - (TH - totalH) / 2 - HLH + 4;
+      const startY = y - (TH - totalH) / 2 - HFS;
       hLines.forEach((l, li) => {
         const lw = boldFont.widthOfTextAtSize(l, HFS);
         const lx = col.x + Math.max(1, (col.w - lw) / 2);
@@ -379,227 +333,128 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
     return y - TH;
   }
 
-  // ── Cover page ────────────────────────────────────────────────────────────
-  let coverPage = pdfDoc.addPage([PW, PH]);
+  // ── Page state ────────────────────────────────────────────────────────────
+  let page = pdfDoc.addPage([PW, PH]);
+  let pageNumber = 1;
   let y = PH - 15;
-  y = await drawHeader(coverPage, y);
-  y -= 10;
 
-  // Line 1: Action Taken Report
-  const atrText = "Action Taken Report";
-  txt(coverPage, atrText,
-      PW / 2 - timesBoldFont.widthOfTextAtSize(atrText, 16) / 2,
-      y, 16, timesBoldFont, black);
-  y -= 18;
-
-  // Line 2: Faculty Feedback – I (or form number)
-  const formNo  = submission.feedbackFormNo || "I";
-  const ffTitle = "Faculty Feedback \u2013 " + formNo;
-  txt(coverPage, ffTitle,
-      PW / 2 - timesBoldFont.widthOfTextAtSize(ffTitle, 18) / 2,
-      y, 18, timesBoldFont, darkBlue);
-  y -= 18;
-
-  // Line 3: Department
-  const dT = (hodUser && hodUser.department) || "Centre for Computer Science and Technology";
-  txt(coverPage, dT,
-      PW / 2 - timesFont.widthOfTextAtSize(dT, 14) / 2,
-      y, 14, timesFont, black);
-  y -= 16;
-
-  // Line 4: Academic Year (left) | Session (right)
-  const sessionLabel = submission.session === "jan-may" ? "January \u2013 May" : "July \u2013 December";
-  const ayText   = "Academic Year \u2013 " + (submission.academicYear || "2025-26");
-  const sessText = "Session: " + sessionLabel;
-  txt(coverPage, ayText,   ML, y, 11, timesFont, black);
-  txt(coverPage, sessText, PW - MR - timesFont.widthOfTextAtSize(sessText, 11), y, 11, timesFont, black);
-  y -= 14;
-
-  // Line 5: Feedback Submitted (left) | Report Generated (right)
-  const subDate  = submission.submissionDate
-    ? new Date(submission.submissionDate).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" })
-    : today;
-  const finalDate = submission.finalReportDate
-    ? new Date(submission.finalReportDate).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" })
-    : today;
-  const fbSubText = "Feedback Submitted: " + subDate;
-  const repGenText = "Report Generated: " + finalDate;
-  txt(coverPage, fbSubText,  ML, y, 11, timesFont, black);
-  txt(coverPage, repGenText, PW - MR - timesFont.widthOfTextAtSize(repGenText, 11), y, 11, timesFont, black);
-  y -= 15;
-
-  // Line 5.5: Filter info (if filtered by semester) - REMOVED
-  // User requested to remove the semester display line completely
-
-  // Line 6: Average FFI (left) | Average Response (right)
-  const allFFIs  = uniqueReports.map(r => r.ffiScore).filter(v => v != null);
-  const avgFFI   = allFFIs.length
-    ? (allFFIs.reduce((s, v) => s + v, 0) / allFFIs.length).toFixed(2)
-    : "\u2014";
-  const allRespPcts = uniqueReports.map(r => r.responsePercent).filter(v => v != null);
-  const allResp  = uniqueReports.map(r => r.responseCount || r.totalResponses || 0).filter(Boolean);
-  const avgResp  = allRespPcts.length
-    ? (allRespPcts.reduce((s, v) => Number(s) + Number(v), 0) / allRespPcts.length).toFixed(2) + "%"
-    : (allResp.length ? (allResp.reduce((s, v) => Number(s) + Number(v), 0) / allResp.length).toFixed(2) : "\u2014");
-  const avgFFIText  = "Average FFI \u2013 " + avgFFI;
-  const avgRespText = "Average Response \u2013 " + avgResp;
-  
-  // Removed the line that was cutting through the text
-  txt(coverPage, avgFFIText,  ML, y, 11, timesBoldFont, black);
-  txt(coverPage, avgRespText, PW - MR - timesBoldFont.widthOfTextAtSize(avgRespText, 11), y, 11, timesBoldFont, black);
-  y -= 18;
-
-  // Define pagination constants (needed for comment section check)
-  const TOP_MARGIN = 30;    // Space at top of continuation pages
-  const BOTTOM_MARGIN = 30; // Space at bottom of pages
-
-  // ── HOD Comment Section (if exists) ───────────────────────────────────────
-  // Show BOTH department-level comment AND individual report remarks
-  const hasComments = (hodCommentText && hodCommentText.trim()) || individualComments.length > 0;
-  
-  console.log('[PDF] ========== COMMENT RENDERING CHECK ==========');
-  console.log('[PDF] hasComments:', hasComments);
-  console.log('[PDF] hodCommentText exists:', !!hodCommentText);
-  console.log('[PDF] individualComments count:', individualComments.length);
-  console.log('[PDF] ===============================================');
-  
-  if (hasComments) {
-    console.log('[PDF] ✅ Rendering HOD comments section...');
-    // Add some spacing
-    y -= 6;
-    
-    // Prepare all comment lines to display
-    const allCommentLines = [];
-    
-    // 1. Department-level comment (if exists)
-    if (hodCommentText && hodCommentText.trim()) {
-      allCommentLines.push({ text: 'Department-level Remarks:', bold: true });
-      const deptWords = hodCommentText.trim().split(' ');
-      let currentLine = '';
-      const maxCharsPerLine = Math.floor(CW / (10 * 0.58)); // ~138 chars per line
-      
-      deptWords.forEach(word => {
-        const testLine = currentLine ? currentLine + ' ' + word : word;
-        if (testLine.length <= maxCharsPerLine) {
-          currentLine = testLine;
-        } else {
-          if (currentLine) allCommentLines.push({ text: currentLine, bold: false });
-          currentLine = word;
-        }
-      });
-      if (currentLine) allCommentLines.push({ text: currentLine, bold: false });
-      
-      // Add spacing between department comment and individual comments
-      if (individualComments.length > 0) {
-        allCommentLines.push({ text: '', bold: false }); // blank line
-      }
-    }
-    
-    // 2. Individual report remarks (if exist)
-    if (individualComments.length > 0) {
-      if (hodCommentText && hodCommentText.trim()) {
-        // Already added department comment above
-      }
-      allCommentLines.push({ text: 'Faculty-specific Remarks:', bold: true });
-      
-      individualComments.forEach((comment, idx) => {
-        const prefix = `${idx + 1}. ${comment.facultyName} (${comment.subjectCode}): `;
-        const remarkWords = comment.remark.split(' ');
-        let currentLine = prefix;
-        const maxCharsPerLine = Math.floor(CW / (10 * 0.58)) - 4; // Slightly less for indentation
-        
-        remarkWords.forEach(word => {
-          const testLine = currentLine + ' ' + word;
-          if (testLine.length <= maxCharsPerLine) {
-            currentLine = testLine;
-          } else {
-            if (currentLine) allCommentLines.push({ text: currentLine, bold: false, indent: true });
-            currentLine = '   ' + word; // indent continuation lines
-          }
-        });
-        if (currentLine) allCommentLines.push({ text: currentLine, bold: false, indent: true });
-      });
-    }
-    
-    // Calculate total height needed for comment box
-    const commentHeight = Math.max(40, allCommentLines.length * 13 + 24);
-    const COMMENT_BOTTOM_MARGIN = 100; // Increased to ensure enough space for table header + first row
-    
-    // Check if comment box fits on current page
-    const spaceAvailable = y - COMMENT_BOTTOM_MARGIN;
-    console.log('[PDF] Comment height needed:', commentHeight, 'Space available:', spaceAvailable);
-    
-    if (commentHeight > spaceAvailable) {
-      // Comment is too big for remaining space, create new page
-      console.log('[PDF] ⚠️ Comment too large for current page, creating new page');
-      coverPage = pdfDoc.addPage([PW, PH]);
-      pageNumber++;
-      y = PH - TOP_MARGIN;
-      console.log('[PDF] New page created for comments, Y reset to:', y);
-    }
-    
-    const commentBoxY = y;
-    
-    // Draw light blue background box
-    rect(coverPage, ML, commentBoxY - commentHeight, CW, commentHeight, {
-      color: rgb(0.95, 0.97, 1), // very light blue
-      borderColor: rgb(0.7, 0.8, 0.95),
-      borderWidth: 0.5
-    });
-    
-    // Title
-    txt(coverPage, "HOD Remarks:", ML + 10, commentBoxY - 14, 10, boldFont, darkBlue);
-    
-    // Render all comment lines
-    let commentY = commentBoxY - 28;
-    allCommentLines.forEach(line => {
-      const useFont = line.bold ? boldFont : timesFont;
-      const xPos = line.indent ? ML + 14 : ML + 10;
-      txt(coverPage, line.text, xPos, commentY, 10, useFont, black);
-      commentY -= 13;
-    });
-    
-    y = commentBoxY - commentHeight - 8;
-    console.log('[PDF] Comment rendered, Y position after comment:', y);
+  function newPlainPage() {
+    page = pdfDoc.addPage([PW, PH]);
+    pageNumber++;
+    y = PH - TOP_MARGIN;
+  }
+  function newTablePage() {
+    newPlainPage();
+    y = drawTableHeader(page, y);
   }
 
-  // ── Draw initial table header ─────────────────────────────────────────────
-  y = drawTableHeader(coverPage, y);
+  // ── Cover page ────────────────────────────────────────────────────────────
+  y = await drawHeader(page, y);
+  y -= 10;
 
-  // ── Data rows ─────────────────────────────────────────────────────────────
-  const ROW_GAP    = 0;  // No gap between rows
-  // BOTTOM_MARGIN and TOP_MARGIN already defined above for comment section
-  const FS = 8.5;           // Font size — readable but compact
-  const LH = 10;            // Line height — tighter spacing
-  const MIN_ROW_HEIGHT = 22; // Minimum row height — signature fits within content height
-  const ROW_PADDING = 8;    // Top+bottom padding inside each row
+  const atrText = "Action Taken Report";
+  txt(page, atrText, PW / 2 - timesBoldFont.widthOfTextAtSize(atrText, 16) / 2, y, 16, timesBoldFont, black);
+  y -= 18;
 
-  let pageNumber = 1;
-  let isFirstDataRow = true; // Track if this is the first data row
-  
-  console.log(`[PDF] ========== Starting Table Rendering ==========`);
-  console.log(`[PDF] Total records: ${uniqueReports.length}`);
-  console.log(`[PDF] Initial Y position after header: ${y}`);
-  console.log(`[PDF] Page dimensions: ${PW}x${PH}, Content width: ${CW}`);
+  const formNo = submission.feedbackFormNo || "I";
+  const ffTitle = "Faculty Feedback \u2013 " + formNo;
+  txt(page, ffTitle, PW / 2 - timesBoldFont.widthOfTextAtSize(ffTitle, 18) / 2, y, 18, timesBoldFont, darkBlue);
+  y -= 18;
+
+  const dT = (hodUser && hodUser.department) || "Centre for Computer Science and Technology";
+  txt(page, dT, PW / 2 - timesFont.widthOfTextAtSize(dT, 14) / 2, y, 14, timesFont, black);
+  y -= 16;
+
+  const sessionLabel = submission.session === "jan-may" ? "January \u2013 May" : "July \u2013 December";
+  const ayText = "Academic Year \u2013 " + (submission.academicYear || "2025-26");
+  const sessText = "Session: " + sessionLabel;
+  txt(page, ayText, ML, y, 11, timesFont, black);
+  txt(page, sessText, PW - MR - timesFont.widthOfTextAtSize(sessText, 11), y, 11, timesFont, black);
+  y -= 14;
+
+  const fmt = (d) => new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" });
+  const subDate = submission.submissionDate ? fmt(submission.submissionDate) : today;
+  const finalDate = submission.finalReportDate ? fmt(submission.finalReportDate) : today;
+  const fbSubText = "Feedback Submitted: " + subDate;
+  const repGenText = "Report Generated: " + finalDate;
+  txt(page, fbSubText, ML, y, 11, timesFont, black);
+  txt(page, repGenText, PW - MR - timesFont.widthOfTextAtSize(repGenText, 11), y, 11, timesFont, black);
+  y -= 15;
+
+  const allFFIs = uniqueReports.map((r) => r.ffiScore).filter((v) => v != null);
+  const avgFFI = allFFIs.length ? (allFFIs.reduce((s, v) => s + v, 0) / allFFIs.length).toFixed(2) : "\u2014";
+  const allRespPcts = uniqueReports.map((r) => r.responsePercent).filter((v) => v != null);
+  const allResp = uniqueReports.map((r) => r.responseCount || r.totalResponses || 0).filter(Boolean);
+  const avgResp = allRespPcts.length
+    ? (allRespPcts.reduce((s, v) => Number(s) + Number(v), 0) / allRespPcts.length).toFixed(2) + "%"
+    : allResp.length
+    ? (allResp.reduce((s, v) => Number(s) + Number(v), 0) / allResp.length).toFixed(2)
+    : "\u2014";
+  const avgFFIText = "Average FFI \u2013 " + avgFFI;
+  const avgRespText = "Average Response \u2013 " + avgResp;
+  txt(page, avgFFIText, ML, y, 11, timesBoldFont, black);
+  txt(page, avgRespText, PW - MR - timesBoldFont.widthOfTextAtSize(avgRespText, 11), y, 11, timesBoldFont, black);
+  y -= 18;
+
+  // ── HOD comments (department-level + individual remarks) ──────────────────
+  const hasComments = (hodCommentText && hodCommentText.trim()) || individualComments.length > 0;
+  if (hasComments) {
+    const CFS = 9;
+    const CLH = 11;
+    const maxW = CW - 8;
+    const cLines = []; // {text, bold, indent, h}
+
+    if (hodCommentText && hodCommentText.trim()) {
+      cLines.push({ text: "Department-level Remarks:", bold: true, indent: 0, h: CLH });
+      wrapCell(hodCommentText.trim(), maxW, timesFont, CFS, CLH, 4).forEach((l) =>
+        cLines.push({ ...l, bold: false })
+      );
+      if (individualComments.length > 0) cLines.push({ text: "", bold: false, indent: 0, spacer: true, h: 5 });
+    }
+    if (individualComments.length > 0) {
+      cLines.push({ text: "Remarks on individual reports:", bold: true, indent: 0, h: CLH });
+      individualComments.forEach((c) => {
+        const label = c.facultyName + (c.subjectCode ? " (" + c.subjectCode + ")" : "") + ": " + c.remark;
+        wrapCell("\u2022 " + label, maxW, timesFont, CFS, CLH, 4).forEach((l) =>
+          cLines.push({ ...l, bold: false })
+        );
+      });
+    }
+
+    cLines.forEach((l) => {
+      // keep room for at least the table header + a little content
+      if (y - l.h < BOTTOM_MARGIN + TH + 40) newPlainPage();
+      if (!l.spacer && l.text) {
+        txt(page, l.text, ML + 4 + (l.indent || 0), y - CFS, CFS, l.bold ? timesBoldFont : timesFont, black);
+      }
+      y -= l.h;
+    });
+    y -= 8;
+  }
+
+  // ── Table start ───────────────────────────────────────────────────────────
+  if (y - BOTTOM_MARGIN < TH + 60) newPlainPage();
+  y = drawTableHeader(page, y);
+
+  // ── Table rows ────────────────────────────────────────────────────────────
+  const SIG_IMG_H = 16;
+  const SIG_NAME_FS = 6;
+  const SIG_NAME_LH = 7;
+  const MIN_SPLIT = 45; // minimum free space needed to START a row on this page
+
+  const toBullets = (arr) =>
+    (Array.isArray(arr) ? arr : arr ? [arr] : [])
+      .filter((c) => typeof c === "string" && c.trim())
+      .map((x) => "\u2022 " + x.trim());
 
   for (let i = 0; i < uniqueReports.length; i++) {
     const r = uniqueReports[i];
 
-    // Build cell text values
-    const cleanedSubjectCode = cleanCourseName(r.subjectCode || "-");
-    const codeParts = cleanedSubjectCode.split("-");
-    const codeBatch = codeParts.length > 1
-      ? codeParts[0].trim() + "\n" + codeParts.slice(1).join("-").trim()
-      : cleanedSubjectCode;
+    // ---- cell texts ----
+    const codeBatch = [r.subjectCode, r.batch].filter(Boolean).join("\n") || "-";
 
-    const attText = (r.commentsNeedingAttention || [])
-      .filter(c => c && c.trim().split(/\s+/).length >= 5)
-      .length > 0
-      ? (r.commentsNeedingAttention || [])
-          .filter(c => c && c.trim().split(/\s+/).length >= 5)
-          .map(x => "\u2022 " + x.trim())
-          .join("\n")   // single line between bullets
-      : "None";
+    const attList = r.needsAttention || r.needs_attention || r.attention || r.improvements || [];
+    const attText = toBullets(attList).join("\n") || "-";
 
     const pcts = r.commentPercentages || {};
     const pctLines = Object.entries(pcts)
@@ -607,1075 +462,194 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
       .sort((a, b) => b[1] - a[1])
       .map(([k, v]) => "\u2022 " + k + ": " + v + "%")
       .join("\n");
-    // Preserve ALL appreciation comments (no filtering)
     const allAppreciations = (r.appreciation || [])
-      .filter(c => typeof c === "string" && c.trim() && c.trim().split(/\s+/).length >= 5)
-      .map(x => "\u2022 " + x.trim());
+      .filter((c) => typeof c === "string" && c.trim() && c.trim().split(/\s+/).length >= 5)
+      .map((x) => "\u2022 " + x.trim());
     const appText = [pctLines, ...allAppreciations].filter(Boolean).join("\n") || "-";
 
-    // Action Taken - check multiple possible field names
     const actionText = r.actionTaken || r.action_taken || r.hodAction || r.hodActionTaken || "-";
-    
-    if (i === 0) {
-      // Log field availability for first record (diagnostic)
-      console.log(`[PDF] Action field check for first record:`);
-      console.log(`[PDF]   actionTaken: "${r.actionTaken || 'empty'}"`);
-      console.log(`[PDF]   hodRemarks: "${r.hodRemarks || 'empty'}"`);
-      console.log(`[PDF]   Keys available: ${Object.keys(r).filter(k => k.includes('action') || k.includes('Action')).join(', ') || 'none with action'}`);
-    }
 
-    // Calculate row height using actual wrapped text for ALL columns including Action Taken
-    const attLines  = calcLines(attText, 145, FS);      // Needs Attention column (145pt)
-    const appLines  = calcLines(appText, 160, FS);      // Appreciation column (160pt)
-    const nameLines = calcLines(r.facultyName || "-", 78, FS);  // Faculty Name (78pt)
-    const progLines = calcLines(cleanCourseName(r.programme) || "-", 85, FS); // Course Name (85pt)
-    const codeLines = calcLines(codeBatch || "-", 58, FS);      // Code/Batch (58pt)
-    const actionLines = calcLines(actionText, 100, FS);  // ✓ FIX: Action Taken (100pt) - was missing proper calculation
-    const semLines = calcLines(String(r.semester || "-"), 22, FS);  // Semester (22pt)
-    
-    const maxLines = Math.max(
-      attLines,
-      appLines,
-      1
-    );
-    
-    // Calculate actual row height with proper padding
-    // Allow rows to be as tall as needed - they will naturally split across pages
-    const ROW_H = Math.max(MIN_ROW_HEIGHT, maxLines * LH + ROW_PADDING);
-    
-    console.log(`[PDF]   Row height calculated: ${ROW_H}pt for ${maxLines} lines`);
-    
-    const totalSpaceNeeded = ROW_H + ROW_GAP;
-    const availableSpace = y - BOTTOM_MARGIN;
-
-    // Diagnostic logging
-    console.log(`[PDF] ------ Record ${i + 1}/${uniqueReports.length} (${r.facultyName}) ------`);
-    console.log(`[PDF]   Max lines: ${maxLines} (Att:${attLines}, App:${appLines}, Name:${nameLines}, Prog:${progLines})`);
-    console.log(`[PDF]   Row height: ${ROW_H}pt, Total needed: ${totalSpaceNeeded}pt`);
-    console.log(`[PDF]   Current Y: ${y.toFixed(1)}, Available: ${availableSpace.toFixed(1)}`);
-    
-    // FULL ROW CONTINUATION LOGIC - Option B Implementation
-    // Seamlessly split row content across pages when needed
-    
-    const rowBottomY = y - ROW_H;
-    const willOverflowPage = rowBottomY < BOTTOM_MARGIN;
-    // availableSpace already declared above, reuse it
-    
-    let partialRowHeight = ROW_H;  // Height to render on current page
-    let needsContinuation = false;
-    let continuationHeight = 0;     // Height for continuation page
-    
-    // FIXED: Apply split logic to ALL rows including first row
-    if (willOverflowPage) {
-      // Increase minimum space threshold for better splitting
-      const MIN_SPACE_FOR_MEANINGFUL_SPLIT = 100; // Need at least 100pt to show meaningful content
-      
-      if (availableSpace > MIN_SPACE_FOR_MEANINGFUL_SPLIT) {
-        // Enough space to start row on this page - will continue on next
-        needsContinuation = true;
-        partialRowHeight = availableSpace - ROW_GAP; // Use available space
-        continuationHeight = ROW_H - partialRowHeight;
-        console.log(`[PDF]   📄 Row SPLITS: ${partialRowHeight.toFixed(1)}pt on page ${pageNumber}, ${continuationHeight.toFixed(1)}pt on page ${pageNumber + 1}`);
-      } else {
-        // Not enough space for meaningful content - move entire row to next page
-        console.log(`[PDF]   📄 Insufficient space (${availableSpace.toFixed(1)}pt) - moving entire row to new page`);
-        coverPage = pdfDoc.addPage([PW, PH]);
-        pageNumber++;
-        y = PH - 20;
-        console.log(`[PDF]   New page created, Y reset to: ${y.toFixed(1)}`);
-      }
-    } else {
-      console.log(`[PDF]   ✓ Row fits completely (ends at ${rowBottomY.toFixed(1)})`);
-    }
-    
-    // Mark that we've processed the first data row
-    isFirstDataRow = false;
-
-    // Draw main row border and white background (partial if splitting)
-    rect(coverPage, ML, y - partialRowHeight, CW, partialRowHeight, { 
-      borderColor: black, borderWidth: 0.5 
-    });
-
-    // Draw vertical cell dividers for each column
-    COLS.forEach((col, ci) => {
-      if (ci > 0) {
-        line(coverPage, col.x, y, col.x, y - partialRowHeight, 0.5, black);
-      }
-    });
-
-    // Draw cell content for each column
     const ffi = r.ffiScore;
     const ffiColor = ffi != null ? (ffi >= 4 ? green : ffi >= 3 ? amber : red) : black;
+    const respDisplay =
+      r.responsePercent != null
+        ? typeof r.responsePercent === "number"
+          ? r.responsePercent.toFixed(2) + "%"
+          : r.responsePercent + "%"
+        : "%";
 
-    const respDisplay = r.responsePercent != null
-      ? (typeof r.responsePercent === 'number' ? r.responsePercent.toFixed(2) + '%' : r.responsePercent + '%')
-      : '%';  // Show just % symbol if no percentage data available
+    // ---- build cells: wrapped with real metrics ----
+    const single = (t, f) => [{ text: sanitize(t), indent: 0, spacer: false, h: LH }];
+    const wrapIn = (t, ci) => wrapCell(t, COLS[ci].w - CELL_PAD_X * 2, timesFont, FS);
 
-    const cellValues = [
-      { v: String(i + 1), bold: true, center: true, noWrap: true }, // S.No - never wrap
-      { v: r.facultyName || "-" },
-      { v: codeBatch },
-      { v: cleanCourseName(r.programme)  || "-" },  // Clean course name (remove "submitted answer" garbage)
-      { v: r.semester   || "-", center: true, noWrap: true }, // Semester - never wrap
-      { v: ffi != null ? ffi.toFixed(2) : "-", color: ffiColor, bold: true, center: true, noWrap: true }, // FFI - never wrap
-      { v: respDisplay, center: true, noWrap: true }, // Response % - never wrap
-      { v: attText },
-      { v: appText },
-      { v: actionText }, // Use actionText instead of r.actionTaken
-      { v: "", sig: true },
+    const cells = [
+      { lines: single(String(i + 1)), font: timesBoldFont, center: true },
+      { lines: wrapIn(r.facultyName || "-", 1), font: timesFont },
+      { lines: wrapIn(codeBatch, 2), font: timesFont },
+      { lines: wrapIn(cleanCourseName(r.programme) || "-", 3), font: timesFont },
+      { lines: single(String(r.semester || "-")), font: timesFont, center: true },
+      { lines: single(ffi != null ? ffi.toFixed(2) : "-"), font: timesBoldFont, center: true, color: ffiColor },
+      { lines: single(respDisplay), font: timesFont, center: true },
+      { lines: wrapIn(attText, 7), font: timesFont },
+      { lines: wrapIn(appText, 8), font: timesFont },
+      { lines: wrapIn(String(actionText), 9), font: timesFont },
+      { lines: [], font: timesFont, sig: true },
     ];
 
-    // Store continuation data for each cell if row splits
-    const cellContinuationData = [];
+    // ---- signature block size (name wrapped inside the column) ----
+    const sigNameLines = withoutSignatures
+      ? []
+      : wrapName(r.facultyName || "", sigCol.w - 6, timesFont, SIG_NAME_FS);
+    const sigBlockH = withoutSignatures
+      ? 0
+      : 4 + SIG_IMG_H + 3 + Math.max(1, sigNameLines.length) * SIG_NAME_LH + 3;
 
-    cellValues.forEach((val, ci) => {
-      const col = COLS[ci];
+    // ---- exact content height of the row ----
+    const sumH = (lines) => lines.reduce((s, l) => s + l.h, 0);
+    const contentH = Math.max(...cells.map((c) => sumH(c.lines)), LH);
+    const rowNeed = Math.max(contentH + PAD_TOP + PAD_BOT, sigBlockH);
 
-      if (val.sig) {
-        // Faculty signature cell - DON'T render yet, will render after continuation completes
-        cellContinuationData.push({ 
-          lines: [], 
-          isSig: true, 
-          facultyName: r.facultyName,
-          col: col 
-        });
-        return;
-      }
+    // ---- decide: fits / split / move to next page ----
+    let avail = y - BOTTOM_MARGIN;
+    if (rowNeed > avail && avail < Math.max(MIN_SPLIT, sigBlockH)) {
+      newTablePage();
+    }
 
-      // Regular text cell - word wrapping
-      const textValue = val.v || "";
-      
-      let allLines;
-      if (val.noWrap) {
-        allLines = [textValue];
-      } else {
-        // Split by \n — empty segments (\n\n between bullets) become spacer lines
-        allLines = textValue.split("\n").flatMap((seg, segIdx, segs) => {
-          if (seg.trim() === "") {
-            // Empty line between bullets — add a half-height spacer
-            return [""];
-          }
+    const pos = cells.map(() => 0);
+    while (true) {
+      avail = y - BOTTOM_MARGIN;
+      const limit = avail - PAD_TOP - PAD_BOT;
 
-          const isBulletLine = seg.startsWith("\u2022 ");
-          const bulletIndent = isBulletLine ? 10 : 0; // extra indent for wrapped continuation of bullet
-          const words = seg.split(/\s+/).filter(w => w);
-          const wrappedLines = [];
-          let currentLine = "";
-
-          const fontToUse = val.bold ? boldFont : timesFont;
-          const maxWidth = col.w - 14 - bulletIndent;
-
-          words.forEach((word) => {
-            const cleanWord = word.trim();
-            if (!cleanWord) return;
-
-            const testLine = currentLine ? currentLine + " " + cleanWord : cleanWord;
-            const testWidth = fontToUse.widthOfTextAtSize(testLine, FS);
-
-            if (testWidth <= maxWidth) {
-              currentLine = testLine;
-            } else {
-              if (currentLine) wrappedLines.push(currentLine);
-
-              const wordWidth = fontToUse.widthOfTextAtSize(cleanWord, FS);
-              if (wordWidth > maxWidth) {
-                let remaining = cleanWord;
-                while (remaining.length > 0) {
-                  let breakPoint = remaining.length;
-                  let testStr = remaining;
-                  while (fontToUse.widthOfTextAtSize(testStr, FS) > maxWidth && testStr.length > 1) {
-                    breakPoint--;
-                    testStr = remaining.substring(0, breakPoint);
-                  }
-                  if (breakPoint > 0) {
-                    wrappedLines.push(remaining.substring(0, breakPoint) + (breakPoint < remaining.length ? "-" : ""));
-                    remaining = remaining.substring(breakPoint);
-                  } else {
-                    wrappedLines.push(remaining.substring(0, 1));
-                    remaining = remaining.substring(1);
-                  }
-                }
-                currentLine = "";
-              } else {
-                currentLine = cleanWord;
-              }
-            }
-          });
-
-          if (currentLine) wrappedLines.push(currentLine);
-
-          // Tag each wrapped line with its bullet indent so renderer knows
-          return wrappedLines.map((l, li) => ({
-            text: l,
-            indent: li === 0 ? 0 : bulletIndent, // first line keeps bullet, continuation indented
-            isSpacer: false,
-          }));
-        }).map(l => typeof l === "string"
-          ? { text: l, indent: 0, isSpacer: l === "" }
-          : l
-        );
-      }
-      
-      // Render ALL lines for this cell (no truncation)
-      // If continuation is needed, lines will naturally continue on next page
-      const visibleLines = allLines;
-      
-      // Render lines on current page
-      for (let li = 0; li < visibleLines.length; li++) {
-        const lineObj = visibleLines[li];
-        const l = typeof lineObj === "object" ? lineObj.text : lineObj;
-        const indent = typeof lineObj === "object" ? (lineObj.indent || 0) : 0;
-        const isSpacer = typeof lineObj === "object" ? lineObj.isSpacer : false;
-        const spacerH = isSpacer ? LH * 0.2 : LH; // spacer lines use minimal height
-
-        const fontToUse = val.bold ? boldFont : timesFont;
-        const lw = l ? fontToUse.widthOfTextAtSize(l, FS) : 0;
-        const tX = val.center ? col.x + (col.w - lw) / 2 : col.x + 6 + indent;
-        const lineY = y - 12 - li * LH;
-        
-        // Only render if line is within current row bounds (not below page bottom)
-        if (lineY >= BOTTOM_MARGIN) {
-          if (!isSpacer && l) txt(coverPage, l, tX, lineY, FS, fontToUse, val.color || black);
-        } else if (needsContinuation && lineY < BOTTOM_MARGIN) {
-          break;
+      // how many lines of each cell fit on this page
+      const take = cells.map((c, ci) => {
+        let h = 0, n = 0;
+        while (pos[ci] + n < c.lines.length && h + c.lines[pos[ci] + n].h <= limit) {
+          h += c.lines[pos[ci] + n].h;
+          n++;
         }
-      }
-      
-      // Calculate which lines need continuation (lines that didn't fit)
-      const linesRendered = Math.floor((y - BOTTOM_MARGIN + 12) / LH);
-      const remainingLines = needsContinuation ? visibleLines.slice(linesRendered) : [];
-      
-      // Store continuation data
-      cellContinuationData.push({
-        lines: remainingLines,
-        val: val,
-        col: col,
-        colIndex: ci
+        return { n, h };
       });
-    });
+      const finished = cells.every((c, ci) => pos[ci] + take[ci].n >= c.lines.length);
+      const usedH = Math.max(...take.map((t) => t.h), 0);
 
-    // Update Y coordinate after drawing this row
-    const yBeforeUpdate = y;
-    y -= partialRowHeight + ROW_GAP;
-    console.log(`[PDF]   Row drawn, Y updated: ${yBeforeUpdate.toFixed(1)} → ${y.toFixed(1)} (moved ${(partialRowHeight + ROW_GAP).toFixed(1)}pt)`);
-    
-    // CONTINUATION LOGIC - Render remaining content on next page
-    if (needsContinuation) {
-      // Check if there's ANY actual content to continue (not just empty cells)
-      const hasContinuationContent = cellContinuationData.some(
-        cellData => cellData && cellData.lines && cellData.lines.length > 0
-      );
-      
-      if (!hasContinuationContent) {
-        console.log(`[PDF]   ⚠️  No continuation content needed - skipping continuation page`);
-        needsContinuation = false; // Cancel continuation
-      } else {
-        console.log(`[PDF]   📄 Creating continuation page for remaining ${continuationHeight.toFixed(1)}pt`);
-        
-        // Create new page for continuation
-        coverPage = pdfDoc.addPage([PW, PH]);
-        pageNumber++;
-        y = PH - 20;
+      if (!finished && usedH === 0) {
+        newTablePage();
+        continue;
+      }
 
-        // Recalculate actual continuation height from real remaining lines
-        let maxContLines = 1;
-        cellContinuationData.forEach(cellData => {
-          if (!cellData || cellData.isSig || !cellData.lines) return;
-          const realLines = cellData.lines.filter(l => {
-            const txt = typeof l === "object" ? l.text : l;
-            return txt && txt.trim();
-          }).length;
-          if (realLines > maxContLines) maxContLines = realLines;
-        });
-        const actualContHeight = Math.max(MIN_ROW_HEIGHT, maxContLines * LH + ROW_PADDING);
-        continuationHeight = actualContHeight;
-        
-        // Draw continuation row structure using actual height
-        rect(coverPage, ML, y - continuationHeight, CW, continuationHeight, { 
-          borderColor: black, borderWidth: 0.5 
-        });
-        
-        // Draw vertical dividers
-        COLS.forEach((col, ci) => {
-          if (ci > 0) {
-            line(coverPage, col.x, y, col.x, y - continuationHeight, 0.5, black);
+      // the row box is exactly as tall as its text (plus padding)
+      let chunkH = Math.max(usedH, finished ? LH : 0) + PAD_TOP + PAD_BOT;
+      if (finished) chunkH = Math.max(chunkH, sigBlockH);
+
+      rect(page, ML, y - chunkH, CW, chunkH, { borderColor: black, borderWidth: 0.5 });
+      COLS.forEach((col, ci) => {
+        if (ci > 0) line(page, col.x, y, col.x, y - chunkH, 0.5, black);
+      });
+
+      cells.forEach((c, ci) => {
+        if (c.sig) return;
+        const col = COLS[ci];
+        let ly = y - PAD_TOP;
+        for (let k = 0; k < take[ci].n; k++) {
+          const L = c.lines[pos[ci] + k];
+          if (!L.spacer && L.text) {
+            const lw = c.font.widthOfTextAtSize(L.text, FS);
+            const tx = c.center
+              ? col.x + Math.max(1, (col.w - lw) / 2)
+              : col.x + CELL_PAD_X + L.indent;
+            txt(page, L.text, tx, ly - FS, FS, c.font, c.color || black);
           }
-        });
-        
-        // Render continuation content for each cell
-        cellContinuationData.forEach((cellData, ci) => {
-          if (!cellData || cellData.lines.length === 0) {
-            // No continuation needed for this cell (e.g., signature, short text)
-            return;
-          }
-          
-          const { lines, val, col } = cellData;
-          
-          // Render remaining lines
-          lines.forEach((lineObj, li) => {
-            const l = typeof lineObj === "object" ? lineObj.text : lineObj;
-            const indent = typeof lineObj === "object" ? (lineObj.indent || 0) : 0;
-            const isSpacer = typeof lineObj === "object" ? lineObj.isSpacer : false;
-            if (isSpacer || !l) return;
-            const fontToUse = val.bold ? boldFont : timesFont;
-            const lw = fontToUse.widthOfTextAtSize(l, FS);
-            const tX = val.center ? col.x + (col.w - lw) / 2 : col.x + 6 + indent;
-            const lineY = y - 12 - li * LH;
-            txt(coverPage, l, tX, lineY, FS, fontToUse, val.color || black);
-          });
-          
-          console.log(`[PDF]     Cell ${ci}: Rendered ${lines.length} continuation lines`);
-        });
-        
-        // Signature is rendered AFTER continuation completes (see below)
-        
-        // Update Y after continuation
-        y -= continuationHeight + ROW_GAP;
-        console.log(`[PDF]   Continuation complete, Y now: ${y.toFixed(1)}`);
-      }
-    }
-    
-    // NOW render signature - AFTER all content (including continuation) is complete
-    // FIX: Calculate correct position inside the signature column box
-    const sigCol = COLS[COLS.length - 1];
-    const sigData = cellContinuationData.find(cd => cd && cd.isSig);
-    
-    if (sigData && !withoutSignatures) {
-      // Determine which page and row the signature should be on
-      let sigY;
-      if (needsContinuation) {
-        // Signature goes on continuation page at bottom of continuation row
-        sigY = y + continuationHeight - 12; // Near bottom of continuation row
-      } else {
-        // Signature goes on current page at bottom of current row
-        sigY = y + partialRowHeight - 12; // Near bottom of current row
-      }
-      
-      const sigImg = facultySigMap[(sigData.facultyName || "").toLowerCase().trim()];
-      if (sigImg) {
-        const sW = 40, sH = 18;  // smaller signature size to fit tight rows
-        const sigX = sigData.col.x + (sigData.col.w - sW) / 2;
-        const sigImageY = sigY - sH;
-        coverPage.drawImage(sigImg, { x: sigX, y: sigImageY, width: sW, height: sH });
-      } else {
-        // Draw placeholder line
-        line(coverPage, sigData.col.x + 4, sigY, 
-             sigData.col.x + sigData.col.w - 4, sigY, 0.5, gray);
-      }
-      
-      // Faculty name below signature — split into two lines if too wide
-      const nameStr = sigData.facultyName || "";
-      const sigColW = sigData.col.w - 6; // usable width
-      const nameFontSize = 6;  // smaller font to fit better
-      const rowH = needsContinuation ? continuationHeight : partialRowHeight;
-
-      if (rowH >= 28) {
-        const fullNameW = timesFont.widthOfTextAtSize(nameStr, nameFontSize);
-        if (fullNameW <= sigColW) {
-          // Fits in one line — centre it
-          const nameX = sigData.col.x + Math.max(1, (sigData.col.w - fullNameW) / 2);
-          txt(coverPage, nameStr, nameX, sigY - 22, nameFontSize, timesFont, gray);
-        } else {
-          // Split at middle word boundary into two lines
-          const words = nameStr.split(" ");
-          const mid = Math.ceil(words.length / 2);
-          const line1 = words.slice(0, mid).join(" ");
-          const line2 = words.slice(mid).join(" ");
-          const l1W = timesFont.widthOfTextAtSize(line1, nameFontSize);
-          const l2W = timesFont.widthOfTextAtSize(line2, nameFontSize);
-          // Clamp X so text never goes outside the column
-          const l1X = Math.max(sigData.col.x + 1, sigData.col.x + (sigData.col.w - Math.min(l1W, sigColW)) / 2);
-          const l2X = Math.max(sigData.col.x + 1, sigData.col.x + (sigData.col.w - Math.min(l2W, sigColW)) / 2);
-          txt(coverPage, line1, l1X, sigY - 20, nameFontSize, timesFont, gray);
-          if (line2) txt(coverPage, line2, l2X, sigY - 28, nameFontSize, timesFont, gray);
+          ly -= L.h;
         }
+        pos[ci] += take[ci].n;
+      });
+
+      // signature goes in the LAST chunk of the row
+      if (finished && !withoutSignatures) {
+        const topY = y - 4;
+        const sigImg = facultySigMap[(r.facultyName || "").toLowerCase().trim()];
+        if (sigImg) {
+          const s = Math.min((sigCol.w - 12) / sigImg.width, SIG_IMG_H / sigImg.height, 1);
+          const w = sigImg.width * s;
+          const h = sigImg.height * s;
+          page.drawImage(sigImg, {
+            x: sigCol.x + (sigCol.w - w) / 2,
+            y: topY - SIG_IMG_H + (SIG_IMG_H - h) / 2,
+            width: w,
+            height: h,
+          });
+        } else {
+          line(page, sigCol.x + 4, topY - SIG_IMG_H + 4, sigCol.x + sigCol.w - 4, topY - SIG_IMG_H + 4, 0.5, gray);
+        }
+        const nameTop = topY - SIG_IMG_H - 3;
+        sigNameLines.forEach((l, k) => {
+          const lw = timesFont.widthOfTextAtSize(l, SIG_NAME_FS);
+          const lx = sigCol.x + Math.max(1, (sigCol.w - lw) / 2);
+          txt(page, l, lx, nameTop - 6 - k * SIG_NAME_LH, SIG_NAME_FS, timesFont, gray);
+        });
       }
+
+      y -= chunkH;
+      if (finished) break;
+      newTablePage(); // row continues on the next page (with table header repeated)
     }
   }
 
-  console.log(`[PDF] ========== Table Rendering Complete ==========`);
-  console.log(`[PDF] Total pages used: ${pageNumber}`);
-  console.log(`[PDF] Final Y position: ${y.toFixed(1)}`);
+  console.log(`[PDF] Table done. Pages: ${pageNumber}, final Y: ${y.toFixed(1)}`);
 
-  // ── Footer note ───────────────────────────────────────────────────────────
-  // Minimize white space - use compact signature section
-  const SIGNATURE_HEIGHT = 90; // Reduced from 150pt - more compact
-  const spaceForSignatures = y - BOTTOM_MARGIN;
-  
-  console.log(`[PDF] Checking signature space: need ${SIGNATURE_HEIGHT}pt, have ${spaceForSignatures.toFixed(1)}pt`);
-  
-  if (spaceForSignatures < SIGNATURE_HEIGHT) {
-      console.log(`[PDF] Creating final page for signatures`);
-      coverPage = pdfDoc.addPage([PW, PH]);
-      pageNumber++;
-      y = PH - TOP_MARGIN;
+  // ── Footer note + HOD / Pro-VC signatures ─────────────────────────────────
+  const SIGNATURE_HEIGHT = 80;
+  if (y - BOTTOM_MARGIN < SIGNATURE_HEIGHT) {
+    newPlainPage();
   }
+  y -= 5;
 
-  y -= 5; // Minimal spacing before footer (reduced from 10pt)
-
-  rect(coverPage, ML, y - 18, CW, 18, {
-    borderColor: black, borderWidth: 0.5
-  });
-  txt(coverPage, "FFI & Suggestions are noted for further improvement.",
-      ML + 4, y - 13, 9, font, black);
+  rect(page, ML, y - 18, CW, 18, { borderColor: black, borderWidth: 0.5 });
+  txt(page, "FFI & Suggestions are noted for further improvement.", ML + 4, y - 13, 9, font, black);
   y -= 18;
 
-  // ── Signature section (HOD | PRO-VC) — Signature first, then name, then position ──────
-  const sBH = 50;  // Reduced signature row height (was 60pt)
-  const sY  = y;
+  const sBH = 50;
+  const sY = y;
   const c2W = Math.floor(CW / 2);
-  const c3W = CW - Math.floor(CW / 2);
+  const c3W = CW - c2W;
   const c2X = ML;
-  const c3X = ML + Math.floor(CW / 2);
+  const c3X = ML + c2W;
 
-  // Single row - no label row
-  rect(coverPage, ML, sY - sBH, CW, sBH, {
-    borderColor: black, borderWidth: 0.5
-  });
-  line(coverPage, c3X, sY, c3X, sY - sBH, 0.5, black);
+  rect(page, ML, sY - sBH, CW, sBH, { borderColor: black, borderWidth: 0.5 });
+  line(page, c3X, sY, c3X, sY - sBH, 0.5, black);
 
-  // HOD: Signature first (top), then name, then position
+  // HOD
   if (hodSig && !withoutSignatures) {
     const sc = Math.min((c2W - 10) / hodSig.width, 25 / hodSig.height, 1);
-    coverPage.drawImage(hodSig, {
-      x: c2X + 4, y: sY - 28,
-      width: hodSig.width * sc, height: hodSig.height * sc
-    });
+    page.drawImage(hodSig, { x: c2X + 4, y: sY - 28, width: hodSig.width * sc, height: hodSig.height * sc });
   } else {
-    line(coverPage, c2X + 4, sY - 20, c2X + c2W - 8, sY - 20, 0.5, gray);
+    line(page, c2X + 4, sY - 20, c2X + c2W - 8, sY - 20, 0.5, gray);
   }
-  txt(coverPage, (hodUser && hodUser.name) || "Abhishek Dixit",
-      c2X + 4, sY - 36, 9, boldFont, black);
-  txt(coverPage, "HOD/Dean", c2X + 4, sY - 48, 7, timesFont, gray);
+  txt(page, (hodUser && hodUser.name) || "Abhishek Dixit", c2X + 4, sY - 36, 9, boldFont, black);
+  txt(page, "HOD/Dean", c2X + 4, sY - 48, 7, timesFont, gray);
 
-  // Pro-VC: Signature first (top), then name, then position
+  // Pro-VC
   if (vcSig && !withoutSignatures && !hideVCSignature) {
     const sc = Math.min((c3W - 10) / vcSig.width, 25 / vcSig.height, 1);
-    coverPage.drawImage(vcSig, {
-      x: c3X + 4, y: sY - 28,
-      width: vcSig.width * sc, height: vcSig.height * sc
-    });
+    page.drawImage(vcSig, { x: c3X + 4, y: sY - 28, width: vcSig.width * sc, height: vcSig.height * sc });
   } else {
-    line(coverPage, c3X + 4, sY - 20, c3X + c3W - 8, sY - 20, 0.5, gray);
+    line(page, c3X + 4, sY - 20, c3X + c3W - 8, sY - 20, 0.5, gray);
   }
-  txt(coverPage, "Dr. Manjaree Pandit",
-      c3X + 4, sY - 36, 9, boldFont, black);
-  txt(coverPage, "Pro-VC", c3X + 4, sY - 48, 7, timesFont, gray);
+  txt(page, (vcUser && vcUser.name) || "", c3X + 4, sY - 36, 9, boldFont, black);
+  txt(page, "Pro-VC", c3X + 4, sY - 48, 7, timesFont, gray);
 
-  // ── Append CSV PDFs with HOD + VC signature stamps ────────────────────────
-  function convertDriveLink(url) {
-    if (!url) return null;
-    // Handle /d/FILE_ID/ format
-    const m1 = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
-    if (m1) return "https://drive.google.com/uc?export=download&id=" + m1[1];
-    // Handle ?id= or open?id= format
-    const m2 = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
-    if (m2) return "https://drive.google.com/uc?export=download&id=" + m2[1];
-    return url;
+  // ── Preview watermark ─────────────────────────────────────────────────────
+  if (isPreview) {
+    pdfDoc.getPages().forEach((p) => {
+      p.drawText("PREVIEW", {
+        x: 230, y: 180, size: 90, font: boldFont,
+        color: rgb(0.85, 0.85, 0.85), rotate: degrees(30), opacity: 0.35,
+      });
+    });
   }
 
-  async function downloadWithRetry(url, retries = 3) {
-    // Check if it's a Google Drive link
-    const fileIdMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)|[?&]id=([a-zA-Z0-9_-]+)/);
-    
-    if (fileIdMatch) {
-      // Google Drive link - try service account first
-      const fileId = fileIdMatch[1] || fileIdMatch[2];
-      
-      try {
-        const { google } = require('googleapis');
-        
-        // Check if service account credentials are available
-        const clientEmail = process.env.GOOGLE_DRIVE_CLIENT_EMAIL;
-        const privateKey = process.env.GOOGLE_DRIVE_PRIVATE_KEY;
-        
-        if (clientEmail && privateKey) {
-          console.log('[PDF] Using service account to download Drive file:', fileId);
-          
-          // Create authentication
-          const auth = new google.auth.GoogleAuth({
-            credentials: {
-              client_email: clientEmail,
-              private_key: privateKey.replace(/\\n/g, '\n'),
-            },
-            scopes: ['https://www.googleapis.com/auth/drive.readonly'],
-          });
-          
-          const drive = google.drive({ version: 'v3', auth });
-          
-          // Download file using Drive API
-          const response = await drive.files.get({
-            fileId: fileId,
-            alt: 'media',
-          }, {
-            responseType: 'arraybuffer'
-          });
-          
-          const buf = Buffer.from(response.data);
-          
-          // Validate PDF header
-          const header = buf.subarray(0, 5).toString("latin1");
-          if (header !== "%PDF-") {
-            throw new Error("Downloaded response is not a PDF. Header: " + JSON.stringify(header));
-          }
-          if (buf.length < 1000) {
-            throw new Error("Downloaded PDF is too small");
-          }
-          
-          console.log(`[PDF] Valid PDF downloaded via service account: ${buf.length} bytes`);
-          return buf;
-        } else {
-          console.warn('[PDF] Service account credentials not found, falling back to public download');
-        }
-      } catch (error) {
-        console.error('[PDF] Service account download failed:', error.message);
-        console.log('[PDF] Falling back to public download method');
-      }
-    }
-    
-    // Fallback: Use public download (works if file is publicly accessible)
-    for (let attempt = 1; attempt <= retries; attempt++) {
-      try {
-        const res = await axios.get(url, {
-          responseType: "arraybuffer",
-          timeout: 40000,  // Increased from 20s to 40s for large files
-          headers: {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/153 Safari/537.36",
-            Accept: "application/pdf,*/*"
-          },
-          maxRedirects: 10,
-          validateStatus: status => status >= 200 && status < 300
-        });
-        const buf = Buffer.from(res.data);
-        // Must be a real PDF
-        const header = buf.subarray(0, 5).toString("latin1");
-        if (header !== "%PDF-") {
-          throw new Error("Downloaded response is not a PDF. Header: " + JSON.stringify(header));
-        }
-        if (buf.length < 1000) {
-          throw new Error("Downloaded PDF is too small");
-        }
-        console.log(`[PDF] Valid PDF downloaded: ${buf.length} bytes`);
-        return buf;
-      } catch (err) {
-        console.warn(`[PDF] Attempt ${attempt}/${retries}: ${err.message}`);
-        if (attempt < retries) {
-          await new Promise(resolve => setTimeout(resolve, 1500 * attempt));
-        }
-      }
-    }
-    return null;
-  }
-
-  // ── Append original faculty PDFs safely ─────────────────────────────────────
-  const seenLinks = new Set();
-  if (!isPreview) {
-    try {
-      const downloadQueue = [];
-      // ---------------------------------------------------------
-      // STEP 1: Build unique download queue
-      // ---------------------------------------------------------
-      for (let ri = 0; ri < uniqueReports.length; ri++) {
-        const rp = uniqueReports[ri];
-        const raw = rp.driveLink || rp.pdfLink;
-        if (!raw) continue;
-        if (String(raw).startsWith("uploaded:")) {
-          continue;
-        }
-        const lk = convertDriveLink(raw);
-        if (!lk) continue;
-        if (seenLinks.has(lk)) {
-          continue;
-        }
-        seenLinks.add(lk);
-        downloadQueue.push({ rp, lk });
-      }
-      console.log(`[PDF] Preparing ${downloadQueue.length} original PDF(s)`);
-
-      // ---------------------------------------------------------
-      // STEP 2: Download first
-      //
-      // IMPORTANT:
-      // We do NOT modify pdfDoc during downloading.
-      // ---------------------------------------------------------
-      const pLimit = require("p-limit");
-      const limit = pLimit(3);
-      const downloadResults = await Promise.all(
-        downloadQueue.map(({ rp, lk }) =>
-          limit(async () => {
-            try {
-              console.log("[PDF] Downloading for " + (rp.facultyName || "Unknown Faculty") + "...");
-              const data = await downloadWithRetry(lk, 3);
-              if (!data) {
-                return { rp, data: null, error: "PDF download failed" };
-              }
-              const buffer = Buffer.isBuffer(data) ? data : Buffer.from(data);
-              // Validate PDF header
-              const header = buffer.subarray(0, 5).toString("latin1");
-              if (header !== "%PDF-") {
-                return { rp, data: null, error: "Downloaded file is not a valid PDF. Header: " + JSON.stringify(header) };
-              }
-              if (buffer.length < 1000) {
-                return { rp, data: null, error: "Downloaded PDF is unexpectedly small" };
-              }
-              return { rp, data: buffer, error: null };
-            } catch (downloadErr) {
-              console.warn("[PDF] Download failed for " + (rp.facultyName || "Unknown Faculty") + ": " + downloadErr.message);
-              return { rp, data: null, error: downloadErr.message };
-            }
-          })
-        )
-      );
-      console.log(`[PDF] Download phase completed: ${downloadResults.length} file(s)`);
-
-      // ---------------------------------------------------------
-      // STEP 3: ONLY NOW modify pdfDoc
-      // ---------------------------------------------------------
-      for (const result of downloadResults) {
-        const { rp, data, error } = result;
-        if (!data) {
-          console.error("[PDF] ❌ SKIPPED " + (rp.facultyName || "Unknown Faculty") + " - Reason: " + (error || "No PDF data"));
-          continue;
-        }
-        try {
-          console.log("[PDF] Appending PDF for " + (rp.facultyName || "Unknown Faculty"));
-          // Load source PDF
-          const srcDoc = await PDFDocument.load(data);
-          const sourcePageIndices = srcDoc.getPageIndices();
-          if (!sourcePageIndices || sourcePageIndices.length === 0) {
-            console.warn("[PDF] No pages found for " + (rp.facultyName || "Unknown Faculty"));
-            continue;
-          }
-          // Remember where this faculty's pages start
-          const pagesBefore = pdfDoc.getPageCount();
-          // Copy pages
-          const copied = await pdfDoc.copyPages(srcDoc, sourcePageIndices);
-          // Add copied pages
-          for (const copiedPage of copied) {
-            pdfDoc.addPage(copiedPage);
-          }
-          console.log("[PDF] Added " + copied.length + " page(s) for " + (rp.facultyName || "Unknown Faculty"));
-
-          // -----------------------------------------------------
-          // STEP 4: Signature stamping
-          // -----------------------------------------------------
-          if (!withoutSignatures) {
-            try {
-              const fSig = facultySigMap[(rp.facultyName || "").toLowerCase().trim()];
-              const pdfjsLib = require("pdfjs-dist/legacy/build/pdf.js");
-              const rawUint8 = new Uint8Array(data);
-              const pdfJsDoc = await pdfjsLib.getDocument({
-                data: rawUint8,
-                useWorkerFetch: false,
-                isEvalSupported: false
-              }).promise;
-
-              let sigPageIdx = null;
-              let facItem = null;
-              let hodItem = null;
-              let vcItem = null;
-
-              // Find the page containing HOD (signature section at bottom)
-              for (let pi = 1; pi <= pdfJsDoc.numPages; pi++) {
-                const pg = await pdfJsDoc.getPage(pi);
-                const tc = await pg.getTextContent();
-                const items = Array.isArray(tc.items) ? tc.items : [];
-                
-                // Find HOD label (this marks the signature section)
-                const foundHod = items.find(item =>
-                  String(item.str || "").trim().toUpperCase() === "HOD" ||
-                  String(item.str || "").trim().includes("Head of Department")
-                );
-                
-                if (!foundHod) {
-                  continue;
-                }
-                
-                sigPageIdx = pi - 1;
-                hodItem = foundHod;
-                
-                // Get Y position of HOD (bottom section)
-                const hodY = Number(foundHod.transform?.[5]) || 0;
-                
-                // Find "Faculty Name & Signature" label ONLY in bottom section (near HOD)
-                // Filter items that are in the same bottom area (within 100 points of HOD)
-                const bottomItems = items.filter(item => {
-                  const itemY = Number(item.transform?.[5]) || 0;
-                  return Math.abs(itemY - hodY) < 100; // Within 100 points of HOD
-                });
-                
-                // Search specifically for "Faculty Name & Signature" in bottom section
-                facItem = bottomItems.find(item => {
-                  const value = String(item.str || "").trim();
-                  return value.includes("Faculty Name & Signature") || 
-                         value.includes("Faculty Name&Signature");
-                });
-                
-                // Fallback: Look for "Signature" near "Faculty" in bottom section
-                if (!facItem) {
-                  const facText = bottomItems.find(item => 
-                    String(item.str || "").includes("Faculty Name")
-                  );
-                  const sigText = bottomItems.find(item => 
-                    String(item.str || "").includes("Signature")
-                  );
-                  // If both found in bottom section, use the Faculty Name item
-                  if (facText && sigText) {
-                    facItem = facText;
-                  }
-                }
-                
-                vcItem = bottomItems.find(item => /PRO\s*-?\s*VC/i.test(String(item.str || "")));
-                break;
-              }
-
-              // Stamp signatures if signature page exists
-              if (sigPageIdx !== null) {
-                const targetPage = pdfDoc.getPage(pagesBefore + sigPageIdx);
-                const SIG_W = 75;
-                const drawSig = (sigImg, labelItem, defaultX, paddingX = 10, sigW = SIG_W) => {
-                  if (!sigImg) return;
-                  const itemX = labelItem ? Number(labelItem.transform?.[4]) || 0 : null;
-                  const itemW = labelItem ? Number(labelItem.width) || 0 : 0;
-                  const itemY = labelItem ? Number(labelItem.transform?.[5]) || 100 : 100;
-                  const x = itemX !== null ? itemX + itemW + paddingX : defaultX;
-                  const h = sigImg.width > 0 ? Math.min(sigW * (sigImg.height / sigImg.width), 22) : 18;
-                  targetPage.drawImage(sigImg, { x, y: itemY - 6, width: sigW, height: h });
-                };
-                drawSig(fSig, facItem, 250, 10);
-                drawSig(hodSig, hodItem, 380, 10);
-                // Pro-VC signature removed from individual faculty PDFs (only on cover page)
-                // drawSig(vcSig, vcItem, 545, 10, 45);
-                console.log("[PDF] Signatures stamped for " + (rp.facultyName || "Unknown Faculty"));
-              }
-            } catch (stampErr) {
-              // Signature failure must NEVER invalidate the final PDF.
-              console.warn("[PDF] Signature stamping skipped for " + (rp.facultyName || "Unknown Faculty") + ": " + stampErr.message);
-            }
-          }
-        } catch (appendErr) {
-          // One bad source PDF must not corrupt the complete final report.
-          console.warn("[PDF] Could not append PDF for " + (rp.facultyName || "Unknown Faculty") + ": " + appendErr.message);
-          continue;
-        }
-      }
-      console.log("[PDF] Original PDF append phase completed");
-      const successCount = downloadResults.filter(r => r.data !== null).length;
-      const failedCount = downloadResults.length - successCount;
-      console.log(`[PDF] ✅ Successfully appended: ${successCount} PDFs`);
-      if (failedCount > 0) {
-        console.error(`[PDF] ❌ Failed to append: ${failedCount} PDFs`);
-        const failedNames = downloadResults.filter(r => !r.data).map(r => r.rp.facultyName || "Unknown").join(", ");
-        console.error(`[PDF] Failed faculty PDFs: ${failedNames}`);
-      }
-    } catch (appendErr) {
-      console.warn("[PDF] Original PDF append phase failed. Returning main report only:", appendErr.message);
-    }
-  }
-
-  // ── Page numbers (REMOVED) ────────────────────────────────────────────────
-  // const total = pdfDoc.getPageCount();
-  // for (let pi = 0; pi < total; pi++) {
-  //   try {
-  //     pdfDoc.getPage(pi).drawText(String(pi + 1) + " / " + String(total), {
-  //       x: PW - 50, y: 8, size: 9, font, color: gray
-  //     });
-  //   } catch (e) {}
-  // }
-
-  // ── Final PDF generation with validation ──────────────────────────────────
-  const finalPdfBytes = await pdfDoc.save({ useObjectStreams: false });
-  const finalPdfBuffer = Buffer.from(finalPdfBytes);
-
-  // Final PDF validation
-  const finalHeader = finalPdfBuffer.subarray(0, 5).toString("latin1");
-  if (finalHeader !== "%PDF-") {
-    throw new Error("Final PDF generation failed: invalid PDF header " + JSON.stringify(finalHeader));
-  }
-  if (finalPdfBuffer.length < 1000) {
-    throw new Error("Final PDF generation failed: PDF is unexpectedly small (" + finalPdfBuffer.length + " bytes)");
-  }
-  console.log("[PDF] FINAL PDF READY:", finalPdfBuffer.length, "bytes");
-  return finalPdfBuffer;
+  const pdfBytes = await pdfDoc.save();
+  return Buffer.from(pdfBytes);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// GENERATE INDIVIDUAL FACULTY FEEDBACK REPORT PDF
-// ─────────────────────────────────────────────────────────────────────────────
-async function generateIndividualFacultyPDF(report) {
-  const User = require('../models/User');  // Add User model
-  
-  // ── Clean course name — remove "submitted answer" and similar text ─────────
-  function cleanCourseName(name) {
-    if (!name) return "";
-    return String(name)
-      .replace(/\bsubmitted\s+answers?\s*:?\s*-?\s*/gi, "") // Remove "submitted answer(s):-" or variations
-      .replace(/\bsubmitted\s+responses?\s*:?\s*-?\s*/gi, "")
-      .replace(/\bstudent\s+feedback\s*:?\s*-?\s*/gi, "")
-      .replace(/\s+/g, " ") // Normalize whitespace
-      .trim();
-  }
-  
-  const pdfDoc = await PDFDocument.create();
-  const font          = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  const boldFont      = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-  const timesFont     = await pdfDoc.embedFont(StandardFonts.TimesRoman);
-  const timesBoldFont = await pdfDoc.embedFont(StandardFonts.TimesRomanBold);
-
-  const black     = rgb(0.1, 0.1, 0.1);
-  const white     = rgb(1, 1, 1);
-  const gray      = rgb(0.45, 0.45, 0.45);
-  const lightGray = rgb(0.95, 0.96, 0.98);
-  const borderCol = rgb(0.82, 0.85, 0.9);
-  const navy      = rgb(0.08, 0.18, 0.38);
-  const green     = rgb(0.08, 0.52, 0.28);
-  const greenBg   = rgb(0.93, 0.98, 0.94);
-  const greenBdr  = rgb(0.68, 0.88, 0.72);
-  const amber     = rgb(0.72, 0.42, 0.05);
-  const amberBg   = rgb(0.99, 0.97, 0.91);
-  const amberBdr  = rgb(0.95, 0.82, 0.58);
-
-  const PW = 595.28; // A4 Portrait
-  const PH = 841.89;
-  const ML = 36;
-  const MR = 36;
-  const CW = PW - ML - MR; // ~523 pt
-
-  let page = pdfDoc.addPage([PW, PH]);
-  let curY = PH - 30;
-
-  function wrapText(text, maxChars) {
-    const words = (text || "").split(" ");
-    const lines = [];
-    let cur = "";
-    words.forEach(w => {
-      const next = cur ? cur + " " + w : w;
-      if (next.length <= maxChars) {
-        cur = next;
-      } else {
-        if (cur) lines.push(cur);
-        cur = w.length > maxChars ? w.substring(0, maxChars - 1) + "…" : w;
-      }
-    });
-    if (cur) lines.push(cur);
-    return lines;
-  }
-
-  function checkPageSpace(requiredSpace) {
-    if (curY - requiredSpace < 30) { // Reduced from 40 to minimize blank space
-      page = pdfDoc.addPage([PW, PH]);
-      curY = PH - 30; // Start closer to top (was 40, now 30 to reduce blank space)
-      return true;
-    }
-    return false;
-  }
-
-  // 1. Header Banner Image or Typography Header
-  let headerDrawn = false;
-  if (_headerBytes) {
-    try {
-      const headerImg = await pdfDoc.embedPng(_headerBytes);
-      const imgH = 54;
-      const imgW = CW;
-      page.drawImage(headerImg, { x: ML, y: curY - imgH, width: imgW, height: imgH });
-      curY -= (imgH + 12);
-      headerDrawn = true;
-    } catch (_) {}
-  }
-
-  if (!headerDrawn) {
-    page.drawRectangle({ x: ML, y: curY - 50, width: CW, height: 50, color: navy });
-    page.drawText("MADHAV INSTITUTE OF TECHNOLOGY & SCIENCE, GWALIOR", {
-      x: ML + 20, y: curY - 22, size: 12, font: boldFont, color: white
-    });
-    page.drawText("A Grant-in-Aid Autonomous Institute Under Govt. of M.P.", {
-      x: ML + 20, y: curY - 38, size: 9, font, color: white
-    });
-    curY -= 62;
-  }
-
-  // Document Title Bar
-  page.drawRectangle({ x: ML, y: curY - 24, width: CW, height: 24, color: lightGray, borderColor: borderCol, borderWidth: 1 });
-  page.drawText("FACULTY STUDENT FEEDBACK & AI ANALYSIS REPORT", {
-    x: ML + 12, y: curY - 16, size: 10, font: boldFont, color: navy
-  });
-  const dateStr = new Date(report.analyzedAt || report.createdAt || Date.now()).toLocaleDateString("en-IN", {
-    day: "2-digit", month: "short", year: "numeric"
-  });
-  page.drawText(`Date: ${dateStr}`, {
-    x: PW - MR - 100, y: curY - 16, size: 9, font, color: gray
-  });
-  curY -= 32;
-
-  // 2. Faculty & Course Details Card + FFI Score Badge
-  const infoH = 88;
-  page.drawRectangle({ x: ML, y: curY - infoH, width: CW, height: infoH, color: white, borderColor: borderCol, borderWidth: 1 });
-
-  // Left Column - Details
-  const leftX = ML + 14;
-  let lineY = curY - 18;
-  page.drawText("Faculty Name:", { x: leftX, y: lineY, size: 9, font: boldFont, color: gray });
-  page.drawText(report.facultyName || "—", { x: leftX + 85, y: lineY, size: 11, font: boldFont, color: black });
-
-  lineY -= 18;
-  page.drawText("Course / Code:", { x: leftX, y: lineY, size: 9, font: boldFont, color: gray });
-  page.drawText(report.subjectCode || "—", { x: leftX + 85, y: lineY, size: 10, font: boldFont, color: navy });
-
-  lineY -= 18;
-  page.drawText("Course Name / Sem:", { x: leftX, y: lineY, size: 9, font: boldFont, color: gray });
-  const cleanedProgramme = cleanCourseName(report.programme);
-  const progSem = [cleanedProgramme, report.semester ? `Semester ${report.semester}` : "", report.branch ? `(${report.branch})` : ""].filter(Boolean).join(" · ") || "—";
-  page.drawText(progSem, { x: leftX + 85, y: lineY, size: 9, font, color: black });
-
-  lineY -= 18;
-  page.drawText("Academic Year:", { x: leftX, y: lineY, size: 9, font: boldFont, color: gray });
-  const responsesText = report.responseCount != null ? ` · Total Responses: ${report.responseCount}` : "";
-  page.drawText((report.academicYear || "2025-2026") + responsesText, { x: leftX + 85, y: lineY, size: 9, font, color: black });
-
-  // Right Column - FFI Score Box
-  const badgeW = 120;
-  const badgeH = 68;
-  const badgeX = PW - MR - badgeW - 10;
-  const badgeY = curY - infoH + 10;
-  const ffi = report.ffiScore != null ? Number(report.ffiScore) : null;
-  const isHighFFI = ffi != null && ffi >= 3.5;
-  const scoreBg = isHighFFI ? greenBg : amberBg;
-  const scoreBdr = isHighFFI ? greenBdr : amberBdr;
-  const scoreCol = isHighFFI ? green : amber;
-
-  page.drawRectangle({ x: badgeX, y: badgeY, width: badgeW, height: badgeH, color: scoreBg, borderColor: scoreBdr, borderWidth: 1 });
-  page.drawText("FFI SCORE", { x: badgeX + 28, y: badgeY + badgeH - 14, size: 8, font: boldFont, color: scoreCol });
-  page.drawText(ffi != null ? ffi.toFixed(2) : "—", { x: badgeX + 24, y: badgeY + badgeH - 42, size: 24, font: boldFont, color: scoreCol });
-  page.drawText("Scale: 1.00 - 5.00", { x: badgeX + 22, y: badgeY + 10, size: 7.5, font, color: gray });
-
-  curY -= (infoH + 16);
-
-  // Helper to draw a comments section
-  function drawSection(title, items, isAppreciation) {
-    const list = Array.isArray(items) && items.length > 0 ? items : [];
-    checkPageSpace(60);
-
-    // Section Header
-    const secBg = isAppreciation ? greenBg : amberBg;
-    const secBdr = isAppreciation ? greenBdr : amberBdr;
-    const secTxt = isAppreciation ? green : amber;
-    const countTxt = `(${list.length} comments identified)`;
-
-    page.drawRectangle({ x: ML, y: curY - 22, width: CW, height: 22, color: secBg, borderColor: secBdr, borderWidth: 1 });
-    page.drawText(title, { x: ML + 10, y: curY - 15, size: 9.5, font: boldFont, color: secTxt });
-    page.drawText(countTxt, { x: ML + 240, y: curY - 15, size: 8.5, font, color: gray });
-    curY -= 28;
-
-    if (list.length === 0) {
-      page.drawText(isAppreciation ? "No specific student appreciation comments recorded." : "No critical student feedback comments needing attention.", {
-        x: ML + 14, y: curY - 10, size: 8.5, font, color: gray
-      });
-      curY -= 22;
-      return;
-    }
-
-    // List items with bullet points
-    list.forEach((comment, idx) => {
-      const wrapped = wrapText(comment, 95);
-      const itemH = (wrapped.length * 13) + 6;
-      checkPageSpace(itemH + 10);
-
-      // Bullet dot
-      page.drawCircle({ x: ML + 12, y: curY - 6, size: 2.2, color: secTxt });
-
-      wrapped.forEach((lineText, li) => {
-        page.drawText(lineText, {
-          x: ML + 22, y: curY - 9 - (li * 13), size: 8.5, font, color: black
-        });
-      });
-
-      curY -= itemH;
-    });
-
-    curY -= 8;
-  }
-
-  // 3. Positive Feedback (Appreciation)
-  drawSection("STUDENT APPRECIATION & POSITIVE FEEDBACK", report.appreciation || report.goodComments, true);
-
-  // 4. Feedback Needing Attention
-  drawSection("AREAS FOR IMPROVEMENT / FEEDBACK NEEDING ATTENTION", report.commentsNeedingAttention || report.badComments, false);
-
-  // 5. HOD Remarks & Action Taken (if any)
-  if (report.hodRemarks || report.actionTaken) {
-    checkPageSpace(60);
-    page.drawRectangle({ x: ML, y: curY - 20, width: CW, height: 20, color: lightGray, borderColor: borderCol, borderWidth: 1 });
-    page.drawText("HOD REMARKS & ACTION TAKEN", { x: ML + 10, y: curY - 14, size: 9, font: boldFont, color: navy });
-    curY -= 26;
-
-    const remarksText = [report.actionTaken ? `Action Taken: ${report.actionTaken}` : "", report.hodRemarks ? `Remarks: ${report.hodRemarks}` : ""].filter(Boolean).join("\n");
-    const wrappedRemarks = wrapText(remarksText, 95);
-    wrappedRemarks.forEach(lineText => {
-      checkPageSpace(15);
-      page.drawText(lineText, { x: ML + 14, y: curY - 9, size: 8.5, font, color: black });
-      curY -= 13;
-    });
-    curY -= 10;
-  }
-
-  // 6. Signatures & Verification Stamp Footer
-  checkPageSpace(70);
-  const footerY = curY - 50;
-  page.drawLine({ start: { x: ML, y: curY - 8 }, end: { x: PW - MR, y: curY - 8 }, thickness: 0.5, color: borderCol });
-
-  // Faculty Name & Signature Box (left side)
-  page.drawText("Faculty Name & Signature:", { x: ML + 10, y: footerY + 30, size: 8, font: boldFont, color: gray });
-  
-  // Draw faculty signature if available (signature at top)
-  // Search by "faculty name & signature" text
-  const facultyUser = await User.findOne({ 
-    name: { $regex: new RegExp("faculty name & signature", 'i') }
-  }).select('signatureImage name').lean();
-  
-  if (facultyUser?.signatureImage) {
-    try {
-      const facSigImg = await pdfDoc.embedPng(facultyUser.signatureImage);
-      const sigScale = Math.min(80 / facSigImg.width, 22 / facSigImg.height, 1);
-      page.drawImage(facSigImg, {
-        x: ML + 10,
-        y: footerY + 2,  // Signature at top (just below label)
-        width: facSigImg.width * sigScale,
-        height: facSigImg.height * sigScale
-      });
-    } catch (err) {
-      console.warn('[PDF] Failed to embed faculty signature:', err.message);
-    }
-  } else {
-    // Draw placeholder line if no signature
-    page.drawLine({ 
-      start: { x: ML + 10, y: footerY + 10 }, 
-      end: { x: ML + 90, y: footerY + 10 }, 
-      thickness: 0.5, 
-      color: gray 
-    });
-  }
-  
-  // Faculty name (below signature)
-  page.drawText(report.facultyName || "Faculty", { x: ML + 10, y: footerY - 14, size: 8.5, font: boldFont, color: black });
-  
-  if (report.facultyAcknowledged) {
-    const ackDate = report.facultyAcknowledgedAt ? new Date(report.facultyAcknowledgedAt).toLocaleDateString("en-IN") : "Verified";
-    page.drawText(`[Acknowledged - ${ackDate}]`, { x: ML + 10, y: footerY - 26, size: 7, font, color: green });
-  }
-
-  // HOD Signature Box (right side)
-  page.drawText("Head of Department (HOD):", { x: PW - MR - 160, y: footerY + 30, size: 8, font: boldFont, color: gray });
-  page.drawText("Verified & Submitted", { x: PW - MR - 160, y: footerY + 16, size: 8.5, font: boldFont, color: navy });
-
-  // Page Numbers (REMOVED)
-  // const totalPages = pdfDoc.getPageCount();
-  // for (let pi = 0; pi < totalPages; pi++) {
-  //   pdfDoc.getPage(pi).drawText(`Page ${pi + 1} of ${totalPages} · Confidential MITS Feedback System`, {
-  //     x: PW / 2 - 100, y: 15, size: 7.5, font, color: gray
-  //   });
-  // }
-
-  return Buffer.from(await pdfDoc.save());
-}
-
-module.exports = { generateFeedbackReportPDF, generateIndividualFacultyPDF };
+module.exports = { generateFeedbackReportPDF };
