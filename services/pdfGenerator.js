@@ -453,7 +453,7 @@ async function generateFeedbackReportPDF({
     // ---- cell texts ----
     const codeBatch = [r.subjectCode, r.batch].filter(Boolean).join("\n") || "-";
 
-    const attList = r.needsAttention || r.needs_attention || r.attention || r.improvements || [];
+    const attList = r.commentsNeedingAttention || r.needsAttention || r.needs_attention || r.attention || r.improvements || [];
     const attText = toBullets(attList).join("\n") || "-";
 
     const pcts = r.commentPercentages || {};
@@ -463,7 +463,7 @@ async function generateFeedbackReportPDF({
       .map(([k, v]) => "\u2022 " + k + ": " + v + "%")
       .join("\n");
     const allAppreciations = (r.appreciation || [])
-      .filter((c) => typeof c === "string" && c.trim() && c.trim().split(/\s+/).length >= 5)
+      .filter((c) => typeof c === "string" && c.trim())
       .map((x) => "\u2022 " + x.trim());
     const appText = [pctLines, ...allAppreciations].filter(Boolean).join("\n") || "-";
 
