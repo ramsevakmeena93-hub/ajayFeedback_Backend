@@ -216,11 +216,7 @@ router.post('/register', async (req, res) => {
       safeDepartment = '';
     }
 
-    // Ajay Meena — Admin
-    if (cleanEmail === '25tc1aj7@mitsgwl.ac.in') {
-      safeRole = 'admin';
-      safeDepartment = '';
-    }
+
 
     // Designated HOD.
     if (cleanEmail === DESIGNATED_HOD_EMAIL) {
@@ -1067,13 +1063,7 @@ router.post(
             DESIGNATED_HOD_DEPARTMENT;
         }
 
-        // Ajay Meena - Admin
-        if (
-          cleanEmail === '25tc1aj7@mitsgwl.ac.in'
-        ) {
-          assignedRole = 'admin';
-          assignedDepartment = '';
-        }
+
 
         const randomPassword =
           await bcrypt.hash(
@@ -1192,13 +1182,7 @@ router.post(
             DESIGNATED_HOD_DEPARTMENT;
         }
 
-        // Ajay Meena - Admin
-        if (
-          cleanEmail === '25tc1aj7@mitsgwl.ac.in'
-        ) {
-          correctedRole = 'admin';
-          correctedDept = '';
-        }
+
 
         /*
          * IMPORTANT:
