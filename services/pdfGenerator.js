@@ -594,13 +594,11 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
 
     const attText = (r.commentsNeedingAttention || [])
       .filter(c => c && c.trim().split(/\s+/).length >= 5)
-      .slice(0, 6)  // cap at 6 bullets max
       .length > 0
       ? (r.commentsNeedingAttention || [])
           .filter(c => c && c.trim().split(/\s+/).length >= 5)
-          .slice(0, 6)
           .map(x => "\u2022 " + x.trim())
-          .join("\n")
+          .join("\n")   // single line between bullets
       : "None";
 
     const pcts = r.commentPercentages || {};
@@ -609,10 +607,9 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
       .sort((a, b) => b[1] - a[1])
       .map(([k, v]) => "\u2022 " + k + ": " + v + "%")
       .join("\n");
-    // Preserve ALL appreciation comments but cap at 6 to balance row height
+    // Preserve ALL appreciation comments (no filtering)
     const allAppreciations = (r.appreciation || [])
       .filter(c => typeof c === "string" && c.trim() && c.trim().split(/\s+/).length >= 5)
-      .slice(0, 6)
       .map(x => "\u2022 " + x.trim());
     const appText = [pctLines, ...allAppreciations].filter(Boolean).join("\n") || "-";
 
@@ -639,11 +636,6 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
     const maxLines = Math.max(
       attLines,
       appLines,
-      nameLines,
-      progLines,
-      codeLines,
-      actionLines,
-      semLines,
       1
     );
     
