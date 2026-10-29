@@ -598,7 +598,7 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
       ? (r.commentsNeedingAttention || [])
           .filter(c => c && c.trim().split(/\s+/).length >= 5)
           .map(x => "\u2022 " + x.trim())
-          .join("\n\n")   // blank line between bullets for readability
+          .join("\n")   // single line between bullets
       : "None";
 
     const pcts = r.commentPercentages || {};
@@ -611,7 +611,7 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
     const allAppreciations = (r.appreciation || [])
       .filter(c => typeof c === "string" && c.trim() && c.trim().split(/\s+/).length >= 5)
       .map(x => "\u2022 " + x.trim());
-    const appText = [pctLines, ...allAppreciations].filter(Boolean).join("\n\n") || "-";
+    const appText = [pctLines, ...allAppreciations].filter(Boolean).join("\n") || "-";
 
     // Action Taken - check multiple possible field names
     const actionText = r.actionTaken || r.action_taken || r.hodAction || r.hodActionTaken || "-";
@@ -831,7 +831,7 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
         const l = typeof lineObj === "object" ? lineObj.text : lineObj;
         const indent = typeof lineObj === "object" ? (lineObj.indent || 0) : 0;
         const isSpacer = typeof lineObj === "object" ? lineObj.isSpacer : false;
-        const spacerH = isSpacer ? LH * 0.5 : LH; // spacer lines use half height
+        const spacerH = isSpacer ? LH * 0.2 : LH; // spacer lines use minimal height
 
         const fontToUse = val.bold ? boldFont : timesFont;
         const lw = l ? fontToUse.widthOfTextAtSize(l, FS) : 0;
