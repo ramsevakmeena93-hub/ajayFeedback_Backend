@@ -950,13 +950,31 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
              sigData.col.x + sigData.col.w - 4, sigY, 0.5, gray);
       }
       
-      // Faculty name below signature — only if row is tall enough
+      // Faculty name below signature — split into two lines if too wide
       const nameStr = sigData.facultyName || "";
-      const nameW = nameStr.length * 7 * 0.52;
-      const nameX = sigData.col.x + Math.max(1, (sigData.col.w - nameW) / 2);
+      const sigColW = sigData.col.w - 6; // usable width
+      const nameFontSize = 7;
       const rowH = needsContinuation ? continuationHeight : partialRowHeight;
+
       if (rowH >= 35) {
-        txt(coverPage, nameStr, nameX, sigY - 26, 7, timesFont, gray);
+        const fullNameW = timesFont.widthOfTextAtSize(nameStr, nameFontSize);
+        if (fullNameW <= sigColW) {
+          // Fits in one line
+          const nameX = sigData.col.x + Math.max(1, (sigData.col.w - fullNameW) / 2);
+          txt(coverPage, nameStr, nameX, sigY - 26, nameFontSize, timesFont, gray);
+        } else {
+          // Split at middle word boundary
+          const words = nameStr.split(" ");
+          const mid = Math.ceil(words.length / 2);
+          const line1 = words.slice(0, mid).join(" ");
+          const line2 = words.slice(mid).join(" ");
+          const l1W = timesFont.widthOfTextAtSize(line1, nameFontSize);
+          const l2W = timesFont.widthOfTextAtSize(line2, nameFontSize);
+          const l1X = sigData.col.x + Math.max(1, (sigData.col.w - l1W) / 2);
+          const l2X = sigData.col.x + Math.max(1, (sigData.col.w - l2W) / 2);
+          txt(coverPage, line1, l1X, sigY - 22, nameFontSize, timesFont, gray);
+          if (line2) txt(coverPage, line2, l2X, sigY - 31, nameFontSize, timesFont, gray);
+        }
       }
     }
   }
