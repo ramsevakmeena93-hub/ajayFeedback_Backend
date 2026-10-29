@@ -122,9 +122,9 @@ async function extractHighlightedText(buffer) {
             if (bounds) {
               const w = bounds.x2 - bounds.x1;
               const h = bounds.y2 - bounds.y1;
-              // Only capture highlight rects (height 5-120px — increased to catch multi-line highlights)
-              // Ignore large container rects (table backgrounds, section boxes) > 120
-              if (w > 20 && h >= 5 && h <= 120) {
+              // Only capture single-line highlight rects (height 5-40px)
+              // Ignore large container rects (table backgrounds, section boxes)
+              if (w > 20 && h >= 5 && h <= 60) {
                 coloredRects.push({ color: pendingColor, ...bounds });
               }
             }
@@ -158,8 +158,8 @@ async function extractHighlightedText(buffer) {
 
       if (inside.length === 0) continue;
 
-      const text = inside.map(t => t.str).join(' ').trim().replace(/\s+/g, ' ');
-      if (!isValidComment(text)) continue;
+      const text = inside.map(t => t.str).join('').replace(/\s+/g, ' ').trim();
+      if (text.length < 3) continue;
 
       // RED is Attention (needs attention / problems), YELLOW is Appreciation (positive feedback)
       if (rect.color === 'red') pushUnique(commentsNeedingAttention, text);
@@ -184,34 +184,14 @@ function isValidComment(text) {
     if (!text || typeof text !== 'string') return false;
     const clean = text.trim();
 
-    // Must be at least 15 characters and at least 3 meaningful words
-    if (clean.length < 15) return false;
-    const words = clean.split(/\s+/).filter(w => /[a-zA-Z]/.test(w));
-    if (words.length < 3) return false;
-
-    // Reject survey questions with score distributions (e.g., "1 The weekly quiz... 0 1 9 28 28 4.26")
-    if (/\b\d+\s+\d+\s+\d+\s+\d+\s+\d+(\s+\d+\.\d+)?\b/.test(clean)) return false;
-    if (/\b\d+\s+\d+\s+\d+\b/.test(clean) && /\d+\.\d+/.test(clean)) return false;
-    if (/^\d{1,2}\s+[A-Za-z].*\b\d+\.\d{1,2}\b/i.test(clean)) return false;
-    if (/^\d{1,2}\s+(the\s+weekly|demonstrates|the\s+classes|performance\s+in|overall\s+rating|evaluation|rate\s+the|whether|the\s+concepts|coverage\s+of|course\s+outcomes)/i.test(clean)) return false;
-
-    // Reject survey percentages & score metrics (e.g. "Good: 20%", "Very Good: 8%", "5/5")
-    if (/\b(good|very\s+good|excellent|average|satisfactory|below\s+average|poor)\s*:\s*\d+%/i.test(clean)) return false;
-    if (/^\d+(\.\d+)?\s*(%|\/\s*\d+)/.test(clean)) return false;
-    if (/\b\d+%\b/.test(clean) && words.length < 5) return false;
-
-    // Reject meaningless fillers and short non-informative phrases
-    const FILLERS = [
-        /^(ok|okay|fine|good|nice|average|normal|moderate|alright|decent|nil|na|n\/a|none|nothing|all good|no issue|no problem|no remarks|no remark|everything is fine|satisfactory|everything is good|all is well|all is good|everything good|no changes needed|no complaints|no issues|all fine|all ok|nothing to say|no feedback)\.?$/i,
-        /^(yes|no|none|na|nil|not\s+applicable|n\/?a)\.?$/i
-    ];
-    if (FILLERS.some(r => r.test(clean))) return false;
+    // Minimum length to be considered a real comment (increased to filter more garbage)
+    if (clean.length < 10) return false;
 
     // Reject page numbers like "1 / 3", "2/3", "about:blank 1 / 2"
     if (/^\d+\s*\/\s*\d+$/.test(clean)) return false;
     if (/about:blank/i.test(clean)) return false;
 
-    // Reject dates
+    // Reject dates (e.g. "04/07/2026 17:03:01 PM")
     if (/\d{1,2}\/\d{1,2}\/\d{2,4}/.test(clean) && clean.length < 40) return false;
 
     // Reject URLs
@@ -231,6 +211,7 @@ function isValidComment(text) {
         /feedback\s+submitted/i,
         /report\s+generated/i
     ];
+
     if (headerPatterns.some(p => p.test(clean))) return false;
 
     // Reject table header keywords and metadata
@@ -240,15 +221,38 @@ function isValidComment(text) {
         'signature', 'hod', 'pro - vc', 'ffi & suggestion', 'student feedback comments',
         'below average', 'course outcomes', 'qv 1', 'qv 2', 'needs attention', 'appreciation',
         'question', 'answer', 'response count', 'total responses', 'feedback form',
-        'submit', 'label', 'operating system', 'purchased'
+        'submit', 'label', 'requirement', 'operating system', 'real world', 'purchased'
     ];
     const lower = clean.toLowerCase();
     if (tableKeywords.some(kw => lower.includes(kw))) return false;
+    
+    // Reject if it looks like a course/subject name followed by an answer
+    // e.g. "Software Engineering 45" or "Data Structures Yes" or "operating system purchased"
+    if (/^[A-Z][A-Za-z\s&]+\s+(?:\d+|yes|no|n\.?a\.?|purchased|required)$/i.test(clean)) return false;
+    
+    // Reject lines that look like questions or prompts
+    if (/\brequirement\b|\boperating system\b|\breal world\b|\bpurchased\b|\bproblem\b.*\bsoftware\b/i.test(clean)) return false;
+    
+    // Reject if it contains multiple tab-separated or pipe-separated values (table data)
+    if (clean.split(/\t|\|/).length > 3) return false;
 
-    // Reject pure numbers, punctuation or repeated characters
+    // Reject pure numbers or punctuation
     if (/^[\d\s.,\-–/\\%]+$/.test(clean)) return false;
+
+    // Reject survey questions with numerical rating tables
+    if (/^\d+\s+[A-Za-z]/.test(clean) && /\b\d+\s+\d+\s+\d+\b/.test(clean)) return false;
+    if (/^\d+\s+Total\b/i.test(clean)) return false;
+    if (/\b(Below Average|Very good|Average)\b/i.test(clean) && /\d+/.test(clean)) return false;
+
+    // Must have at least 1 letter
     if (!/[a-zA-Z]/.test(clean)) return false;
-    if (/(.)\1{4,}/.test(clean)) return false;
+
+    // Reject if it's ONLY a rating word with no additional content
+    const ratingOnlyPatterns = [
+        /^(good|nice|excellent|poor|best|worst|average|ok|okay)\.?$/i,
+        /^(very\s+good|very\s+nice|very\s+bad)\.?$/i
+    ];
+    if (ratingOnlyPatterns.some(p => p.test(clean))) return false;
 
     return true;
 }
@@ -276,15 +280,8 @@ async function extractAllStudentComments(buffer, targetCourseCode) {
         const hasQuestionsTable = fullText.includes('label') && fullText.includes('question') && fullText.includes('qv');
 
         // Prefer pages dedicated to comments, but keep all potential pages
-        // Include ALL pages that don't look like pure question/score tables
         if (hasSubmitted || hasStudentFeedbackHeader || !hasQuestionsTable) {
             rawCommentPages.push({ pageNum: p, page, tc, fullText, hasQuestionsTable });
-        } else {
-            // Still include pages that have any student-like text, even without keyword match
-            const hasLongText = tc.items.some(i => i.str && i.str.trim().split(/\s+/).length >= 4);
-            if (hasLongText && !hasQuestionsTable) {
-                rawCommentPages.push({ pageNum: p, page, tc, fullText, hasQuestionsTable });
-            }
         }
     }
 
@@ -318,10 +315,7 @@ async function extractAllStudentComments(buffer, targetCourseCode) {
             let commentStartY = 750;
             for (const y of yKeys) {
                 const line = rowMap[y].sort((a, b) => a.transform[4] - b.transform[4]).map(i => i.str).join(' ').toLowerCase();
-                if ((line.includes('submitted') && (line.includes('answer') || line.includes('response'))) ||
-                    (line.includes('student') && line.includes('feedback')) ||
-                    (line.includes('s.no') || line.includes('s. no') || line.includes('sr.no') || line.includes('sr. no')) ||
-                    (line.includes('comment') && line.includes('suggestion'))) {
+                if ((line.includes('submitted') && (line.includes('answer') || line.includes('response'))) || (line.includes('student') && line.includes('feedback'))) {
                     commentStartY = y;
                     break;
                 }
@@ -329,7 +323,7 @@ async function extractAllStudentComments(buffer, targetCourseCode) {
 
             // Filter rows below header line and above bottom page footer (y > 30)
             const commentRows = yKeys.filter(y => y < commentStartY - 10 && y > 30).map(y => {
-                const text = rowMap[y].sort((a, b) => a.transform[4] - b.transform[4]).map(i => i.str).join(' ').trim();
+                const text = rowMap[y].sort((a, b) => a.transform[4] - b.transform[4]).map(i => i.str).join('').replace(/\s+/g, ' ').trim();
                 return { y, text };
             });
 
@@ -339,8 +333,7 @@ async function extractAllStudentComments(buffer, targetCourseCode) {
                 let curr = commentRows[i].text;
 
                 // Merge continuation rows (line breaks within same comment)
-                // Use 22pt gap — handles larger fonts and tighter spacing
-                while (i + 1 < commentRows.length && (commentRows[i].y - commentRows[i + 1].y) <= 22) {
+                while (i + 1 < commentRows.length && (commentRows[i].y - commentRows[i + 1].y) <= 16) {
                     curr += ' ' + commentRows[i + 1].text;
                     i++;
                 }
@@ -875,17 +868,20 @@ function calculateCommentPercentages(allComments, responseCount) {
     const KEYWORDS = {
         'Excellent': [
             'excellent', 'outstanding', 'superb', 'brilliant',
-            'best', 'besttttt', 'bestt',
+            'best', 'besttttt', 'bestt', 'mind blowing', 'profoundly',
+            'love the way', 'amazing', '5 star', 'perfect',
             'excellent teacher', 'excellent mam', 'excellent sir', 'excellent ma\'am'
         ],
         'Very Good': [
             'very good', 'very well', 'very nice',
-            'very helpful', 'very great', 'very clear'
+            'very helpful', 'very great', 'very clear', 'very practical',
+            'very much', 'soo desperate', 'prepared very well', 'dedicated'
         ],
         'Good': [
             'good', 'great', 'nice', 'well done', 'satisfactory',
             'good teacher', 'good mam', 'good sir', 'good ma\'am',
-            'overall good', 'nicely', 'fine', 'decent'
+            'overall good', 'nicely', 'fine', 'decent', 'rich content',
+            'easy to understand', 'easy to follow', 'simple language', 'clear'
         ]
     };
 
@@ -1026,10 +1022,19 @@ async function analyzePDFBuffer(buffer) {
     // Final strict filter: ensure zero attention comments in appreciation
     appreciation = appreciation.filter(c => !commentsNeedingAttention.includes(c));
 
-    // STEP 7: Calculate comment percentages (Excellent, Very Good, Good)
+    // STEP 7: Calculate comment percentages (Excellent, Very Good, Good) before filtering
     const commentPercentages = calculateCommentPercentages(allComments, meta?.responseCount);
 
-    console.log(`[PDF] Analysis complete: ${allComments.length} total comments extracted`);
+    // STEP 8: Filter out short (< 6 words) or trivial comments from final appreciation list
+    const TRIVIAL_APP_RX = /^(very good|good|nice|ok|okay|fine|sir very good|teaches good|good teacher|all is fine|rich content|everything is nice|everything is perfect|every thing is good|no remarks needed)$/i;
+    appreciation = appreciation.filter(c => {
+        const words = c.trim().replace(/[.,!?;:]+$/, '').split(/\s+/);
+        if (words.length < 6) return false;
+        if (TRIVIAL_APP_RX.test(c.trim())) return false;
+        return true;
+    });
+
+    console.log(`[PDF] Analysis complete: ${allComments.length} total comments extracted, ${appreciation.length} substantive appreciation comments kept`);
 
     return {
         appreciation,

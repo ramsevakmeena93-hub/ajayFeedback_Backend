@@ -1,4 +1,4 @@
-// ============================================================
+//hf classfier  // ============================================================
 // HuggingFace Inference API — DeBERTa v3 Zero-Shot Classifier
 // Model: MoritzLaurer/deberta-v3-base-zeroshot-v1
 //
@@ -21,16 +21,44 @@ const NEUTRAL_FILLERS = new Set([
   'everything fine','all fine','all ok','nothing to say','no feedback'
 ]);
 
+// ── Spam & Keyboard Mash Patterns ─────────────────────────────────────────────
+const SPAM_RULES = [
+  /([a-z])\1{2,}/i,                  // repeated char 3+ times (e.g. ttrrr, aaaaa)
+  /[bcdfghjklmnpqrstvwxz]{6,}/i,      // 6 consonants in a row (prevents flagging 'strengths'/'lengths')
+  /(asdf|dfgh|ghjk|hjkl|zxcv|xcvb|cvbn|qwerty|qazwsx|wsxedc|fhdj)/i, // keyboard rows
+  /\b(?:\w*[zxqj]){3,}\w*\b/i        // 3+ rare letters (z,x,q,j) in a single word (e.g. Ugsggizkvgizgx)
+];
+
+function isSpam(text) {
+  return SPAM_RULES.some(rx => rx.test(text));
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // NEEDS_ATTENTION RULES — checked FIRST, highest priority
 // If ANY rule matches → NEEDS_ATTENTION, no API call needed
 // ─────────────────────────────────────────────────────────────────────────────
 const ATTENTION_RULES = [
+  // Equipment, wifi, lab, devices, malfunctions (e.g. "equipments not functioning like wifi and all")
+  /\b(not\s+(functioning|working|available|adequate|responding|proper|clear))\b/i,
+  /\b(equipment|equipments|device|devices|wifi|internet|network|pc|pcs|computer|computers|system|systems|projector|screen|mic|microphone|speaker|ac|software|compiler|setup)\s.{0,30}(not|issue|problem|broken|down|slow|fail|error|poor|bug|missing|fault|trouble)\b/i,
+  /\b(issue|issues|problem|problems|trouble|fault|faults|defect|defects|error|errors)\s.{0,25}(wifi|internet|network|equipment|pc|computer|system|projector|mic|software|compiler|lab|device)\b/i,
+  /\b(wifi|internet|network|compiler|vs\s*code|software|system|hardware|equipment|projector|mic)\s+(issue|problem|down|slow|trouble|error|glitch)\b/i,
+  /\b(and\s+)?(else|rest|otherwise)\s+(is\s+)?(all\s+)?(good|fine|ok|okay|nice|well|decent|too\s+good)\b/i,
+
   // Suggestions / requests (most common source of misclassification)
   /\b(need|needs?|needed|require[sd]?)\s.{0,50}(more|better|proper|clear|improve|example|explanation|practice|time|notes?|material|lab|session|class|interaction)\b/i,
   /\b(more\s)(example|explanation|practice|time|interact|detail|class|lab|session|hands?.?on|real.?world|problem|illustration|discussion)\b/i,
   /\b(better\s)(notes?|material|explanation|teaching|slides?|ppt|approach|method|pace|content|coverage)\b/i,
-  /\b(can be|could be|should be|must be)\s.{0,30}(better|improve|more|interactive|clear|effective|helpful|engaging|detailed)\b/i,
+  /\b(can be|could be|should be|must be)\s.{0,30}(better|improve|more|interactive|clear|effective|helpful|engaging|detailed|communicative)\b/i,
+  /\b(can|could|should|must)\s+be\s+(more|better|a\s+bit|little)\b/i,
+  /\b(pace|speed)\s.{0,30}(can\s+be\s+better|could\s+be\s+better|improve|problem|fast|slow)\b/i,
+  /\bproblem\s+(just\s+)?(lies|is|with)\b/i,
+  /\b(try\s+(to\s+)?(better|understand)|better\s+understand\w*)\b/i,
+  /\b(not\s+on\s+time|not\s+in\s+time|delay(ed)?)\b/i,
+  /\bsyllabus\s.{0,30}(not\s+(on\s+time|complete|covered))\b/i,
+  /\b(not\s+at\s+all\s+engaging|not\s+engaging|not\s+interactive|class\s+is\s+not)\b/i,
+  /\btakes?\s+too\s+much\s+time\b/i,
+  /\b(little\s+bit\s+louder|more\s+loud|speak\s+louder|listen\s+to\s+students?)\b/i,
   /\b(should|must|please|kindly|request|suggest|would be (good|great|better|helpful|nice|beneficial))\b/i,
   /\b(provide|share|upload|give|send|make available)\s.{0,30}(notes?|material|slides?|ppt|pdf|handout|formula|content|book)\b/i,
 
@@ -139,6 +167,8 @@ const APPRECIATION_RULES = [
   /\b(good (command|knowledge|understanding|grip|hold) (over|of|on) (subject|topic|concept))\b/i,
   /\b(teaches? (very well|nicely|clearly|effectively|brilliantly|perfectly))\b/i,
   /\b(explains? (very well|nicely|clearly|effectively|brilliantly|everything|perfectly))\b/i,
+  /\b(lovely|good|nice|kind|sweet|polite|humble)\s+(teacher|faculty|professor|sir|mam|ma'?am|instructor|educator)\b/i,
+  /\b(good\s+and\s+lovely|lovely\s+and\s+good|lovely)\b/i,
   /\b(very (helpful|supportive|friendly|approachable|patient|dedicated|sincere|kind|polite|humble|cooperative))\b/i,
 ];
 
@@ -146,13 +176,16 @@ const APPRECIATION_RULES = [
 function hfApiCall(text, candidateLabels, template) {
   return new Promise((resolve, reject) => {
     const TOKEN = process.env.HF_API_TOKEN || '';
-    const body  = JSON.stringify({
+    const parameters = {
+      candidate_labels: candidateLabels,
+      multi_label: false
+    };
+    if (template) {
+      parameters.hypothesis_template = template;
+    }
+    const body = JSON.stringify({
       inputs: text,
-      parameters: {
-        candidate_labels    : candidateLabels,
-        hypothesis_template : template,
-        multi_label         : false
-      }
+      parameters
     });
 
     const req = https.request({
@@ -249,6 +282,12 @@ async function classifyCommentsWithHF(rawComments) {
     if (seen.has(text.toLowerCase()))    continue;
     seen.add(text.toLowerCase());
 
+    if (isSpam(text)) {
+      result.statistics.skipped++;
+      result.classifiedComments.push({ text, classification: 'skipped', needsAttention: false, reason: 'spam' });
+      continue;
+    }
+
     const lower = text.toLowerCase().replace(/[.,!?;:]+$/, '').trim();
     if (NEUTRAL_FILLERS.has(lower)) {
       result.statistics.neutral++;
@@ -307,13 +346,18 @@ async function classifyCommentsWithHF(rawComments) {
     }
 
     try {
-      const pred      = await callHF(
+      const LABEL_APP = "The student praises the teacher's teaching quality, helpfulness, or performance.";
+      const LABEL_ATT = "The student expresses a complaint, identifies a problem, or suggests an improvement in teaching or learning.";
+      const pred = await callHF(
         text,
-        ['appreciation', 'complaint or suggestion'],
-        'This student feedback about a teacher is a {}.'
+        [LABEL_APP, LABEL_ATT],
+        '{}'
       );
-      const isApprec  = pred.labels[0] === 'appreciation';
-      const confidence = parseFloat(pred.scores[0].toFixed(4));
+      // Zero-shot labels and scores are sorted in descending order of score.
+      // Index 0 in pred.labels is always the winning label!
+      const topLabel = (pred.labels && pred.labels[0] ? pred.labels[0] : '').trim();
+      const isApprec = (topLabel === LABEL_APP);
+      const confidence = parseFloat(((pred.scores && pred.scores[0]) || 0).toFixed(4));
 
       result.statistics.aiClassified++;
 
