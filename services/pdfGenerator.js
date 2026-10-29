@@ -116,7 +116,7 @@ async function generateFeedbackReportPDF({
   }
 
   // ── Text layout constants (table body) ────────────────────────────────────
-  const MIN_COMMENT_WORDS = 5; // appreciation comments shorter than this many words are hidden
+  const MIN_COMMENT_WORDS = 0; // show ALL comments regardless of length
   const FS = 8;            // body font size
   const LH = 10;           // line height
   const SPACER_H = 3;      // blank line between paragraphs
@@ -456,7 +456,7 @@ async function generateFeedbackReportPDF({
     // ---- cell texts ----
     const codeBatch = [r.subjectCode, r.batch].filter(Boolean).join("\n") || "-";
 
-    const attList = r.needsAttention || r.needs_attention || r.attention || r.improvements || [];
+    const attList = r.commentsNeedingAttention || r.needsAttention || r.needs_attention || r.attention || r.improvements || [];
     const attText = toBullets(attList).join("\n") || "-";
 
     const pcts = r.commentPercentages || {};
@@ -466,7 +466,7 @@ async function generateFeedbackReportPDF({
       .map(([k, v]) => "\u2022 " + k + ": " + v + "%")
       .join("\n");
     const allAppreciations = (r.appreciation || [])
-      .filter((c) => typeof c === "string" && c.trim().split(/\s+/).length >= MIN_COMMENT_WORDS)
+      .filter((c) => typeof c === "string" && c.trim())
       .map((x) => "\u2022 " + x.trim());
     const appText = [pctLines, ...allAppreciations].filter(Boolean).join("\n") || "-";
 
