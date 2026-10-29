@@ -571,7 +571,7 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
   // BOTTOM_MARGIN and TOP_MARGIN already defined above for comment section
   const FS = 8.5;           // Font size — readable but compact
   const LH = 10;            // Line height — tighter spacing
-  const MIN_ROW_HEIGHT = 28; // Minimum row height
+  const MIN_ROW_HEIGHT = 22; // Minimum row height — signature fits within content height
   const ROW_PADDING = 8;    // Top+bottom padding inside each row
 
   let pageNumber = 1;
@@ -940,7 +940,7 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
       
       const sigImg = facultySigMap[(sigData.facultyName || "").toLowerCase().trim()];
       if (sigImg) {
-        const sW = 50, sH = 25;
+        const sW = 40, sH = 18;  // smaller signature size to fit tight rows
         const sigX = sigData.col.x + (sigData.col.w - sW) / 2;
         const sigImageY = sigY - sH;
         coverPage.drawImage(sigImg, { x: sigX, y: sigImageY, width: sW, height: sH });
@@ -950,11 +950,14 @@ async function generateFeedbackReportPDF({ submission, reports, hodUser, vcUser,
              sigData.col.x + sigData.col.w - 4, sigY, 0.5, gray);
       }
       
-      // Faculty name below signature
+      // Faculty name below signature — only if row is tall enough
       const nameStr = sigData.facultyName || "";
       const nameW = nameStr.length * 7 * 0.52;
       const nameX = sigData.col.x + Math.max(1, (sigData.col.w - nameW) / 2);
-      txt(coverPage, nameStr, nameX, sigY - 30, 7, timesFont, gray);
+      const rowH = needsContinuation ? continuationHeight : partialRowHeight;
+      if (rowH >= 35) {
+        txt(coverPage, nameStr, nameX, sigY - 26, 7, timesFont, gray);
+      }
     }
   }
 
