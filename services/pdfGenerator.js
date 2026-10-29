@@ -654,6 +654,10 @@ async function generateFeedbackReportPDF({
   }
 
   // ── Append original faculty PDFs with signature stamps ─────────────────────
+  // These are the source PDFs uploaded via Google Drive links in the CSV.
+  // Appended after the summary table; HOD/faculty/ProVC signatures are stamped
+  // on the signature page of each appended PDF (when withoutSignatures=false).
+
   function convertDriveLink(url) {
     if (!url) return null;
     const m1 = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
@@ -663,8 +667,9 @@ async function generateFeedbackReportPDF({
     return url;
   }
 
-  async function downloadWithRetry(url, retries = 3) {
+  async function downloadPdfBuffer(url, retries = 3) {
     const axios = require("axios");
+    // Try service account for Google Drive links
     const fileIdMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)|[?&]id=([a-zA-Z0-9_-]+)/);
     if (fileIdMatch) {
       const fileId = fileIdMatch[1] || fileIdMatch[2];
@@ -678,15 +683,16 @@ async function generateFeedbackReportPDF({
             scopes: ["https://www.googleapis.com/auth/drive.readonly"],
           });
           const drive = google.drive({ version: "v3", auth });
-          const response = await drive.files.get({ fileId, alt: "media" }, { responseType: "arraybuffer" });
-          const buf = Buffer.from(response.data);
-          if (buf.subarray(0, 5).toString("latin1") !== "%PDF-") throw new Error("Not a PDF");
-          return buf;
+          const resp = await drive.files.get({ fileId, alt: "media" }, { responseType: "arraybuffer" });
+          const buf = Buffer.from(resp.data);
+          if (buf.subarray(0, 5).toString("latin1") === "%PDF-") return buf;
+          throw new Error("Service account response is not a PDF");
         }
       } catch (e) {
         console.warn("[PDF] Service account failed, falling back:", e.message);
       }
     }
+    // Public download fallback
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
         const res = await axios.get(url, {
@@ -695,11 +701,11 @@ async function generateFeedbackReportPDF({
           maxRedirects: 10,
         });
         const buf = Buffer.from(res.data);
-        if (buf.subarray(0, 5).toString("latin1") !== "%PDF-") throw new Error("Not a PDF");
+        if (buf.subarray(0, 5).toString("latin1") !== "%PDF-") throw new Error("Response is not a PDF");
         if (buf.length < 1000) throw new Error("PDF too small");
         return buf;
       } catch (err) {
-        console.warn(`[PDF] Attempt ${attempt}/${retries}: ${err.message}`);
+        console.warn(`[PDF] Download attempt ${attempt}/${retries}: ${err.message}`);
         if (attempt < retries) await new Promise(r => setTimeout(r, 1500 * attempt));
       }
     }
@@ -708,82 +714,108 @@ async function generateFeedbackReportPDF({
 
   if (!isPreview) {
     try {
+      // Build unique download queue from driveLink / pdfLink fields
       const seenLinks = new Set();
-      const downloadQueue = [];
+      const queue = [];
       for (const rp of uniqueReports) {
         const raw = rp.driveLink || rp.pdfLink;
         if (!raw || String(raw).startsWith("uploaded:")) continue;
         const lk = convertDriveLink(raw);
         if (!lk || seenLinks.has(lk)) continue;
         seenLinks.add(lk);
-        downloadQueue.push({ rp, lk });
+        queue.push({ rp, lk });
       }
-      console.log(`[PDF] Appending ${downloadQueue.length} original PDF(s)`);
+      console.log(`[PDF] Appending ${queue.length} original faculty PDF(s)`);
 
       // Download in parallel (max 3 at once)
       let pLimit;
-      try { pLimit = require("p-limit"); } catch(e) { pLimit = (n) => (fn) => fn(); }
-      const limit = pLimit(3);
-      const downloadResults = await Promise.all(
-        downloadQueue.map(({ rp, lk }) =>
-          limit(async () => {
-            const data = await downloadWithRetry(lk, 3);
+      try { pLimit = require("p-limit"); } catch (e) { pLimit = () => (fn) => fn(); }
+      const limiter = pLimit(3);
+      const results = await Promise.all(
+        queue.map(({ rp, lk }) =>
+          limiter(async () => {
+            const data = await downloadPdfBuffer(lk, 3);
             return { rp, data };
           })
         )
       );
 
-      // Append pages
-      for (const { rp, data } of downloadResults) {
-        if (!data) { console.warn("[PDF] Skipped (no data):", rp.facultyName); continue; }
+      // Append each downloaded PDF and stamp signatures
+      for (const { rp, data } of results) {
+        if (!data) {
+          console.warn("[PDF] Skipped (download failed):", rp.facultyName);
+          continue;
+        }
         try {
           const srcDoc = await PDFDocument.load(data);
           const indices = srcDoc.getPageIndices();
           if (!indices.length) continue;
+
           const pagesBefore = pdfDoc.getPageCount();
           const copied = await pdfDoc.copyPages(srcDoc, indices);
-          for (const p of copied) pdfDoc.addPage(p);
+          for (const pg of copied) pdfDoc.addPage(pg);
           console.log(`[PDF] Appended ${copied.length} page(s) for ${rp.facultyName}`);
 
-          // Stamp signatures on signature page
+          // ── Stamp signatures on the signature page ──────────────────────
           if (!withoutSignatures) {
             try {
               const pdfjsLib = require("pdfjs-dist/legacy/build/pdf.js");
-              const pdfJsDoc = await pdfjsLib.getDocument({ data: new Uint8Array(data), useWorkerFetch: false, isEvalSupported: false }).promise;
+              const pdfJsDoc = await pdfjsLib.getDocument({
+                data: new Uint8Array(data),
+                useWorkerFetch: false,
+                isEvalSupported: false,
+              }).promise;
+
               let sigPageIdx = null;
               let facItem = null, hodItem = null, vcItem = null;
+
               for (let pi = 1; pi <= pdfJsDoc.numPages; pi++) {
                 const pg  = await pdfJsDoc.getPage(pi);
                 const tc  = await pg.getTextContent();
                 const items = tc.items || [];
-                const foundHod = items.find(it => /^HOD$|Head of Department/i.test(String(it.str || "").trim()));
+                // Find HOD label — marks the signature row
+                const foundHod = items.find(it =>
+                  /^HOD$|Head of Department/i.test(String(it.str || "").trim())
+                );
                 if (!foundHod) continue;
                 sigPageIdx = pi - 1;
-                hodItem = foundHod;
                 const hodY = Number(foundHod.transform?.[5]) || 0;
-                const bottomItems = items.filter(it => Math.abs((Number(it.transform?.[5]) || 0) - hodY) < 100);
-                facItem = bottomItems.find(it => String(it.str || "").includes("Faculty Name"));
-                vcItem  = bottomItems.find(it => /PRO\s*-?\s*VC/i.test(String(it.str || "")));
+                const near = items.filter(it => Math.abs((Number(it.transform?.[5]) || 0) - hodY) < 100);
+                facItem = near.find(it => String(it.str || "").includes("Faculty Name"));
+                hodItem = foundHod;
+                vcItem  = near.find(it => /PRO\s*-?\s*VC/i.test(String(it.str || "")));
                 break;
               }
+
               if (sigPageIdx !== null) {
                 const targetPage = pdfDoc.getPage(pagesBefore + sigPageIdx);
                 const SIG_W = 75;
-                const drawSig = (sigImg, labelItem, defaultX) => {
+
+                const drawStamp = (sigImg, labelItem, defaultX) => {
                   if (!sigImg) return;
-                  const ix = labelItem ? Number(labelItem.transform?.[4]) || defaultX : defaultX;
-                  const iy = labelItem ? Number(labelItem.transform?.[5]) || 100 : 100;
-                  const scale = sigImg.width > 0 ? Math.min(SIG_W / sigImg.width, 30 / sigImg.height) : 1;
-                  const sw = sigImg.width * scale, sh = sigImg.height * scale;
-                  targetPage.drawImage(sigImg, { x: ix, y: iy - 6, width: sw, height: sh });
+                  const ix = labelItem ? (Number(labelItem.transform?.[4]) || defaultX) : defaultX;
+                  const iy = labelItem ? (Number(labelItem.transform?.[5]) || 100) : 100;
+                  const scale = sigImg.width > 0
+                    ? Math.min(SIG_W / sigImg.width, 30 / sigImg.height)
+                    : 1;
+                  targetPage.drawImage(sigImg, {
+                    x: ix,
+                    y: iy - 6,
+                    width:  sigImg.width  * scale,
+                    height: sigImg.height * scale,
+                  });
                 };
+
+                // Faculty signature
                 const fSig = facultySigMap[(rp.facultyName || "").toLowerCase().trim()];
-                if (fSig)   drawSig(fSig,   facItem, 80);
-                if (hodSig) drawSig(hodSig, hodItem, 300);
-                if (vcSig && !hideVCSignature) drawSig(vcSig, vcItem, 520);
+                if (fSig)   drawStamp(fSig,   facItem, 80);
+                // HOD signature
+                if (hodSig) drawStamp(hodSig, hodItem, 300);
+                // Pro-VC signature (only if not hidden)
+                if (vcSig && !hideVCSignature) drawStamp(vcSig, vcItem, 520);
               }
             } catch (sigErr) {
-              console.warn("[PDF] Signature stamp failed:", sigErr.message);
+              console.warn("[PDF] Signature stamp failed for", rp.facultyName, ":", sigErr.message);
             }
           }
         } catch (appendErr) {
