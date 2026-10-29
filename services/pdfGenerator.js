@@ -653,6 +653,148 @@ async function generateFeedbackReportPDF({
     });
   }
 
+  // ── Append original faculty PDFs with signature stamps ─────────────────────
+  function convertDriveLink(url) {
+    if (!url) return null;
+    const m1 = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+    if (m1) return "https://drive.google.com/uc?export=download&id=" + m1[1];
+    const m2 = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+    if (m2) return "https://drive.google.com/uc?export=download&id=" + m2[1];
+    return url;
+  }
+
+  async function downloadWithRetry(url, retries = 3) {
+    const axios = require("axios");
+    const fileIdMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)|[?&]id=([a-zA-Z0-9_-]+)/);
+    if (fileIdMatch) {
+      const fileId = fileIdMatch[1] || fileIdMatch[2];
+      try {
+        const { google } = require("googleapis");
+        const clientEmail = process.env.GOOGLE_DRIVE_CLIENT_EMAIL;
+        const privateKey  = process.env.GOOGLE_DRIVE_PRIVATE_KEY;
+        if (clientEmail && privateKey) {
+          const auth = new google.auth.GoogleAuth({
+            credentials: { client_email: clientEmail, private_key: privateKey.replace(/\\n/g, "\n") },
+            scopes: ["https://www.googleapis.com/auth/drive.readonly"],
+          });
+          const drive = google.drive({ version: "v3", auth });
+          const response = await drive.files.get({ fileId, alt: "media" }, { responseType: "arraybuffer" });
+          const buf = Buffer.from(response.data);
+          if (buf.subarray(0, 5).toString("latin1") !== "%PDF-") throw new Error("Not a PDF");
+          return buf;
+        }
+      } catch (e) {
+        console.warn("[PDF] Service account failed, falling back:", e.message);
+      }
+    }
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        const res = await axios.get(url, {
+          responseType: "arraybuffer", timeout: 40000,
+          headers: { "User-Agent": "Mozilla/5.0", Accept: "application/pdf,*/*" },
+          maxRedirects: 10,
+        });
+        const buf = Buffer.from(res.data);
+        if (buf.subarray(0, 5).toString("latin1") !== "%PDF-") throw new Error("Not a PDF");
+        if (buf.length < 1000) throw new Error("PDF too small");
+        return buf;
+      } catch (err) {
+        console.warn(`[PDF] Attempt ${attempt}/${retries}: ${err.message}`);
+        if (attempt < retries) await new Promise(r => setTimeout(r, 1500 * attempt));
+      }
+    }
+    return null;
+  }
+
+  if (!isPreview) {
+    try {
+      const seenLinks = new Set();
+      const downloadQueue = [];
+      for (const rp of uniqueReports) {
+        const raw = rp.driveLink || rp.pdfLink;
+        if (!raw || String(raw).startsWith("uploaded:")) continue;
+        const lk = convertDriveLink(raw);
+        if (!lk || seenLinks.has(lk)) continue;
+        seenLinks.add(lk);
+        downloadQueue.push({ rp, lk });
+      }
+      console.log(`[PDF] Appending ${downloadQueue.length} original PDF(s)`);
+
+      // Download in parallel (max 3 at once)
+      let pLimit;
+      try { pLimit = require("p-limit"); } catch(e) { pLimit = (n) => (fn) => fn(); }
+      const limit = pLimit(3);
+      const downloadResults = await Promise.all(
+        downloadQueue.map(({ rp, lk }) =>
+          limit(async () => {
+            const data = await downloadWithRetry(lk, 3);
+            return { rp, data };
+          })
+        )
+      );
+
+      // Append pages
+      for (const { rp, data } of downloadResults) {
+        if (!data) { console.warn("[PDF] Skipped (no data):", rp.facultyName); continue; }
+        try {
+          const srcDoc = await PDFDocument.load(data);
+          const indices = srcDoc.getPageIndices();
+          if (!indices.length) continue;
+          const pagesBefore = pdfDoc.getPageCount();
+          const copied = await pdfDoc.copyPages(srcDoc, indices);
+          for (const p of copied) pdfDoc.addPage(p);
+          console.log(`[PDF] Appended ${copied.length} page(s) for ${rp.facultyName}`);
+
+          // Stamp signatures on signature page
+          if (!withoutSignatures) {
+            try {
+              const pdfjsLib = require("pdfjs-dist/legacy/build/pdf.js");
+              const pdfJsDoc = await pdfjsLib.getDocument({ data: new Uint8Array(data), useWorkerFetch: false, isEvalSupported: false }).promise;
+              let sigPageIdx = null;
+              let facItem = null, hodItem = null, vcItem = null;
+              for (let pi = 1; pi <= pdfJsDoc.numPages; pi++) {
+                const pg  = await pdfJsDoc.getPage(pi);
+                const tc  = await pg.getTextContent();
+                const items = tc.items || [];
+                const foundHod = items.find(it => /^HOD$|Head of Department/i.test(String(it.str || "").trim()));
+                if (!foundHod) continue;
+                sigPageIdx = pi - 1;
+                hodItem = foundHod;
+                const hodY = Number(foundHod.transform?.[5]) || 0;
+                const bottomItems = items.filter(it => Math.abs((Number(it.transform?.[5]) || 0) - hodY) < 100);
+                facItem = bottomItems.find(it => String(it.str || "").includes("Faculty Name"));
+                vcItem  = bottomItems.find(it => /PRO\s*-?\s*VC/i.test(String(it.str || "")));
+                break;
+              }
+              if (sigPageIdx !== null) {
+                const targetPage = pdfDoc.getPage(pagesBefore + sigPageIdx);
+                const SIG_W = 75;
+                const drawSig = (sigImg, labelItem, defaultX) => {
+                  if (!sigImg) return;
+                  const ix = labelItem ? Number(labelItem.transform?.[4]) || defaultX : defaultX;
+                  const iy = labelItem ? Number(labelItem.transform?.[5]) || 100 : 100;
+                  const scale = sigImg.width > 0 ? Math.min(SIG_W / sigImg.width, 30 / sigImg.height) : 1;
+                  const sw = sigImg.width * scale, sh = sigImg.height * scale;
+                  targetPage.drawImage(sigImg, { x: ix, y: iy - 6, width: sw, height: sh });
+                };
+                const fSig = facultySigMap[(rp.facultyName || "").toLowerCase().trim()];
+                if (fSig)   drawSig(fSig,   facItem, 80);
+                if (hodSig) drawSig(hodSig, hodItem, 300);
+                if (vcSig && !hideVCSignature) drawSig(vcSig, vcItem, 520);
+              }
+            } catch (sigErr) {
+              console.warn("[PDF] Signature stamp failed:", sigErr.message);
+            }
+          }
+        } catch (appendErr) {
+          console.error("[PDF] Append failed for", rp.facultyName, ":", appendErr.message);
+        }
+      }
+    } catch (outerErr) {
+      console.error("[PDF] Append section error:", outerErr.message);
+    }
+  }
+
   const pdfBytes = await pdfDoc.save();
   return Buffer.from(pdfBytes);
 }
