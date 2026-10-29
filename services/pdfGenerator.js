@@ -317,7 +317,7 @@ async function generateFeedbackReportPDF({
 
   function drawTableHeader(page, y) {
     // Highlighted header: dark-blue fill, white bold text, white dividers
-    rect(page, ML, y - TH, CW, TH, { borderColor: black, borderWidth: 1, color: headerFill });
+    rect(page, ML, y - TH, CW, TH, { color: headerFill, borderColor: headerFill, borderWidth: 0.5 });
     COLS.forEach((col, ci) => {
       if (ci > 0) line(page, col.x, y, col.x, y - TH, 0.8, white);
     });
@@ -346,8 +346,11 @@ async function generateFeedbackReportPDF({
     pageNumber++;
     y = PH - TOP_MARGIN;
   }
-  function newTablePage() {
-    newPlainPage();
+  async function newTablePage() {
+    page = pdfDoc.addPage([PW, PH]);
+    pageNumber++;
+    y = PH - 15;
+    y = await drawHeader(page, y);  // draw MITS header on every continuation page
     y = drawTableHeader(page, y);
   }
 
@@ -454,7 +457,12 @@ async function generateFeedbackReportPDF({
     const r = uniqueReports[i];
 
     // ---- cell texts ----
-    const codeBatch = [r.subjectCode, r.batch].filter(Boolean).join("\n") || "-";
+    // Split subjectCode on dash to put batch on second line e.g. "30261101\nBatch-A"
+    const rawCode = r.subjectCode || "-";
+    const dashIdx = rawCode.indexOf("-");
+    const codeBatch = dashIdx > 0
+      ? rawCode.slice(0, dashIdx).trim() + "\n" + rawCode.slice(dashIdx + 1).trim()
+      : (r.batch ? rawCode + "\n" + r.batch : rawCode);
 
     const attList = r.commentsNeedingAttention || r.needsAttention || r.needs_attention || r.attention || r.improvements || [];
     const attText = toBullets(attList).join("\n") || "-";
@@ -517,7 +525,7 @@ async function generateFeedbackReportPDF({
     // ---- decide: fits / split / move to next page ----
     let avail = y - BOTTOM_MARGIN;
     if (rowNeed > avail && avail < Math.max(MIN_SPLIT, sigBlockH)) {
-      newTablePage();
+      await newTablePage();
     }
 
     const pos = cells.map(() => 0);
@@ -538,7 +546,7 @@ async function generateFeedbackReportPDF({
       const usedH = Math.max(...take.map((t) => t.h), 0);
 
       if (!finished && usedH === 0) {
-        newTablePage();
+        await newTablePage();
         continue;
       }
 
@@ -596,7 +604,7 @@ async function generateFeedbackReportPDF({
 
       y -= chunkH;
       if (finished) break;
-      newTablePage(); // row continues on the next page (with table header repeated)
+      await newTablePage(); // row continues on the next page (with table header repeated)
     }
   }
 
