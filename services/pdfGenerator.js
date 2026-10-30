@@ -64,6 +64,7 @@ async function generateFeedbackReportPDF({
   hideVCSignature = false,
   appendOriginals = true, // append the faculty original PDFs at the end (set false to skip)
 }) {
+  console.log(`[PDF] Starting PDF generation for ${reports.length} reports`);
   const User = require("../models/User");
   const HODComment = require("../models/HODComment");
 
@@ -519,7 +520,7 @@ async function generateFeedbackReportPDF({
   y -= 16;
 
   const sessionLabel = submission.session === "jan-may" ? "January \u2013 May" : "July \u2013 December";
-    const courseName = cleanCourseName(r.programme || r.courseName || r.subjectName || r.course || r.subject) || "-";
+  const ayText = "Academic Year: " + (submission.academicYear || "2026-2027");
   const sessText = "Session: " + sessionLabel;
   txt(page, ayText, ML, y, 11, timesFont, black);
   txt(page, sessText, PW - MR - timesFont.widthOfTextAtSize(sessText, 11), y, 11, timesFont, black);
