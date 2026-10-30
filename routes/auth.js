@@ -739,7 +739,11 @@ router.post(
       res.json({
         message:
           'Signature saved',
-        user: payload
+        user: {
+          ...payload,
+          signatureImage: signatureImage,
+          hasSignature: true,
+        }
       });
     } catch (err) {
       res.status(500).json({
