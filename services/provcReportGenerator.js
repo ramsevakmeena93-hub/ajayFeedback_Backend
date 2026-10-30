@@ -402,9 +402,9 @@ async function generateProVCReport({
     // Build row data
     const rowsData = reports.map((r, idx) => {
       const studentItems = [
-        ...(r.appreciation     || []).filter(c => c && c.trim().split(/\s+/).length >= 4).slice(0, 4),
-        ...(r.commentsNeedingAttention || []).filter(c => c && c.trim().split(/\s+/).length >= 4).slice(0, 4),
-      ].slice(0, 6);
+        ...(r.appreciation     || []).filter(c => c && c.trim()),
+        ...(r.commentsNeedingAttention || []).filter(c => c && c.trim()),
+      ];
 
       // HOD comments: hodRemarks + actionTaken
       const hodItems = [];
