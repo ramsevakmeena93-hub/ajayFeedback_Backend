@@ -55,6 +55,19 @@ function safe(v, fallback = '') {
   return v == null ? fallback : String(v).trim() || fallback;
 }
 
+// Strip "Submitted answers:-", "Submitted answers:", etc. from course names
+function cleanCourseName(v) {
+  if (!v) return '';
+  return String(v)
+    .replace(/[\r\n]+/g, ' ')
+    .replace(/\s*[-–:]\s*submitted\s+answers?\s*:?-?\s*/gi, '')
+    .replace(/\bsubmitted\s+answers?\s*:?-?\s*/gi, '')
+    .replace(/\bsubmitted\s+responses?\s*:?-?\s*/gi, '')
+    .replace(/\bstudent\s+feedback\s*:?-?\s*/gi, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
 /**
  * Draw text wrapping inside a rectangular cell.
  * Returns the actual text height used (for dynamic row sizing).
@@ -628,7 +641,7 @@ function buildDeptCourseRow(r, idx, provcMap) {
   return {
     sno    : String(idx + 1),
     code   : safe(r.subjectCode),
-    name   : safe(r.programme || r.subjectCode),
+    name   : cleanCourseName(r.programme || r.courseName || r.subjectName || r.subjectCode) || safe(r.subjectCode),
     reg    : safe(r.registeredStudents, '—'),
     pct,
     ffi    : r.ffiScore != null ? Number(r.ffiScore).toFixed(2) : '—',
@@ -884,7 +897,7 @@ async function generateDepartmentProVCReport({
     y = drawDeptInfoBlock(doc, {
       department  : safe(submission.department || hodUser?.department),
       session     : sessionLabel,
-      programme   : safe(programme || reports?.[0]?.programme || 'B.Tech.'),
+      programme   : cleanCourseName(programme) || cleanCourseName(reports?.[0]?.programme) || 'B.Tech.',
       generatedOn,
     }, y);
     y += 4;

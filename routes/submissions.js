@@ -830,7 +830,7 @@ router.get('/:id/provc-department-report', authMiddleware, async (req, res) => {
         : new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
       avgResponse : avgResp,
       dfi,
-      programme   : allReports[0]?.programme || '',
+      programme   : '', // will be derived + cleaned inside the generator from reports
     });
 
     const safeDept = (submission.department || submission.hodId?.department || 'Department')
