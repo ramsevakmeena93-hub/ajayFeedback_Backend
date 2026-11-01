@@ -1,25 +1,65 @@
+/**
+ * provcReportGenerator.js
+ *
+ * Generates landscape A4 Pro-VC reports with PDFKit:
+ *   1. generateProVCReport            – "Faculty Feedback Report (Course Wise)" for one faculty
+ *   2. generateDepartmentProVCReport  – "Department Overall Pro-VC Comments Report"
+ *
+ * FIXES vs. previous version (found by inspecting the generated PDFs):
+ *  1. PAGE ORIENTATION  – `size:[841.89,595.28]` + `layout:'landscape'` makes PDFKit swap the
+ *     dimensions, so pages came out PORTRAIT (595x842) and the HOD / Pro-VC columns were cut off.
+ *     Size is now passed as a landscape array with NO `layout` option.
+ *  2. CELL BORDERS      – `rect().fill().stroke()` strokes nothing (fill consumes the path), so the
+ *     table had no grid. Now uses `fillAndStroke`.
+ *  3. COURSE NAME       – the `programme` field holds "<course name>\nSubmitted answers:-"; this was
+ *     printed as course name AND as the "Programme" in the info block. Now cleaned, and Programme
+ *     no longer comes from reports[0].programme.
+ *  4. COURSE CODE       – values like "34252108-Batch-AProblem-Solving" are parsed into
+ *     "34252108 (Batch-A)".
+ *  5. FACULTY CELL BUG  – when a faculty's rows spanned a page break, the merged name cell was drawn
+ *     using the old page's Y, producing giant/stray names at the bottom of pages. Each page segment
+ *     is now drawn separately.
+ *  6. TEXT OVERLAP      – row height was measured with width (w-14) but text drawn with (w-15), so a
+ *     line could wrap differently and overlap the next bullet. One shared width is used now.
+ *  7. ROW HEIGHT CAP    – rows were capped at 160pt and clipped silently; now clipped only at page
+ *     height, with an ellipsis when truncated.
+ *  8. EMPTY HOD CELL    – no more "• —" bullet; a centred "—" is shown.
+ *  9. HEADERS           – "Respons e %" wrapped badly; labels shortened.
+ * 10. WASTED SPACE / STRAY PAGES – signature space was reserved on every page, and the overall-comments
+ *     page repeated an empty table header. Now only the last page reserves space, and a plain page
+ *     (header + title only) is used when comments/signatures overflow.
+ * 11. PRO-VC LOOKUP    – comment lookup now also matches on parsed code+section.
+ * 12. SENTENCE SPLIT   – keeps full stops, no longer splits "Dr. X", strips list numbering.
+ * 13. FALLBACK HEADER  – removed Devanagari text (Helvetica can't render it); header PNG is fit, not
+ *     stretched.
+ * 14. Added "Page x of y" footer and optional Pro-VC signature image.
+ */
+
 'use strict';
 
 const PDFDocument = require('pdfkit');
 const fs = require('fs');
 const path = require('path');
 
+// ── Asset paths ────────────────────────────────────────────────────────────
 const MITS_LOGO_LEFT  = path.join(__dirname, '../../src/assets/mits-logo.png');
 const MITS_HEADER_PNG = path.join(__dirname, '../assets/mits-header.png');
 
+// ── Page geometry (landscape A4: width > height, NO `layout` option!) ─────
 const PAGE_W = 841.89;
 const PAGE_H = 595.28;
 const MARGIN = 18;
-const HEADER_BOTTOM = 78;
-const FOOTER_H      = 22;
+const HEADER_BOTTOM = 78;            // y where title bar starts
+const FOOTER_H      = 22;            // reserved for "Page x of y"
 const TABLE_BOTTOM  = PAGE_H - FOOTER_H;
-const SIG_H         = 70;
+const SIG_H         = 70;            // height of the signature block
 const MIN_ROW_H     = 30;
-const FS            = 7.5;
+const FS            = 7.5;           // table body font size
 const BULLET_X      = 3;
 const TEXT_X        = 12;
 const PAD_R         = 3;
 
+// ── Brand colours ─────────────────────────────────────────────────────────
 const C = {
   darkBlue  : '#1B3D7A',
   red       : '#C0392B',
@@ -38,6 +78,9 @@ const C = {
   labelBg   : '#EEF2FF',
 };
 
+// ══════════════════════════════════════════════════════════════════════════
+// Generic helpers
+// ══════════════════════════════════════════════════════════════════════════
 function ffiColor(score) {
   if (!score) return C.textDark;
   if (score >= 4.0) return C.ffiGreen;
@@ -55,10 +98,12 @@ function fmtDate(d) {
 
 const ABBREV_GUARD = /(?<!\b(?:Dr|Mr|Mrs|Ms|Prof|Sr|Jr|vs|etc|Fig|No)\.)(?<=[.!?])\s+(?=[A-Z])/;
 
+/** Split free text into bullet items (newlines + sentence boundaries, keeps full stops). */
 function splitSentences(text) {
   if (!text) return [];
   const s = String(text)
     .replace(/\r/g, '')
+    // turn "1. foo 2. bar" list numbering into line breaks
     .replace(/(?:^|\n|(?<=[.!?])\s)\s*\d{1,2}[.)]\s+(?=[A-Z])/g, '\n');
   return s
     .split(/\n+/)
@@ -67,6 +112,7 @@ function splitSentences(text) {
     .filter(Boolean);
 }
 
+/** Remove the junk the data layer appends to course names. */
 function cleanCourseName(v) {
   return safe(v)
     .replace(/submitted\s+answers\s*:?\s*-?/gi, '')
@@ -74,6 +120,7 @@ function cleanCourseName(v) {
     .trim();
 }
 
+/** "34252108-Batch-AProblem-Solving" -> { code:'34252108', section:'Batch-A' } */
 function parseCourseCode(raw) {
   const s = safe(raw).replace(/\s+/g, ' ');
   const m = s.match(/^(.+?)-Batch-?\s*([A-Z0-9])/);
@@ -86,6 +133,10 @@ function codeLabel(raw) {
   return section ? `${code}\n(${section})` : code;
 }
 
+/**
+ * NOTE: in the stored data `programme` actually contains the course name
+ * (+ "Submitted answers:-"). Prefer a real name field when present.
+ */
 function courseNameOf(r) {
   return cleanCourseName(
     r.subjectName || r.courseName || r.courseTitle || r.subjectTitle ||
@@ -108,6 +159,7 @@ function sessionLabelOf(submission) {
   return safe(submission.academicYear || submission.session);
 }
 
+// ── Pro-VC comment lookup (matches raw code OR parsed code+section) ───────
 const norm = s => safe(s).toLowerCase().replace(/\s+/g, ' ');
 
 function buildProvcLookup(submission) {
@@ -126,6 +178,7 @@ function buildProvcLookup(submission) {
   };
 }
 
+// ── Build one table row's data (shared by both reports) ───────────────────
 function buildRow(r, idx, getProvc, strict) {
   const clean = arr => (arr || []).map(c => safe(c)).filter(Boolean);
   let student;
@@ -151,20 +204,23 @@ function buildRow(r, idx, getProvc, strict) {
     pct    : fmtPct(r),
     ffi    : r.ffiScore != null ? Number(r.ffiScore).toFixed(2) : '—',
     student,
-    hod,
+    hod,                                   // empty => centred "—" (no bullet)
     provc  : splitSentences(getProvc(r.facultyName, r.subjectCode)),
   };
 }
 
+// ══════════════════════════════════════════════════════════════════════════
+// Low-level drawing
+// ══════════════════════════════════════════════════════════════════════════
 function drawRect(doc, x, y, w, h, fill) {
   doc.save()
      .lineWidth(0.5)
      .rect(x, y, w, h)
-     .fillAndStroke(fill || 'white', C.border)
+     .fillAndStroke(fill || 'white', C.border)   // FIX: fill().stroke() drew no borders
      .restore();
 }
 
-const bulletTextW = w => w - TEXT_X - PAD_R;
+const bulletTextW = w => w - TEXT_X - PAD_R;      // ONE width for measuring AND drawing
 
 function bulletsHeight(doc, items, w) {
   let total = 4;
@@ -188,7 +244,7 @@ function drawBullets(doc, items, x, y, w, h) {
   for (const it of list) {
     doc.font('Helvetica').fontSize(FS).fillColor(C.textDark);
     const th = doc.heightOfString(it, { width: bulletTextW(w) });
-    if (ty + th > maxY) {
+    if (ty + th > maxY) {                          // truncated – show an ellipsis
       if (ty + 9 <= y + h) doc.text('…', x + TEXT_X, ty, { width: 20, lineBreak: false });
       break;
     }
@@ -198,6 +254,7 @@ function drawBullets(doc, items, x, y, w, h) {
   }
 }
 
+// ── Institution header + title bar ─────────────────────────────────────────
 function drawHeader(doc) {
   const logoSize = 58;
   if (fs.existsSync(MITS_LOGO_LEFT)) {
@@ -209,6 +266,7 @@ function drawHeader(doc) {
   if (fs.existsSync(MITS_HEADER_PNG)) {
     doc.image(MITS_HEADER_PNG, bx, 8, { fit: [bw, 68], align: 'center', valign: 'top' });
   } else {
+    // English-only fallback (Helvetica cannot render Devanagari)
     doc.font('Helvetica-Bold').fontSize(11).fillColor(C.darkBlue)
        .text('Madhav Institute of Technology & Science, Gwalior (M.P.), INDIA', bx, 14, { width: bw, align: 'center' });
     doc.font('Helvetica-Bold').fontSize(9.5).fillColor(C.red)
@@ -232,12 +290,14 @@ function newPage(doc) {
   doc.addPage({ size: [PAGE_W, PAGE_H], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
 }
 
+/** New page with institution header + title bar. Returns the y to continue from. */
 function newPlainPage(doc, title) {
   newPage(doc);
   drawHeader(doc);
   return drawTitleBar(doc, HEADER_BOTTOM, title) + 3;
 }
 
+// ── Info grid: rows of [labelL, valueL, labelR, valueR] ───────────────────
 function drawInfoGrid(doc, rows, y) {
   const bw = PAGE_W - MARGIN * 2;
   const half = bw / 2;
@@ -249,7 +309,7 @@ function drawInfoGrid(doc, rows, y) {
     doc.font('Helvetica').fontSize(8.5);
     const hL = doc.heightOfString(safe(lv), { width: valW - 8 });
     const hR = doc.heightOfString(safe(rv), { width: valW - 8 });
-    const rh = Math.max(16, Math.max(hL, hR) + 8);
+    const rh = Math.max(16, Math.max(hL, hR) + 8);   // grows if a value wraps
 
     drawRect(doc, MARGIN,                 cy, labelW, rh, lk ? C.labelBg : 'white');
     drawRect(doc, MARGIN + labelW,        cy, valW,   rh, 'white');
@@ -269,6 +329,10 @@ function drawInfoGrid(doc, rows, y) {
   return cy;
 }
 
+// ══════════════════════════════════════════════════════════════════════════
+// Generic table engine (column specs drive header, height and drawing)
+// kind: 'text' | 'ffi' | 'bullets'   (text cols may set bold / color)
+// ══════════════════════════════════════════════════════════════════════════
 function colX(cols, key) {
   let x = MARGIN;
   for (const c of cols) { if (c.key === key) return x; x += c.w; }
@@ -287,7 +351,7 @@ function drawColHeader(doc, cols, y, h = 30) {
   return y + h;
 }
 
-const MAX_ROW_H = TABLE_BOTTOM - (HEADER_BOTTOM + 18 + 3 + 30) - 2;
+const MAX_ROW_H = TABLE_BOTTOM - (HEADER_BOTTOM + 18 + 3 + 30) - 2;  // tallest row that fits a fresh page
 
 function rowHeight(doc, cols, row) {
   let maxH = MIN_ROW_H;
@@ -307,24 +371,27 @@ function rowHeight(doc, cols, row) {
 function drawRow(doc, cols, row, y, h, zebra) {
   let x = MARGIN;
   for (const c of cols) {
-    let bg = zebra ? C.rowAlt : 'white';
-    if (c.bg) bg = c.bg;
-    drawRect(doc, x, y, c.w, h, bg);
+    {
+      let bg = zebra ? C.rowAlt : 'white';
+      if (c.bg) bg = c.bg;
+      drawRect(doc, x, y, c.w, h, bg);
 
-    if (c.kind === 'bullets') {
-      drawBullets(doc, row[c.key], x, y, c.w, h);
-    } else if (c.kind === 'ffi') {
-      const score = parseFloat(safe(row[c.key], '0'));
-      doc.font('Helvetica-Bold').fontSize(9).fillColor(ffiColor(score))
-         .text(safe(row[c.key]), x + 2, y + (h - 10) / 2, { width: c.w - 4, align: 'center', lineBreak: false });
-    } else {
-      doc.font(c.bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(FS).fillColor(c.color || C.textDark)
-         .text(safe(row[c.key]), x + 2, y + 4, { width: c.w - 4, align: c.align || 'left' });
+      if (c.kind === 'bullets') {
+        drawBullets(doc, row[c.key], x, y, c.w, h);
+      } else if (c.kind === 'ffi') {
+        const score = parseFloat(safe(row[c.key], '0'));
+        doc.font('Helvetica-Bold').fontSize(9).fillColor(ffiColor(score))
+           .text(safe(row[c.key]), x + 2, y + (h - 10) / 2, { width: c.w - 4, align: 'center', lineBreak: false });
+      } else {
+        doc.font(c.bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(FS).fillColor(c.color || C.textDark)
+           .text(safe(row[c.key]), x + 2, y + 4, { width: c.w - 4, align: c.align || 'left' });
+      }
     }
     x += c.w;
   }
 }
 
+// ── Signature block (HOD left, Pro-VC right) ──────────────────────────────
 function loadSignature(img) {
   try {
     if (!img) return null;
@@ -338,6 +405,7 @@ function loadSignature(img) {
 }
 
 function drawSignatures(doc, y, { hodUser, vcUser, approvedDate, title }) {
+  // Not enough room on this page → move to a fresh plain page
   if (y + 12 + SIG_H > TABLE_BOTTOM) {
     y = newPlainPage(doc, title);
   }
@@ -347,6 +415,7 @@ function drawSignatures(doc, y, { hodUser, vcUser, approvedDate, title }) {
   const rx = MARGIN + half;
   const lineLen = 200;
 
+  // Left – HOD
   doc.font('Helvetica-Bold').fontSize(9).fillColor(C.darkBlue)
      .text('HOD Name & Signature', MARGIN, sigY, { width: half });
   doc.moveTo(MARGIN, sigY + 42).lineTo(MARGIN + lineLen, sigY + 42).lineWidth(0.7).stroke(C.textDark);
@@ -354,6 +423,7 @@ function drawSignatures(doc, y, { hodUser, vcUser, approvedDate, title }) {
      .text(safe(hodUser?.name, 'Head of Department'), MARGIN, sigY + 46, { width: half });
   doc.text('Date :  _______________', MARGIN, sigY + 58, { width: half });
 
+  // Right – Pro-VC
   doc.font('Helvetica-Bold').fontSize(9).fillColor(C.darkBlue)
      .text('Pro-Vice Chancellor', rx, sigY, { width: half, align: 'right' });
   const sig = loadSignature(vcUser?.signatureImage);
@@ -368,6 +438,7 @@ function drawSignatures(doc, y, { hodUser, vcUser, approvedDate, title }) {
   doc.text(`Date :  ${fmtDate(approvedDate)}`, rx, sigY + 58, { width: half, align: 'right' });
 }
 
+// ── "Page x of y" footer ───────────────────────────────────────────────────
 function drawFooters(doc) {
   const range = doc.bufferedPageRange();
   for (let i = 0; i < range.count; i++) {
@@ -380,7 +451,7 @@ function drawFooters(doc) {
 
 function createDoc(title, subject) {
   return new PDFDocument({
-    size        : [PAGE_W, PAGE_H],
+    size        : [PAGE_W, PAGE_H],            // landscape by dimensions – do NOT add layout:'landscape'
     margins     : { top: 0, bottom: 0, left: 0, right: 0 },
     bufferPages : true,
     autoFirstPage: true,
@@ -393,20 +464,34 @@ function createDoc(title, subject) {
 // ══════════════════════════════════════════════════════════════════════════
 const FACULTY_TITLE = 'FACULTY FEEDBACK REPORT (COURSE WISE)';
 
+// widths sum = 805
 const FAC_COLS = [
-  { key: 'sno',     label: 'S.No',                                   w: 24,  kind: 'text',    align: 'center' },
-  { key: 'code',    label: 'Course Code\n(Section)',                 w: 62,  kind: 'text',    align: 'center' },
-  { key: 'name',    label: 'Course Name',                            w: 95,  kind: 'text',    align: 'left'   },
-  { key: 'reg',     label: 'Reg.\nStud.',                            w: 34,  kind: 'text',    align: 'center' },
-  { key: 'sent',    label: 'Links\nSent',                            w: 34,  kind: 'text',    align: 'center' },
-  { key: 'resp',    label: 'Resp.\nCount',                           w: 36,  kind: 'text',    align: 'center' },
-  { key: 'pct',     label: 'Resp.\n%',                               w: 36,  kind: 'text',    align: 'center' },
-  { key: 'ffi',     label: 'FFI\nScore',                             w: 34,  kind: 'ffi',     bg: C.rowGold },
-  { key: 'student', label: 'Student Comments\n(Key Points)',         w: 155, kind: 'bullets' },
-  { key: 'hod',     label: 'HOD Comments\n(Action Taken / Remarks)', w: 155, kind: 'bullets' },
-  { key: 'provc',   label: 'Pro-VC Comments',                        w: 140, kind: 'bullets', bg: C.commentBg },
+  { key: 'sno',     label: 'S.No',                                  w: 24,  kind: 'text',    align: 'center' },
+  { key: 'code',    label: 'Course Code\n(Section)',                w: 62,  kind: 'text',    align: 'center' },
+  { key: 'name',    label: 'Course Name',                           w: 95,  kind: 'text',    align: 'left'   },
+  { key: 'reg',     label: 'Reg.\nStud.',                           w: 34,  kind: 'text',    align: 'center' },
+  { key: 'sent',    label: 'Links\nSent',                           w: 34,  kind: 'text',    align: 'center' },
+  { key: 'resp',    label: 'Resp.\nCount',                          w: 36,  kind: 'text',    align: 'center' },
+  { key: 'pct',     label: 'Resp.\n%',                              w: 36,  kind: 'text',    align: 'center' },
+  { key: 'ffi',     label: 'FFI\nScore',                            w: 34,  kind: 'ffi',     bg: C.rowGold },
+  { key: 'student', label: 'Student Comments\n(Key Points)',        w: 155, kind: 'bullets' },
+  { key: 'hod',     label: 'HOD Comments\n(Action Taken / Remarks)',w: 155, kind: 'bullets' },
+  { key: 'provc',   label: 'Pro-VC Comments',                       w: 140, kind: 'bullets', bg: C.commentBg },
 ];
 
+/**
+ * @param {object} params
+ * @param {object} params.faculty       – { name, designation, department }
+ * @param {object} params.submission    – { academicYear, session, provcComments, programme? }
+ * @param {Array}  params.reports       – FacultyReport docs for this faculty
+ * @param {object} [params.hodUser]     – { name }
+ * @param {object} [params.vcUser]      – { name, signatureImage }
+ * @param {string} [params.approvedDate]
+ * @param {number} [params.avgResponse]
+ * @param {number} [params.dfi]
+ * @param {string} [params.programme]   – programme label (defaults to submission.programme or 'B.Tech.')
+ * @returns {Promise<Buffer>}
+ */
 async function generateProVCReport({
   faculty, submission, reports, hodUser, vcUser, approvedDate, avgResponse, dfi, programme,
 }) {
@@ -424,14 +509,15 @@ async function generateProVCReport({
       const getProvc = buildProvcLookup(submission);
       const rows = (reports || []).map((r, i) => buildRow(r, i, getProvc, false));
 
+      // Page 1
       drawHeader(doc);
       let y = drawTitleBar(doc, HEADER_BOTTOM, FACULTY_TITLE) + 2;
 
       y = drawInfoGrid(doc, [
-        ['Faculty Name', safe(faculty.name),                  'Academic Session',     sessionLabelOf(submission)],
-        ['Designation',  safe(faculty.designation, 'Faculty'), 'Programme',            safe(programme || submission.programme, 'B.Tech.')],
-        ['Department',   safe(faculty.department),            'Dept. Avg Response %', avgResponse != null ? Number(avgResponse).toFixed(2) : '—'],
-        ['',             '',                                  'DFI (Department)',     dfi != null ? Number(dfi).toFixed(2) : '—'],
+        ['Faculty Name', safe(faculty.name),                 'Academic Session',     sessionLabelOf(submission)],
+        ['Designation',  safe(faculty.designation, 'Faculty'),'Programme',            safe(programme || submission.programme, 'B.Tech.')],
+        ['Department',   safe(faculty.department),           'Dept. Avg Response %', avgResponse != null ? Number(avgResponse).toFixed(2) : '—'],
+        ['',             '',                                 'DFI (Department)',     dfi != null ? Number(dfi).toFixed(2) : '—'],
       ], y) + 4;
 
       y = drawColHeader(doc, FAC_COLS, y);
@@ -466,9 +552,10 @@ async function generateProVCReport({
 // ══════════════════════════════════════════════════════════════════════════
 const DEPT_TITLE = 'DEPARTMENT OVERALL PRO-VC COMMENTS REPORT';
 
+// widths sum = 805
 const DEPT_COLS = [
   { key: 'sno',     label: 'S.No',                                   w: 24,  kind: 'text',    align: 'center' },
-  { key: 'faculty', label: 'Faculty Name',                           w: 95,  kind: 'text',    align: 'left',   bold: true, color: '#1B3D7A' },
+  { key: 'faculty', label: 'Faculty Name',                           w: 95,  kind: 'text',    align: 'left', bold: true, color: C.darkBlue },
   { key: 'code',    label: 'Course Code\n(Section)',                 w: 62,  kind: 'text',    align: 'center' },
   { key: 'name',    label: 'Course Name',                            w: 100, kind: 'text',    align: 'left'   },
   { key: 'reg',     label: 'Reg.\nStud.',                            w: 34,  kind: 'text',    align: 'center' },
@@ -479,6 +566,7 @@ const DEPT_COLS = [
   { key: 'provc',   label: 'Pro-VC Comments',                        w: 138, kind: 'bullets', bg: C.commentBg },
 ];
 
+/** Yellow "overall VC comments" box. Returns new y. */
 function drawOverallComments(doc, vcComment, y, maxBottom) {
   const bw = PAGE_W - MARGIN * 2;
   const TITLE_H = 16;
@@ -513,6 +601,18 @@ function drawOverallComments(doc, vcComment, y, maxBottom) {
   return y + bodyH;
 }
 
+/**
+ * @param {object} params
+ * @param {object} params.submission  – { academicYear, session, department, vcComment, provcComments, programme? }
+ * @param {Array}  params.reports     – all FacultyReport docs for the submission
+ * @param {object} [params.hodUser]
+ * @param {object} [params.vcUser]
+ * @param {string} [params.approvedDate]
+ * @param {number} [params.avgResponse]  (kept for API compatibility)
+ * @param {number} [params.dfi]          (kept for API compatibility)
+ * @param {string} [params.programme]
+ * @returns {Promise<Buffer>}
+ */
 async function generateDepartmentProVCReport({
   submission, reports, hodUser, vcUser, approvedDate, avgResponse, dfi, programme,
 }) {
@@ -526,15 +626,15 @@ async function generateDepartmentProVCReport({
     try {
       const getProvc = buildProvcLookup(submission);
 
-      // Rows keep ORIGINAL order; faculty name written on every row
+      // Rows keep the ORIGINAL order of `reports`; S.No runs 1..N without gaps.
       const rows = (reports || []).map((r, i) => {
         const row = buildRow(r, i, getProvc, true);
-        row.faculty = safe(r.facultyName, 'Unknown');
+        row.faculty = safe(r.facultyName, 'Unknown');   // written on EVERY row
         return row;
       });
-
       const heights = rows.map(row => rowHeight(doc, DEPT_COLS, row));
 
+      // Page 1
       drawHeader(doc);
       let y = drawTitleBar(doc, HEADER_BOTTOM, DEPT_TITLE) + 3;
       y = drawInfoGrid(doc, [
@@ -548,6 +648,7 @@ async function generateDepartmentProVCReport({
         return drawColHeader(doc, DEPT_COLS, ny);
       };
 
+      // Rows flow continuously; a new page starts only when the next row does not fit.
       for (let i = 0; i < rows.length; i++) {
         if (y + heights[i] > TABLE_BOTTOM) y = contPage();
         drawRow(doc, DEPT_COLS, rows[i], y, heights[i], i % 2 === 1);
@@ -560,6 +661,7 @@ async function generateDepartmentProVCReport({
         y += 30;
       }
 
+      // Overall VC comments (own plain page if it doesn't fit – no empty table header)
       y += 8;
       const bw = PAGE_W - MARGIN * 2;
       doc.font('Helvetica').fontSize(8.5);
@@ -569,6 +671,7 @@ async function generateDepartmentProVCReport({
       if (!items.length) boxH = 16 + 22;
 
       if (y + boxH > TABLE_BOTTOM - SIG_H - 12) {
+        // try the box on this page only if it can fit alone; otherwise move it
         if (y + boxH > TABLE_BOTTOM) y = newPlainPage(doc, DEPT_TITLE);
       }
       y = drawOverallComments(doc, submission.vcComment, y, TABLE_BOTTOM - SIG_H - 14);
