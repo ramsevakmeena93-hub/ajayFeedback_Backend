@@ -1,22 +1,12 @@
-/**
- * provcReportGenerator.js
- *
- * Generates landscape A4 Pro-VC reports with PDFKit:
- *   1. generateProVCReport            – "Faculty Feedback Report (Course Wise)" for one faculty
- *   2. generateDepartmentProVCReport  – "Department Overall Pro-VC Comments Report"
- */
-
 'use strict';
 
 const PDFDocument = require('pdfkit');
 const fs = require('fs');
 const path = require('path');
 
-// ── Asset paths ────────────────────────────────────────────────────────────
 const MITS_LOGO_LEFT  = path.join(__dirname, '../../src/assets/mits-logo.png');
 const MITS_HEADER_PNG = path.join(__dirname, '../assets/mits-header.png');
 
-// ── Page geometry (landscape A4: width > height, NO `layout` option!) ─────
 const PAGE_W = 841.89;
 const PAGE_H = 595.28;
 const MARGIN = 18;
@@ -30,7 +20,6 @@ const BULLET_X      = 3;
 const TEXT_X        = 12;
 const PAD_R         = 3;
 
-// ── Brand colours ─────────────────────────────────────────────────────────
 const C = {
   darkBlue  : '#1B3D7A',
   red       : '#C0392B',
@@ -49,9 +38,6 @@ const C = {
   labelBg   : '#EEF2FF',
 };
 
-// ══════════════════════════════════════════════════════════════════════════
-// Generic helpers
-// ══════════════════════════════════════════════════════════════════════════
 function ffiColor(score) {
   if (!score) return C.textDark;
   if (score >= 4.0) return C.ffiGreen;
@@ -170,9 +156,6 @@ function buildRow(r, idx, getProvc, strict) {
   };
 }
 
-// ══════════════════════════════════════════════════════════════════════════
-// Low-level drawing
-// ══════════════════════════════════════════════════════════════════════════
 function drawRect(doc, x, y, w, h, fill) {
   doc.save()
      .lineWidth(0.5)
@@ -309,12 +292,11 @@ const MAX_ROW_H = TABLE_BOTTOM - (HEADER_BOTTOM + 18 + 3 + 30) - 2;
 function rowHeight(doc, cols, row) {
   let maxH = MIN_ROW_H;
   for (const c of cols) {
-    if (c.kind === 'merged') continue;
     let h = MIN_ROW_H;
     if (c.kind === 'bullets') {
       h = bulletsHeight(doc, row[c.key], c.w);
     } else if (c.kind === 'text') {
-      doc.font('Helvetica').fontSize(FS);
+      doc.font(c.bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(FS);
       h = doc.heightOfString(safe(row[c.key]), { width: c.w - 4 }) + 8;
     }
     if (h > maxH) maxH = h;
@@ -325,21 +307,19 @@ function rowHeight(doc, cols, row) {
 function drawRow(doc, cols, row, y, h, zebra) {
   let x = MARGIN;
   for (const c of cols) {
-    if (c.kind !== 'merged') {
-      let bg = zebra ? C.rowAlt : 'white';
-      if (c.bg) bg = c.bg;
-      drawRect(doc, x, y, c.w, h, bg);
+    let bg = zebra ? C.rowAlt : 'white';
+    if (c.bg) bg = c.bg;
+    drawRect(doc, x, y, c.w, h, bg);
 
-      if (c.kind === 'bullets') {
-        drawBullets(doc, row[c.key], x, y, c.w, h);
-      } else if (c.kind === 'ffi') {
-        const score = parseFloat(safe(row[c.key], '0'));
-        doc.font('Helvetica-Bold').fontSize(9).fillColor(ffiColor(score))
-           .text(safe(row[c.key]), x + 2, y + (h - 10) / 2, { width: c.w - 4, align: 'center', lineBreak: false });
-      } else {
-        doc.font('Helvetica').fontSize(FS).fillColor(C.textDark)
-           .text(safe(row[c.key]), x + 2, y + 4, { width: c.w - 4, align: c.align || 'left' });
-      }
+    if (c.kind === 'bullets') {
+      drawBullets(doc, row[c.key], x, y, c.w, h);
+    } else if (c.kind === 'ffi') {
+      const score = parseFloat(safe(row[c.key], '0'));
+      doc.font('Helvetica-Bold').fontSize(9).fillColor(ffiColor(score))
+         .text(safe(row[c.key]), x + 2, y + (h - 10) / 2, { width: c.w - 4, align: 'center', lineBreak: false });
+    } else {
+      doc.font(c.bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(FS).fillColor(c.color || C.textDark)
+         .text(safe(row[c.key]), x + 2, y + 4, { width: c.w - 4, align: c.align || 'left' });
     }
     x += c.w;
   }
@@ -488,7 +468,7 @@ const DEPT_TITLE = 'DEPARTMENT OVERALL PRO-VC COMMENTS REPORT';
 
 const DEPT_COLS = [
   { key: 'sno',     label: 'S.No',                                   w: 24,  kind: 'text',    align: 'center' },
-  { key: 'faculty', label: 'Faculty Name',                           w: 95,  kind: 'merged' },
+  { key: 'faculty', label: 'Faculty Name',                           w: 95,  kind: 'text',    align: 'left',   bold: true, color: '#1B3D7A' },
   { key: 'code',    label: 'Course Code\n(Section)',                 w: 62,  kind: 'text',    align: 'center' },
   { key: 'name',    label: 'Course Name',                            w: 100, kind: 'text',    align: 'left'   },
   { key: 'reg',     label: 'Reg.\nStud.',                            w: 34,  kind: 'text',    align: 'center' },
@@ -498,16 +478,6 @@ const DEPT_COLS = [
   { key: 'hod',     label: 'HOD Comments\n(Action Taken / Remarks)', w: 140, kind: 'bullets' },
   { key: 'provc',   label: 'Pro-VC Comments',                        w: 138, kind: 'bullets', bg: C.commentBg },
 ];
-
-function drawFacultySegment(doc, name, y, height) {
-  if (height <= 0) return;
-  const x = colX(DEPT_COLS, 'faculty');
-  const w = DEPT_COLS.find(c => c.key === 'faculty').w;
-  drawRect(doc, x, y, w, height, 'white');
-  doc.font('Helvetica-Bold').fontSize(8.5).fillColor(C.darkBlue);
-  const nameH = doc.heightOfString(safe(name), { width: w - 8 });
-  doc.text(safe(name), x + 4, y + Math.max(5, (height - nameH) / 2), { width: w - 8 });
-}
 
 function drawOverallComments(doc, vcComment, y, maxBottom) {
   const bw = PAGE_W - MARGIN * 2;
@@ -556,19 +526,14 @@ async function generateDepartmentProVCReport({
     try {
       const getProvc = buildProvcLookup(submission);
 
-      const groups = [];
-      const index = {};
-      (reports || []).forEach(r => {
-        const name = r.facultyName || 'Unknown';
-        if (index[name] == null) { index[name] = groups.length; groups.push({ facultyName: name, rows: [] }); }
-        groups[index[name]].rows.push(r);
+      // Rows keep ORIGINAL order; faculty name written on every row
+      const rows = (reports || []).map((r, i) => {
+        const row = buildRow(r, i, getProvc, true);
+        row.faculty = safe(r.facultyName, 'Unknown');
+        return row;
       });
 
-      let sno = 0;
-      for (const g of groups) {
-        g.courseRows = g.rows.map(r => buildRow(r, sno++, getProvc, true));
-        g.heights    = g.courseRows.map(row => rowHeight(doc, DEPT_COLS, row));
-      }
+      const heights = rows.map(row => rowHeight(doc, DEPT_COLS, row));
 
       drawHeader(doc);
       let y = drawTitleBar(doc, HEADER_BOTTOM, DEPT_TITLE) + 3;
@@ -583,23 +548,13 @@ async function generateDepartmentProVCReport({
         return drawColHeader(doc, DEPT_COLS, ny);
       };
 
-      let zebra = 0;
-      for (const g of groups) {
-        let segStart = y;
-        for (let i = 0; i < g.courseRows.length; i++) {
-          const rh = g.heights[i];
-          if (y + rh > TABLE_BOTTOM) {
-            drawFacultySegment(doc, g.facultyName, segStart, y - segStart);
-            y = contPage();
-            segStart = y;
-          }
-          drawRow(doc, DEPT_COLS, g.courseRows[i], y, rh, zebra++ % 2 === 1);
-          y += rh;
-        }
-        drawFacultySegment(doc, g.facultyName, segStart, y - segStart);
+      for (let i = 0; i < rows.length; i++) {
+        if (y + heights[i] > TABLE_BOTTOM) y = contPage();
+        drawRow(doc, DEPT_COLS, rows[i], y, heights[i], i % 2 === 1);
+        y += heights[i];
       }
 
-      if (!groups.length) {
+      if (!rows.length) {
         doc.font('Helvetica').fontSize(10).fillColor(C.textMid)
            .text('No course reports available for this department.', MARGIN, y + 10, { width: PAGE_W - MARGIN * 2 });
         y += 30;
@@ -613,7 +568,9 @@ async function generateDepartmentProVCReport({
       for (const it of items) boxH += doc.heightOfString(it, { width: bw - 28 }) + 5;
       if (!items.length) boxH = 16 + 22;
 
-      if (y + boxH > TABLE_BOTTOM) y = newPlainPage(doc, DEPT_TITLE);
+      if (y + boxH > TABLE_BOTTOM - SIG_H - 12) {
+        if (y + boxH > TABLE_BOTTOM) y = newPlainPage(doc, DEPT_TITLE);
+      }
       y = drawOverallComments(doc, submission.vcComment, y, TABLE_BOTTOM - SIG_H - 14);
 
       drawSignatures(doc, y, { hodUser, vcUser, approvedDate, title: DEPT_TITLE });
