@@ -139,10 +139,13 @@ router.post(
         .populate({
           path: 'reports',
           model: 'FacultyReport',
+          // Only fields actually used in the PDF — excludes heavy arrays:
+          // rawStudentComments, commentCategories, goodComments, badComments,
+          // commentPercentages, fileHash, pdfFilePath, pdfLink, driveLink
           select:
             'facultyName subjectCode programme semester ffiScore responseCount responsePercent ' +
-            'registeredStudents linkSent linksSent appreciation commentsNeedingAttention hodRemarks ' +
-            'actionTaken academicYear',
+            'registeredStudents linkSent linksSent appreciation commentsNeedingAttention ' +
+            'hodRemarks actionTaken academicYear',
         })
         .lean();
 
@@ -195,7 +198,10 @@ router.post(
         || allReports.map(r => r.actionTaken || '').filter(Boolean).join('\n')
         || '';
 
-      const saved = await ProVCReport.create({
+      const mongoose = require('mongoose');
+      const tempId = new mongoose.Types.ObjectId();
+      const docPayload = {
+        _id:             tempId,
         reportType:      'department-overall',
         department,
         programme:       allReports[0]?.programme || '',
@@ -209,9 +215,15 @@ router.post(
         reportTitle:     `Overall Pro-VC Report — ${department} (${submission.academicYear || ''})`,
         overallComments: overallComments || submission.vcComment || '',
         actionTaken:     actionTakenSnapshot,
-      });
+      };
 
-      res.json({ reportId: saved._id, message: 'Department report generated' });
+      // Respond immediately — don't make the client wait for the DB write
+      res.json({ reportId: tempId, message: 'Department report generated' });
+
+      // Save to DB in the background (fire-and-forget)
+      ProVCReport.create(docPayload).catch(err => {
+        console.error('[ProVC Dept Report] background DB save failed:', err.message);
+      });
     } catch (err) {
       console.error('[ProVC Dept Report]', err);
       res.status(500).json({ error: err.message });

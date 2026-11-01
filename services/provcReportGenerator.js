@@ -222,18 +222,37 @@ function drawRect(doc, x, y, w, h, fill) {
 
 const bulletTextW = w => w - TEXT_X - PAD_R;      // ONE width for measuring AND drawing
 
+/**
+ * Measure bullet items and cache the heights to avoid redundant
+ * heightOfString calls during drawing.
+ * Returns { totalH, itemHeights } where itemHeights[i] is the measured
+ * height of items[i] (filtered to truthy only).
+ */
 function bulletsHeight(doc, items, w) {
-  let total = 4;
   doc.font('Helvetica').fontSize(FS);
-  for (const it of items || []) {
-    if (!it) continue;
-    total += doc.heightOfString(it, { width: bulletTextW(w) }) + 2;
-  }
-  return total + 2;
+  const tw = bulletTextW(w);
+  const list = (items || []).filter(Boolean);
+  const itemHeights = list.map(it => doc.heightOfString(it, { width: tw }));
+  const totalH = 4 + itemHeights.reduce((s, h) => s + h + 2, 0) + 2;
+  return { totalH, list, itemHeights };
 }
 
-function drawBullets(doc, items, x, y, w, h) {
-  const list = (items || []).filter(Boolean);
+/**
+ * Draw pre-measured bullet items.
+ * Accepts either a raw array (re-measures) or the { list, itemHeights } cache
+ * returned by bulletsHeight.
+ */
+function drawBullets(doc, itemsOrCache, x, y, w, h) {
+  let list, itemHeights;
+  if (itemsOrCache && !Array.isArray(itemsOrCache) && itemsOrCache.list) {
+    ({ list, itemHeights } = itemsOrCache);
+  } else {
+    // fallback: re-measure (should only happen if called without cache)
+    const measured = bulletsHeight(doc, itemsOrCache, w);
+    list = measured.list;
+    itemHeights = measured.itemHeights;
+  }
+
   if (!list.length) {
     doc.font('Helvetica').fontSize(FS).fillColor(C.textGrey)
        .text('—', x + 2, y + 4, { width: w - 4, align: 'center' });
@@ -241,15 +260,16 @@ function drawBullets(doc, items, x, y, w, h) {
   }
   const maxY = y + h - 2;
   let ty = y + 4;
-  for (const it of list) {
-    doc.font('Helvetica').fontSize(FS).fillColor(C.textDark);
-    const th = doc.heightOfString(it, { width: bulletTextW(w) });
+  const tw = bulletTextW(w);
+  for (let i = 0; i < list.length; i++) {
+    const th = itemHeights[i];
     if (ty + th > maxY) {                          // truncated – show an ellipsis
       if (ty + 9 <= y + h) doc.text('…', x + TEXT_X, ty, { width: 20, lineBreak: false });
       break;
     }
+    doc.font('Helvetica').fontSize(FS).fillColor(C.textDark);
     doc.text('•', x + BULLET_X, ty, { width: 8, lineBreak: false });
-    doc.text(it, x + TEXT_X, ty, { width: bulletTextW(w) });
+    doc.text(list[i], x + TEXT_X, ty, { width: tw });
     ty += th + 2;
   }
 }
@@ -353,12 +373,18 @@ function drawColHeader(doc, cols, y, h = 30) {
 
 const MAX_ROW_H = TABLE_BOTTOM - (HEADER_BOTTOM + 18 + 3 + 30) - 2;  // tallest row that fits a fresh page
 
+/**
+ * Measure the height of a row AND cache bullet measurements on the row
+ * object (keyed as `_bh_<colKey>`) so drawRow doesn't re-measure.
+ */
 function rowHeight(doc, cols, row) {
   let maxH = MIN_ROW_H;
   for (const c of cols) {
     let h = MIN_ROW_H;
     if (c.kind === 'bullets') {
-      h = bulletsHeight(doc, row[c.key], c.w);
+      const measured = bulletsHeight(doc, row[c.key], c.w);
+      row[`_bh_${c.key}`] = measured;          // cache for drawRow
+      h = measured.totalH;
     } else if (c.kind === 'text') {
       doc.font(c.bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(FS);
       h = doc.heightOfString(safe(row[c.key]), { width: c.w - 4 }) + 8;
@@ -377,7 +403,8 @@ function drawRow(doc, cols, row, y, h, zebra) {
       drawRect(doc, x, y, c.w, h, bg);
 
       if (c.kind === 'bullets') {
-        drawBullets(doc, row[c.key], x, y, c.w, h);
+        // use cached measurements from rowHeight() if available
+        drawBullets(doc, row[`_bh_${c.key}`] || row[c.key], x, y, c.w, h);
       } else if (c.kind === 'ffi') {
         const score = parseFloat(safe(row[c.key], '0'));
         doc.font('Helvetica-Bold').fontSize(9).fillColor(ffiColor(score))
