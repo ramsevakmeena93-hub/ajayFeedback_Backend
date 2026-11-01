@@ -687,6 +687,34 @@ router.patch('/:id/action-taken', authMiddleware, async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// PATCH /:id/session  — Pro-VC / admin can set session on existing submissions
+// ─────────────────────────────────────────────────────────────────────────────
+router.patch('/:id/session', authMiddleware, async (req, res) => {
+  try {
+    const callerRoles = new Set([
+      ...(req.user?.roles || []),
+      ...(req.user?.role ? [req.user.role] : []),
+    ]);
+    const allowed = callerRoles.has('provc') || callerRoles.has('vc') || callerRoles.has('admin') || callerRoles.has('hod');
+    if (!allowed) return res.status(403).json({ error: 'Access denied' });
+
+    const { session } = req.body;
+    if (!['jan-may', 'jul-dec'].includes(session)) {
+      return res.status(400).json({ error: 'session must be jan-may or jul-dec' });
+    }
+    const updated = await Submission.findByIdAndUpdate(
+      req.params.id,
+      { session },
+      { new: true }
+    );
+    if (!updated) return res.status(404).json({ error: 'Submission not found' });
+    res.json({ session: updated.session });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Download final PDF
 // ─────────────────────────────────────────────────────────────────────────────
 
