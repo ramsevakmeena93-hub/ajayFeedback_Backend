@@ -745,7 +745,7 @@ router.get('/:id/download-pdf', authMiddleware, async (req, res) => {
       ...(req.user?.roles || []),
       ...(req.user?.role ? [req.user.role] : []),
     ]);
-    if (!callerRoles.has('vc') && !callerRoles.has('admin') && !callerRoles.has('hod')) {
+    if (!callerRoles.has('vc') && !callerRoles.has('provc') && !callerRoles.has('admin') && !callerRoles.has('hod')) {
       const u = await User.findById(req.user.id).select('name');
       const fullNameClean = u
         ? u.name.replace(/^(Dr\.?|Prof\.?|Mr\.?|Ms\.?|Mrs\.?)\s+/i, '').trim()
