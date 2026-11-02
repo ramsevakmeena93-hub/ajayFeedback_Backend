@@ -9,6 +9,7 @@ const COLORS = {
   border: "#222222",
   text: "#111111",
   muted: "#333333",
+  darkBlue: "#1B3D7A",
 };
 
 function safeText(value, fallback = "") {
@@ -88,7 +89,7 @@ function drawMetadataTable(doc, metadata, y = 97) {
   const heights = [31, 29, 29];
   const rows = [
     [
-      ["Coordinator Name :", safeText(metadata.coordinatorName)],
+      ["HOD Name :", safeText(metadata.coordinatorName)],
       ["Session Name :", safeText(metadata.sessionName)],
     ],
     [
@@ -171,12 +172,36 @@ function drawRecordRow(doc, record, y, h = 30) {
 
 function drawSignatures(doc, y) {
   const baseline = Math.max(y + 12, 520);
+  const pageW    = PAGE.width;
+  const half     = (pageW - 24) / 2;   // half of usable width
+  const leftX    = 12;
+  const rightX   = 12 + half + 12;     // right column starts after left half + gap
+  const lineLen  = 180;
+
+  doc.font("Times-Bold").fontSize(9).fillColor(COLORS.darkBlue);
+
+  // ── Left: HOD ────────────────────────────────────────────────────────────
+  doc.text("Head of Department (HOD)", leftX, baseline, { width: half });
+
+  doc.moveTo(leftX, baseline + 36)
+     .lineTo(leftX + lineLen, baseline + 36)
+     .lineWidth(0.7).stroke(COLORS.text);
+
   doc.font("Times-Roman").fontSize(8.5).fillColor(COLORS.text);
-  doc.text("Coordinator's Name & Signature", 12, baseline, { width: 210 });
-  doc.text("HOD Name & Signature", 380, baseline, { width: 190 });
-  doc.text("Pro-VC", PAGE.width - 58, baseline, { width: 50, align: "right" });
-  doc.text("Date", 12, baseline + 12);
-  doc.text("Date", 380, baseline + 12);
+  doc.text("Name & Signature", leftX, baseline + 40, { width: half });
+  doc.text("Date :  _______________", leftX, baseline + 52, { width: half });
+
+  // ── Right: Pro-VC ─────────────────────────────────────────────────────────
+  doc.font("Times-Bold").fontSize(9).fillColor(COLORS.darkBlue);
+  doc.text("Pro-Vice Chancellor", rightX, baseline, { width: half, align: "right" });
+
+  doc.moveTo(rightX + half - lineLen, baseline + 36)
+     .lineTo(rightX + half, baseline + 36)
+     .lineWidth(0.7).stroke(COLORS.text);
+
+  doc.font("Times-Roman").fontSize(8.5).fillColor(COLORS.text);
+  doc.text("Name & Signature", rightX, baseline + 40, { width: half, align: "right" });
+  doc.text("Date :  _______________", rightX, baseline + 52, { width: half, align: "right" });
 }
 
 function generateDepartmentSummaryPdf(analysis, outputPath, options = {}) {
