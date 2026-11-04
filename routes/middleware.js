@@ -32,23 +32,22 @@ function authMiddleware(req, res, next) {
     }
 
     // ── Re-sync role from DB on every request ──────────────────────────────
-    // This ensures role changes take effect immediately without requiring
-    // the user to log out and back in (stale JWT problem).
-    const User     = require('../models/User');
-    const UserRole = require('../models/UserRole');
-    User.findById(decoded.id).select('role roles department activeWorkspace status').lean()
+    // Ensures role changes take effect immediately without requiring logout.
+    const User = require('../models/User');
+    User.findById(decoded.id)
+      .select('role roles department activeWorkspace status')
+      .lean()
       .then(dbUser => {
-        if (!dbUser || dbUser.status === 'suspended') return; // let token stand, route will 403
-        req.user.role            = dbUser.role;
-        req.user.roles           = dbUser.roles?.length ? dbUser.roles : [dbUser.role];
-        req.user.department      = dbUser.department;
-        req.user.activeWorkspace = dbUser.activeWorkspace || dbUser.role;
-        next();
+        if (dbUser && dbUser.status !== 'suspended') {
+          req.user.role            = dbUser.role;
+          req.user.roles           = dbUser.roles?.length ? dbUser.roles : [dbUser.role];
+          req.user.department      = dbUser.department;
+          req.user.activeWorkspace = dbUser.activeWorkspace || dbUser.role;
+        }
+        next(); // always call next — suspended check happens in route
       })
-      .catch(() => next()); // DB error — fall back to JWT values
+      .catch(() => next()); // DB error — fall back to JWT values, still proceed
 
-    // Don't call next() here — called inside the .then() above
-    return;
   } catch {
     res.status(401).json({ error: 'Invalid token' });
   }
