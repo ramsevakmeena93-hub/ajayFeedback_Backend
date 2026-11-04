@@ -89,7 +89,7 @@ router.get('/users', ...adminOnly, async (req, res) => {
     if (department) filter.department = department;
     if (status)     filter.status     = status;
 
-    const users = await User.find(filter, '-password -signatureImage').sort({ createdAt: -1 });
+    const users = await User.find(filter, '-password -signatureImage -profilePhoto -bio -googleId').sort({ createdAt: -1 });
 
     // Optionally enrich with UserRole documents
     if (withRoles === 'true') {
@@ -813,7 +813,7 @@ router.get('/google-users', ...adminOnly, async (req, res) => {
   try {
     const googleUsers = await User.find({
       $or: [{ googleVerified: true }, { googleId: { $ne: '' } }],
-    }, '-password').sort({ lastLogin: -1 });
+    }, '-password -signatureImage -profilePhoto -bio').sort({ lastLogin: -1 });
     res.json(googleUsers);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
