@@ -1003,10 +1003,27 @@ router.post(
       const cleanEmail =
         email.toLowerCase().trim();
 
+      // Search by email first, then by googleId (handles Gmail login
+      // linking to an existing institute email account)
       let user =
-        await User.findOne({
-          email: cleanEmail
+        await User.findOne({ email: cleanEmail });
+
+      // If not found by email, try matching by googleId (already linked before)
+      if (!user && sub) {
+        user = await User.findOne({ googleId: sub });
+      }
+
+      // If still not found, try matching institute email from Gmail username
+      // e.g. "25tc1aj7@gmail.com" → look for "25tc1aj7@mitsgwl.ac.in"
+      if (!user) {
+        const gmailLocal = cleanEmail.split('@')[0];
+        user = await User.findOne({
+          email: { $regex: new RegExp(`^${gmailLocal}@`, 'i') }
         });
+        if (user) {
+          console.log(`[Auth] Google OAuth — linked Gmail ${cleanEmail} to institute account ${user.email}`);
+        }
+      }
 
       if (
         !isAllowedDomain(
