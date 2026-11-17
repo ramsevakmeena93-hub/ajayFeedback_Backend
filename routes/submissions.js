@@ -472,8 +472,8 @@ router.patch('/:id/status', authMiddleware, async (req, res) => {
     const updateData = {
       status,
       vcComment: vcComment || '',
-      ...(status === 'approved'   ? { finalReportDate: new Date() } : {}),
-      ...(status === 'escalated'  ? { escalatedAt: new Date() }     : {}),
+      ...(status === 'approved'  ? { finalReportDate: new Date(), approverId: req.user.id } : {}),
+      ...(status === 'escalated' ? { escalatedAt: new Date() } : {}),
     };
 
     const submission = await Submission.findByIdAndUpdate(
@@ -733,7 +733,21 @@ router.get('/:id/download-pdf', authMiddleware, async (req, res) => {
     }
 
     const User = require('../models/User');
-    const vcUser = await User.findOne({ role: 'vc' }).select('name signatureImage');
+    // Fetch VC or ProVC user for signature — whoever approved this submission
+    let vcUser = null;
+    if (submission.approverId) {
+      vcUser = await User.findById(submission.approverId).select('name signatureImage');
+    }
+    if (!vcUser) {
+      // fallback: find any vc or provc with a signature
+      vcUser = await User.findOne({
+        role: { $in: ['vc', 'provc'] },
+        signatureImage: { $ne: '' },
+      }).select('name signatureImage');
+    }
+    if (!vcUser) {
+      vcUser = await User.findOne({ role: { $in: ['vc', 'provc'] } }).select('name signatureImage');
+    }
 
     let reportDocs = submission.reports || [];
     if (reportDocs.length === 0 || typeof reportDocs[0] === 'string' || !reportDocs[0]?.facultyName) {
@@ -836,8 +850,20 @@ router.get('/:id/provc-department-report', authMiddleware, async (req, res) => {
     }
 
     const User = require('../models/User');
-    const vcUser = await User.findOne({ $or: [{ role: 'vc' }, { role: 'provc' }] })
-      .select('name signatureImage').lean();
+    // Fetch VC or ProVC user — prefer the one who approved, then fallback to any with signature
+    let vcUser = null;
+    if (submission.approverId) {
+      vcUser = await User.findById(submission.approverId).select('name signatureImage').lean();
+    }
+    if (!vcUser) {
+      vcUser = await User.findOne({
+        role: { $in: ['vc', 'provc'] },
+        signatureImage: { $ne: '' },
+      }).select('name signatureImage').lean();
+    }
+    if (!vcUser) {
+      vcUser = await User.findOne({ role: { $in: ['vc', 'provc'] } }).select('name signatureImage').lean();
+    }
 
     // Department-wide stats
     const allReports = submission.reports || [];
