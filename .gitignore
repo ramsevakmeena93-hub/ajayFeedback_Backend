@@ -15,6 +15,9 @@ training_data/
 
 # Entire model folder - not needed on Render
 models/deberta-zeroshot/
+ai/deberta-zeroshot/*.safetensors
+ai/deberta-zeroshot/*.model
+ai/deberta-zeroshot/deberta-zeroshot/
 __pycache__/
 *.pyc
 

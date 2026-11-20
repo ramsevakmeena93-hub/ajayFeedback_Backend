@@ -38,7 +38,8 @@ const allowedOrigins = [
   'http://localhost:5175',
   'http://localhost:5176',
   'http://localhost:5177',
-  process.env.FRONTEND_URL,
+  'https://ajayfeedback.vercel.app',   // production Vercel frontend
+  process.env.FRONTEND_URL,             // override via Render env var
 ].filter(Boolean);
 
 const corsOptions = {

@@ -49,6 +49,33 @@ def is_spam(text: str) -> bool:
             return True
     return False
 
+# ── PDF Rating Table Noise Patterns ───────────────────────────────────────────
+# Catches rows accidentally extracted from PDF rating tables, e.g.:
+#   "1The weekly quiz and fortnightly2122219153.47"
+#   "2Demonstrates a consistently positive,172316233.76"
+#   "12The PPTs/Notes are shared in a timely1915205112.63 manner"
+TABLE_NOISE_PATTERNS = [
+    # Digit(s) immediately glued to a capital letter — classic table row prefix: "1The", "12The"
+    re.compile(r'^\d{1,2}[A-Z]'),
+    # Word text immediately followed by 3+ digits (no space) — counts embedded in text: "fortnightly2122219"
+    re.compile(r'[a-zA-Z]{3,}\d{3,}'),
+    # 4 or more standalone numbers in sequence — rating column counts: "2 12 25 14 18"
+    re.compile(r'(\b\d+\b\s*){4,}'),
+    # Ends with a decimal rating score: "3.47", "2.63", "3.76"
+    re.compile(r'\b[1-5]\.\d{2}\s*$'),
+    # "same as roll no. 64" / "same as above" cross-references
+    re.compile(r'\b(same\s+as\s+(roll|student|above|no\.?\s*\d*))\b', re.I),
+    # Bare rating like "Overall 4.8 out of 5" with no real sentence content
+    re.compile(r'^(overall\s+)?\d+(\.\d+)?\s*(out\s+of\s+\d+)?\s*$', re.I),
+]
+
+def is_table_noise(text: str) -> bool:
+    """Returns True if text looks like a PDF-extracted rating table row, not a real comment."""
+    for rx in TABLE_NOISE_PATTERNS:
+        if rx.search(text):
+            return True
+    return False
+
 # ── High-Priority Needs Attention Pre-Rules ───────────────────────────────────
 # If matched, classified directly as NEEDS_ATTENTION to prevent leaks
 ATTENTION_RULES = [
@@ -179,6 +206,15 @@ async def classify(request: Request):
                 result["classifiedComments"].append({
                     "text": cleaned, "classification": "skipped",
                     "needsAttention": False, "confidence": 1.0, "reason": "spam-or-gibberish"
+                })
+                continue
+
+            # 1b. Check PDF rating table noise — numbered rows with embedded counts/scores
+            if is_table_noise(cleaned):
+                result["statistics"]["skipped"] += 1
+                result["classifiedComments"].append({
+                    "text": cleaned, "classification": "skipped",
+                    "needsAttention": False, "confidence": 1.0, "reason": "table-noise"
                 })
                 continue
 

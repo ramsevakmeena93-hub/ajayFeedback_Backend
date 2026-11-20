@@ -158,7 +158,7 @@ async function extractHighlightedText(buffer) {
 
       if (inside.length === 0) continue;
 
-      const text = inside.map(t => t.str).join('').replace(/\s+/g, ' ').trim();
+      const text = inside.map(t => t.str).join(' ').trim().replace(/\s+/g, ' ');
       if (text.length < 3) continue;
 
       // RED is Attention (needs attention / problems), YELLOW is Appreciation (positive feedback)
@@ -180,12 +180,71 @@ async function extractHighlightedText(buffer) {
 // Rejects: page numbers, dates, URLs, table headers, metadata
 // Accepts: single-word feedback ("GOOD", "Excellent", "best", "nice")
 // ─────────────────────────────────────────────────────────────────
+
+/**
+ * cleanCommentText — strips PDF extraction artifacts from a comment string.
+ *
+ * PDFs often embed rating column counts directly into text, e.g.:
+ *   "notes are never shared in time0152941..."  →  "notes are never shared in time"
+ *   "Sir explains02629294.29 very well"         →  "Sir explains very well"
+ *
+ * Rules applied (order matters):
+ *  1. Remove a leading row-number prefix glued to the first word: "4Performance" → "Performance"
+ *  2. Remove trailing decimal rating score: "...3.47" → ""
+ *  3. Remove blocks of 3+ consecutive digits that appear mid-text or at end
+ *  4. Normalise whitespace
+ */
+function cleanCommentText(text) {
+    if (!text || typeof text !== 'string') return text;
+    let t = text.trim();
+
+    // 1. Strip leading row-number glued to capital letter: "4Performance" → "Performance"
+    t = t.replace(/^\d{1,2}([A-Z])/, '$1');
+
+    // 2. Remove full decimal blocks (rating scores embedded in text): "02629294.29", "3.47"
+    //    But preserve real decimals in normal sentences like "4.5 out of 5" — those are rare
+    //    Safe pattern: a digit run of 3+ digits followed by dot+digits = PDF count artifact
+    t = t.replace(/\d{3,}\.\d+/g, '');   // long-number.decimal  e.g. "02629294.29"
+    t = t.replace(/\b[1-5]\.\d{2}\b/g, ''); // short rating score e.g. "3.47", "4.29"
+
+    // 3. Remove digits glued directly to word characters (PDF column bleed)
+    //    "discussed02629" → "discussed",  "fortnightly21222" → "fortnightly"
+    //    But keep "2D", "3G", "5G", "2nd", "3rd", "1st"
+    t = t.replace(/([a-zA-Z]{2,})\d{2,}/g, '$1');   // word(2+chars) + 2+ digits
+    t = t.replace(/\d{2,}([a-zA-Z]{2,})/g, '$1');   // 2+ digits + word(2+chars)
+
+    // 4. Remove long standalone digit runs (4+ digits — counts/codes, not years)
+    t = t.replace(/\b\d{4,}\b/g, '');
+
+    // 5. Normalise whitespace
+    t = t.replace(/\s{2,}/g, ' ').trim();
+    // Remove trailing/leading stray punctuation left by number removal
+    t = t.replace(/\s+([.,;])/g, '$1');
+
+    return t;
+}
+
 function isValidComment(text) {
     if (!text || typeof text !== 'string') return false;
     const clean = text.trim();
 
-    // Minimum length to be considered a real comment (increased to filter more garbage)
-    if (clean.length < 10) return false;
+    // Minimum length to be considered a real comment
+    if (clean.length < 3) return false;
+
+    // ── Reject PDF rating-table rows ──────────────────────────────────────────
+    // Pattern: starts with a row number immediately glued to a capital letter
+    // e.g. "4Performance in...", "9Whether MMTLP...", "10Additional classes..."
+    if (/^\d{1,2}[A-Z]/.test(clean)) return false;
+
+    // Pattern: word text immediately followed by 3+ digits (no space) — embedded counts
+    // e.g. "discussed02629294.29", "fortnightly2122219153.47"
+    if (/[a-zA-Z]{3,}\d{3,}/.test(clean)) return false;
+
+    // Pattern: 4+ standalone numbers in sequence — rating column counts
+    if (/(\b\d+\b\s*){4,}/.test(clean)) return false;
+
+    // Pattern: ends with a decimal rating score like "3.47", "4.29", "4.18"
+    if (/\b[1-5]\.\d{2}\s*$/.test(clean)) return false;
 
     // Reject page numbers like "1 / 3", "2/3", "about:blank 1 / 2"
     if (/^\d+\s*\/\s*\d+$/.test(clean)) return false;
@@ -323,7 +382,23 @@ async function extractAllStudentComments(buffer, targetCourseCode) {
 
             // Filter rows below header line and above bottom page footer (y > 30)
             const commentRows = yKeys.filter(y => y < commentStartY - 10 && y > 30).map(y => {
-                const text = rowMap[y].sort((a, b) => a.transform[4] - b.transform[4]).map(i => i.str).join('').replace(/\s+/g, ' ').trim();
+                // Sort items left-to-right by X position
+                const rowItems = rowMap[y].sort((a, b) => a.transform[4] - b.transform[4]);
+
+                // --- KEY FIX ---
+                // PDF rating tables have the question text in the first column and
+                // rating counts (numbers) in subsequent columns on the SAME Y row.
+                // We keep only text items — items whose trimmed value contains at least
+                // one letter. Pure-number cells (counts, scores) are dropped.
+                const textOnlyItems = rowItems.filter(item => {
+                    const s = item.str.trim();
+                    // Keep if it has any letter character
+                    return /[a-zA-Z]/.test(s);
+                });
+
+                // If filtering removed everything fall back to all items (genuine comment row)
+                const chosenItems = textOnlyItems.length > 0 ? textOnlyItems : rowItems;
+                const text = chosenItems.map(i => i.str).join(' ').trim();
                 return { y, text };
             });
 
@@ -341,7 +416,8 @@ async function extractAllStudentComments(buffer, targetCourseCode) {
                 // Clean and normalize whitespace
                 curr = curr.trim().replace(/\s+/g, ' ');
 
-                // Add complete comment as-is (NO splitting)
+                // Clean embedded table numbers, then validate
+                curr = cleanCommentText(curr);
                 if (isValidComment(curr)) {
                     res.push(curr);
                 }
@@ -376,7 +452,7 @@ async function extractAllStudentComments(buffer, targetCourseCode) {
                 const bullets = tableComments.split(/•/).map(s => s.trim()).filter(Boolean);
                 bullets.forEach(b => {
                     // Clean and validate
-                    const cleaned = b.trim().replace(/\s+/g, ' ');
+                    const cleaned = cleanCommentText(b.trim().replace(/\s+/g, ' '));
                     if (!/^(good|very good|excellent|below average):\s*\d+%/i.test(cleaned) && isValidComment(cleaned)) {
                         comments.push(cleaned);
                     }
@@ -392,7 +468,7 @@ async function extractAllStudentComments(buffer, targetCourseCode) {
             const tc = await page.getTextContent();
             const items = tc.items.filter(i => i.str && i.str.trim());
             for (const item of items) {
-                const str = item.str.trim().replace(/\s+/g, ' ');
+                const str = cleanCommentText(item.str.trim().replace(/\s+/g, ' '));
                 if (str.length >= 8 && isValidComment(str)) {
                     // Look for feedback keywords
                     if (/good|nice|excellent|poor|best|worst|speed|voice|doubt|explain|notes|exam|quiz|teach|clear|improve|slow|fast|audible|helpful|teaching|class|lecture|understand/i.test(str)) {
@@ -771,7 +847,7 @@ async function extractMetaFromBuffer(buffer) {
             const fullText = tc.items.map(i => i.str.trim()).filter(Boolean).join(' ');
 
             if (!facultyName) {
-                const m = fullText.match(/(?:faculty\s*name|name\s*of\s*faculty)\s*[:\-]?\s*([A-Za-z\s.]+?)(?=\s+(?:course|code|programme|semester|$))/i);
+                const m = fullText.match(/(?:faculty\s*name|name\s*of\s*faculty)\s*[:\-]?\s*([A-Za-z\s.]{2,50})/i);
                 if (m && m[1].trim().length > 2) facultyName = m[1].trim();
             }
 
@@ -781,11 +857,9 @@ async function extractMetaFromBuffer(buffer) {
             }
 
             if (!programme) {
-                // More flexible pattern for course name
                 const patterns = [
-                    /(?:course\s*name|programme|branch)\s*[:\-]?\s*((?:[A-Za-z0-9&,./\-\(\)]+\s*)+?)(?=\s*(?:semester|sem\b|\d{1,2}\s*(?:semester|sem|\b)|ffi|resp|response|registered|$))/i,
-                    /(?:^|\n)((?:[A-Z][A-Za-z0-9&,./\-\(\)\s]+))(?=\s*(?:semester|sem\b|I{1,3}V?|V?I{1,3}\b))/im, // Matches course names before semester numbers
-                    /programme\s*[:\-]?\s*([A-Z][A-Za-z0-9&,./\-\(\)\s]+?)(?=\s*semester)/i
+                    /(?:course\s*name|programme|branch)\s*[:\-]?\s*([A-Za-z0-9&,./\-\(\)\s]{3,60})/i,
+                    /programme\s*[:\-]?\s*([A-Za-z0-9&,./\-\(\)\s]{3,60})/i
                 ];
                 
                 for (const pattern of patterns) {
@@ -1025,12 +1099,12 @@ async function analyzePDFBuffer(buffer) {
     // STEP 7: Calculate comment percentages (Excellent, Very Good, Good) before filtering
     const commentPercentages = calculateCommentPercentages(allComments, meta?.responseCount);
 
-    // STEP 8: Filter out short (< 6 words) or trivial comments from final appreciation list
-    const TRIVIAL_APP_RX = /^(very good|good|nice|ok|okay|fine|sir very good|teaches good|good teacher|all is fine|rich content|everything is nice|everything is perfect|every thing is good|no remarks needed)$/i;
+    // STEP 8: Ensure only clean, non-filler comments in appreciation list (deduplicated & meaningful)
+    const FILLER_ONLY_RX = /^(ok|okay|fine|na|n\/a|nil|none|nothing|no remark|no remarks|no feedback)$/i;
     appreciation = appreciation.filter(c => {
-        const words = c.trim().replace(/[.,!?;:]+$/, '').split(/\s+/);
-        if (words.length < 6) return false;
-        if (TRIVIAL_APP_RX.test(c.trim())) return false;
+        const trimmed = c.trim().replace(/[.,!?;:]+$/, '');
+        if (!trimmed || trimmed.length < 3) return false;
+        if (FILLER_ONLY_RX.test(trimmed)) return false;
         return true;
     });
 
@@ -1073,4 +1147,4 @@ async function extractMetaFromPDF(buffer) {
     }
 }
 
-module.exports = { analyzePDF, analyzePDFBuffer, extractMetaFromPDF, extractHighlightedText, convertDriveLink };
+module.exports = { analyzePDF, analyzePDFBuffer, extractMetaFromPDF, extractHighlightedText, convertDriveLink, extractMetaFromBuffer, extractAllStudentComments };

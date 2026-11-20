@@ -445,6 +445,12 @@ function drawSignatures(doc, y, { hodUser, vcUser, approvedDate, title }) {
   // Left – HOD
   doc.font('Helvetica-Bold').fontSize(9).fillColor(C.darkBlue)
      .text('HOD Name & Signature', MARGIN, sigY, { width: half });
+  const hodSig = loadSignature(hodUser?.signatureImage);
+  if (hodSig) {
+    try {
+      doc.image(hodSig, MARGIN, sigY + 12, { fit: [140, 28] });
+    } catch (_) { /* bad image – skip */ }
+  }
   doc.moveTo(MARGIN, sigY + 42).lineTo(MARGIN + lineLen, sigY + 42).lineWidth(0.7).stroke(C.textDark);
   doc.font('Helvetica').fontSize(8.5).fillColor(C.textDark)
      .text(safe(hodUser?.name, 'Head of Department'), MARGIN, sigY + 46, { width: half });

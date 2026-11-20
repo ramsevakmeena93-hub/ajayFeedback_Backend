@@ -43,7 +43,7 @@ async function classifyComments(rawComments) {
       const payload = comments.map(c => typeof c === 'object' && c !== null ? (c.text || c.comment || '') : String(c));
       const response = await axios.post(`${FASTAPI_URL}/classify`, payload, {
         headers: { 'Content-Type': 'application/json' },
-        timeout: 60000
+        timeout: 2000
       });
 
       const result = response.data;
