@@ -1,12 +1,14 @@
 // ============================================================
-// COLLEGE FEEDBACK INTELLIGENCE — HuggingFace DeBERTa v3
-// Model: MoritzLaurer/deberta-v3-base-zeroshot-v1
-// Zero-shot classification — no training required
-// Replaces the old rule-based v6 engine
+// COLLEGE FEEDBACK INTELLIGENCE — IMPROVED CLASSIFIER
+// Uses multiple AI models with strict validation:
+// 1. Google Gemini 1.5 Flash (primary)
+// 2. HuggingFace DeBERTa v3 Large (fallback)
+// 3. Enhanced rule-based engine (validation)
 // ============================================================
 
 const axios = require('axios');
 const { classifyCommentsWithHF } = require('./hfClassifierService');
+const improvedClassifier = require('./improvedClassifier');
 
 const FASTAPI_URL = process.env.FASTAPI_CLASSIFIER_URL || 'http://localhost:7860';
 
@@ -55,7 +57,70 @@ async function classifyComments(rawComments) {
     }
   }
 
-  // 2. Fallback to HF service / high-precision rule engine
+  // 2. Try improved classifier with Gemini AI
+  try {
+    console.log('[AI] Using improved multi-model classifier (Gemini + HF + Rules)...');
+    const improvedResult = await improvedClassifier.classifyComments(comments);
+    
+    // Build full result with categories
+    const result = {
+      appreciation: improvedResult.appreciation,
+      commentsNeedingAttention: improvedResult.commentsNeedingAttention,
+      commentCategories: {
+        Teaching: [],
+        Communication: [],
+        Availability: [],
+        Materials: [],
+        Assessment: [],
+        General: []
+      },
+      classifiedComments: [],
+      statistics: {
+        totalReceived: comments.length,
+        meaningfulCount: improvedResult.statistics.total,
+        appreciation: improvedResult.statistics.appreciation,
+        attention: improvedResult.statistics.attention,
+        neutral: improvedResult.statistics.neutral,
+        skipped: 0,
+        aiClassified: improvedResult.statistics.highConfidence + improvedResult.statistics.mediumConfidence,
+        ruleClassified: improvedResult.statistics.lowConfidence,
+        highConfidence: improvedResult.statistics.highConfidence,
+        mediumConfidence: improvedResult.statistics.mediumConfidence,
+        lowConfidence: improvedResult.statistics.lowConfidence
+      }
+    };
+    
+    // Categorize attention comments
+    improvedResult.commentsNeedingAttention.forEach(comment => {
+      const lower = comment.toLowerCase();
+      if (/\b(speed|fast|slow|rush|pace|time)\b/i.test(lower)) {
+        result.commentCategories.Teaching.push(comment);
+      } else if (/\b(voice|audible|volume|sound|communication)\b/i.test(lower)) {
+        result.commentCategories.Communication.push(comment);
+      } else if (/\b(doubt|available|support|help|approachable)\b/i.test(lower)) {
+        result.commentCategories.Availability.push(comment);
+      } else if (/\b(note|material|pdf|slide|upload)\b/i.test(lower)) {
+        result.commentCategories.Materials.push(comment);
+      } else if (/\b(quiz|marks|test|assessment|exam)\b/i.test(lower)) {
+        result.commentCategories.Assessment.push(comment);
+      } else {
+        result.commentCategories.General.push(comment);
+      }
+    });
+    
+    console.log(`[AI] ✅ Improved Classifier Results:`);
+    console.log(`[AI] Attention  : ${result.commentsNeedingAttention.length}`);
+    console.log(`[AI] Appreciate : ${result.appreciation.length}`);
+    console.log(`[AI] Neutral    : ${result.statistics.neutral}`);
+    console.log(`[AI] High Confidence: ${result.statistics.highConfidence}`);
+    console.log(`[AI] Medium Confidence: ${result.statistics.mediumConfidence}`);
+    console.log('[AI] ========================================');
+    return result;
+  } catch (err) {
+    console.warn('[AI] Improved classifier error:', err.message, '— falling back to HF service');
+  }
+  
+  // 3. Fallback to original HF service / high-precision rule engine
   try {
     const result = await classifyCommentsWithHF(comments);
     console.log(`[AI] Attention  : ${result.commentsNeedingAttention.length}`);
