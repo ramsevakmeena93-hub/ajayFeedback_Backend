@@ -1112,6 +1112,61 @@ async function analyzePDF(pdfLink) {
 }
 
 /**
+ * Extract rating statistics from survey table (Good, Very Good, Excellent counts)
+ * Looks for "Total" row in rating tables and extracts column counts
+ */
+async function extractRatingStatistics(buffer) {
+    const uint8 = new Uint8Array(buffer);
+    const doc = await pdfjsLib.getDocument({ data: uint8, verbosity: 0 }).promise;
+    
+    for (let p = 1; p <= doc.numPages; p++) {
+        const page = await doc.getPage(p);
+        const tc = await page.getTextContent();
+        const items = tc.items.filter(i => i.str && i.str.trim());
+        
+        // Find "Total" row (last row of rating table)
+        const totalItems = [];
+        let totalY = null;
+        
+        for (const item of items) {
+            const text = (item.str || '').trim().toLowerCase();
+            if (text === 'total' || text === '15') { // Row 15 is usually Total
+                totalY = item.transform[5];
+                break;
+            }
+        }
+        
+        if (totalY) {
+            // Collect all numbers on the same Y line (within 5px tolerance)
+            const rowNums = items
+                .filter(i => Math.abs(i.transform[5] - totalY) < 5)
+                .filter(i => /^\d+$/.test(i.str.trim()))
+                .map(i => parseInt(i.str.trim(), 10))
+                .filter(n => n > 0);
+            
+            // Expected format: [Below Avg, Average, Good, Very Good, Excellent, QV score]
+            // Example: [48, 182, 318, 238, 194, 3.36]
+            if (rowNums.length >= 5) {
+                const [belowAvg, average, good, veryGood, excellent] = rowNums;
+                const total = belowAvg + average + good + veryGood + excellent;
+                
+                if (total > 0) {
+                    console.log(`[PDF] ✓ Found rating statistics: G=${good}, VG=${veryGood}, E=${excellent}, Total=${total}`);
+                    return {
+                        'Good': Math.round((good / total) * 100),
+                        'Very Good': Math.round((veryGood / total) * 100),
+                        'Excellent': Math.round((excellent / total) * 100),
+                        counts: { good, veryGood, excellent, average, belowAvg, total }
+                    };
+                }
+            }
+        }
+    }
+    
+    return null;
+}
+
+/**
  * Calculate accurate percentages from raw student comments.
  * Counts exact keyword occurrences across ALL comments (not just classified ones).
  * Returns: { "Excellent": 10, "Very Good": 25, "Good": 65 } (percentages)
@@ -1277,8 +1332,15 @@ async function analyzePDFBuffer(buffer) {
     // Final strict filter: ensure zero attention comments in appreciation
     appreciation = appreciation.filter(c => !commentsNeedingAttention.includes(c));
 
-    // STEP 7: Calculate comment percentages (Excellent, Very Good, Good) before filtering
-    const commentPercentages = calculateCommentPercentages(allComments, meta?.responseCount);
+    // STEP 7: Calculate comment percentages 
+    // Try extracting from rating table first, fallback to keyword counting
+    let commentPercentages = await extractRatingStatistics(buffer);
+    if (!commentPercentages) {
+        commentPercentages = calculateCommentPercentages(allComments, meta?.responseCount);
+        console.log('[PDF] Using keyword-based percentages:', commentPercentages);
+    } else {
+        console.log('[PDF] Using rating table percentages:', commentPercentages);
+    }
 
     // STEP 8: Ensure only clean, non-filler comments in appreciation list (deduplicated & meaningful)
     const FILLER_ONLY_RX = /^(ok|okay|fine|na|n\/a|nil|none|nothing|no remark|no remarks|no feedback)$/i;
