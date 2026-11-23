@@ -9,6 +9,7 @@
 const axios = require('axios');
 const { classifyCommentsWithHF } = require('./hfClassifierService');
 const improvedClassifier = require('./improvedClassifier');
+const { isSurveyQuestionOrHeader } = require('../utils/surveyFilter');
 
 const FASTAPI_URL = process.env.FASTAPI_CLASSIFIER_URL || 'http://localhost:7860';
 
@@ -38,6 +39,18 @@ async function classifyComments(rawComments) {
     };
   }
 
+  // Sanitize: filter out any survey questions (1-14) or table headers from appreciation and attention
+  const sanitizeResult = res => {
+    if (!res) return res;
+    if (Array.isArray(res.appreciation)) {
+      res.appreciation = res.appreciation.filter(c => !isSurveyQuestionOrHeader(c));
+    }
+    if (Array.isArray(res.commentsNeedingAttention)) {
+      res.commentsNeedingAttention = res.commentsNeedingAttention.filter(c => !isSurveyQuestionOrHeader(c));
+    }
+    return res;
+  };
+
   // 1. Try redirecting to FastAPI DeBERTa server if reachable
   if (FASTAPI_URL) {
     try {
@@ -48,7 +61,7 @@ async function classifyComments(rawComments) {
         timeout: 2000
       });
 
-      const result = response.data;
+      const result = sanitizeResult(response.data);
       console.log(`[AI] FastAPI Success: ${result.commentsNeedingAttention?.length || 0} attention, ${result.appreciation?.length || 0} appreciation`);
       console.log('[AI] ========================================');
       return result;
@@ -63,7 +76,7 @@ async function classifyComments(rawComments) {
     const improvedResult = await improvedClassifier.classifyComments(comments);
     
     // Build full result with categories
-    const result = {
+    const result = sanitizeResult({
       appreciation: improvedResult.appreciation,
       commentsNeedingAttention: improvedResult.commentsNeedingAttention,
       commentCategories: {
@@ -88,7 +101,7 @@ async function classifyComments(rawComments) {
         mediumConfidence: improvedResult.statistics.mediumConfidence,
         lowConfidence: improvedResult.statistics.lowConfidence
       }
-    };
+    });
     
     // Categorize attention comments
     improvedResult.commentsNeedingAttention.forEach(comment => {
@@ -122,7 +135,7 @@ async function classifyComments(rawComments) {
   
   // 3. Fallback to original HF service / high-precision rule engine
   try {
-    const result = await classifyCommentsWithHF(comments);
+    const result = sanitizeResult(await classifyCommentsWithHF(comments));
     console.log(`[AI] Attention  : ${result.commentsNeedingAttention.length}`);
     console.log(`[AI] Appreciate : ${result.appreciation.length}`);
     console.log(`[AI] Neutral    : ${result.statistics.neutral}`);

@@ -19,6 +19,8 @@ const FILLER_PHRASES = new Set([
   'all ok','all fine','no issues','no problem','no problems','no feedback',
 ]);
 
+const { isSurveyQuestionOrHeader } = require('../utils/surveyFilter');
+
 function filterShortComments(list) {
   if (!Array.isArray(list)) return [];
   return list.filter(c => {
@@ -26,6 +28,7 @@ function filterShortComments(list) {
     const t = c.trim();
     if (t.length < 3) return false;                          // ignore single chars or empty
     if (FILLER_PHRASES.has(t.toLowerCase().replace(/[.,!?]+$/, ''))) return false;
+    if (isSurveyQuestionOrHeader(t)) return false;           // reject survey questions & table headers
     return t.split(/\s+/).filter(Boolean).length >= 5;       // less than 5 words not added to appreciation/needs attention
   });
 }

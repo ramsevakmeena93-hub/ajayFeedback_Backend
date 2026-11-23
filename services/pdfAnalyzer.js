@@ -1,4 +1,5 @@
 const axios = require('axios');
+const { isSurveyQuestionOrHeader } = require('../utils/surveyFilter');
 const pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js');
 pdfjsLib.GlobalWorkerOptions.workerSrc = false;
 
@@ -1384,17 +1385,19 @@ async function analyzePDFBuffer(buffer) {
     }
 
     // STEP 8: Ensure only clean, non-filler comments with >= 5 words in appreciation & need attention lists
+    // Exclude any survey questions (questions 1-14) or table headers from both sections
     const FILLER_ONLY_RX = /^(ok|okay|fine|na|n\/a|nil|none|nothing|no remark|no remarks|no feedback)$/i;
-    const meetsWordCount = c => {
+    const isValidReportComment = c => {
         if (!c || typeof c !== 'string') return false;
         const trimmed = c.trim().replace(/[.,!?;:]+$/, '');
         if (!trimmed || trimmed.length < 3) return false;
         if (FILLER_ONLY_RX.test(trimmed)) return false;
+        if (isSurveyQuestionOrHeader(trimmed)) return false;
         return trimmed.split(/\s+/).filter(Boolean).length >= 5;
     };
 
-    appreciation = appreciation.filter(meetsWordCount);
-    commentsNeedingAttention = commentsNeedingAttention.filter(meetsWordCount);
+    appreciation = appreciation.filter(isValidReportComment);
+    commentsNeedingAttention = commentsNeedingAttention.filter(isValidReportComment);
 
     console.log(`[PDF] Analysis complete: ${allComments.length} total comments extracted, ${appreciation.length} appreciation and ${commentsNeedingAttention.length} attention comments kept (>= 5 words)`);
 
