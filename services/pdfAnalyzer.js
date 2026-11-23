@@ -235,11 +235,12 @@ function isValidComment(text) {
     // PRIORITY 1: ACCEPT REAL FEEDBACK (bypass other checks)
     // If comment contains actual feedback words, it's likely a real comment
     // ══════════════════════════════════════════════════════════════════════════
-    const feedbackIndicators = /\b(sir|ma'?am|teacher|faculty|professor|teaching|class|lecture|explains?|teaches?|helpful|good|nice|best|worst|better|improve|slow|fast|clear|unclear|difficult|easy|understands?|doubts?|notes?|material|lab|practical|exam|quiz|test|assignments?|pace|speed|time|voice|audible|interactive|boring|interesting|patient|rude|polite|friendly|strict|lenient|knowledge|experience|method|style|way|approach|behavior|attitude|respect|support|guide|help|available|absent|late|punctual|regular|irregular)\b/i;
+    const feedbackIndicators = /\b(sir|ma'?am|teacher|faculty|professor|teaching|class|lecture|explains?|teaches?|helpful|good|nice|best|worst|better|improve|slow|fast|clear|unclear|difficult|easy|understands?|doubts?|notes?|material|lab|practical|exam|quiz|test|assignments?|pace|speed|time|voice|audible|interactive|boring|interesting|patient|rude|polite|friendly|strict|lenient|knowledge|experience|method|style|way|approach|behavior|attitude|respect|support|guide|help|available|absent|late|punctual|regular|irregular|excellent|decent|supporting|outstanding|amazing|great|cool|nil|nothing|blank|na)\b/i;
     
     const hasFeedbackWords = feedbackIndicators.test(clean);
     
-    if (hasFeedbackWords && clean.length >= 10) {
+    // RELAXED: Accept feedback indicators with length >= 3 (was 10)
+    if (hasFeedbackWords && clean.length >= 3) {
         // This looks like actual feedback - do minimal validation only
         
         // Still reject pure metadata
@@ -252,7 +253,7 @@ function isValidComment(text) {
             return false;
         }
         
-        // Otherwise accept it
+        // Otherwise accept it (including "Good", "Excellent", etc. as they ARE real comments in some PDFs)
         console.log('[PDF] ✓ ACCEPTED (has feedback indicators): ' + clean.substring(0, 60));
         return true;
     }
@@ -373,25 +374,36 @@ function findCommentSectionBounds(textContent) {
     let sectionStartY = null;
     let sectionEndY = null;
     
-    console.log('[PDF] Searching for "Student Feedback Comments" section...');
+    console.log('[PDF] Searching for feedback section...');
+    
+    // Find first feedback-like text (look for common feedback words)
+    let firstFeedbackY = null;
     
     for (let i = 0; i < items.length; i++) {
         const item = items[i];
         const text = (item.str || '').toLowerCase().trim();
         const y = item.transform[5];
         
-        // Look for section header "Student Feedback Comments"
+        // Look for explicit section header "Student Feedback Comments"
         if (!sectionStartY) {
             if ((text.includes('student') && text.includes('feedback') && text.includes('comment')) ||
                 text === 'student feedback comments' ||
                 (text.includes('feedback') && text.includes('comment'))) {
                 sectionStartY = y - 30; // Start 30px below header
-                console.log(`[PDF] ✓ Found section header at Y=${y}, starting extraction at Y=${sectionStartY}`);
+                console.log(`[PDF] ✓ Found explicit section header at Y=${y}, starting extraction at Y=${sectionStartY}`);
+            }
+        }
+        
+        // NEW: Track first line with feedback words (fallback for PDFs without headers)
+        if (!firstFeedbackY && text.length >= 3) {
+            const feedbackWords = /\b(good|excellent|nice|best|worst|poor|teacher|mam|sir|teaching|helpful|explains|slow|fast|clear|boring|interesting)\b/i;
+            if (feedbackWords.test(text)) {
+                firstFeedbackY = y;
             }
         }
         
         // Look for section end markers (signature, next section header)
-        if (sectionStartY && !sectionEndY) {
+        if ((sectionStartY || firstFeedbackY) && !sectionEndY) {
             if (text.includes('signature') || 
                 text.includes('faculty signature') ||
                 text.includes('hod signature') ||
@@ -403,6 +415,12 @@ function findCommentSectionBounds(textContent) {
                 break;
             }
         }
+    }
+    
+    // If no explicit header found, use first feedback location
+    if (!sectionStartY && firstFeedbackY) {
+        sectionStartY = firstFeedbackY + 20; // Start slightly above first feedback
+        console.log(`[PDF] ✓ No explicit header, using first feedback at Y=${firstFeedbackY}, starting extraction at Y=${sectionStartY}`);
     }
     
     // If we found start but not end, use page bottom
@@ -430,19 +448,21 @@ async function extractAllStudentComments(buffer, targetCourseCode) {
         const tc = await page.getTextContent();
         const fullText = tc.items.map(i => i.str).join(' ').toLowerCase();
 
-        // CRITICAL: Only process pages with the actual section header
+        // FLEXIBLE: Check for various comment section indicators
         const hasStudentFeedbackHeader = 
             (fullText.includes('student') && fullText.includes('feedback') && fullText.includes('comment')) ||
-            fullText.includes('student feedback comments');
+            fullText.includes('student feedback comments') ||
+            // NEW: Also accept pages with common feedback words (for PDFs without explicit section headers)
+            (fullText.match(/(good|excellent|nice|best|teacher|mam|sir|teaching|helpful)/gi) || []).length >= 3;
 
         if (hasStudentFeedbackHeader) {
-            console.log(`[PDF] ✓ Page ${p} has "Student Feedback Comments" section`);
+            console.log(`[PDF] ✓ Page ${p} has feedback content`);
             rawCommentPages.push({ pageNum: p, page, tc, fullText });
         }
     }
     
     if (rawCommentPages.length === 0) {
-        console.warn('[PDF] ⚠ No pages found with "Student Feedback Comments" section!');
+        console.warn('[PDF] ⚠ No pages found with feedback content!');
         return [];
     }
 
@@ -468,9 +488,11 @@ async function extractAllStudentComments(buffer, targetCourseCode) {
             // ═══ CRITICAL: Find section boundaries ═══
             const { sectionStartY, sectionEndY } = findCommentSectionBounds(tc);
             
-            if (!sectionStartY) {
-                console.warn(`[PDF] ⚠ No "Student Feedback Comments" section found on page ${pageNum}`);
-                continue;
+            // Safety: If no bounds found at all, process entire page
+            const useSectionFilter = sectionStartY !== null && sectionEndY !== null;
+            
+            if (!useSectionFilter) {
+                console.warn(`[PDF] ⚠ No section bounds detected on page ${pageNum}, processing entire page`);
             }
 
             // Group text items by row Y (tolerance 3pt)
@@ -483,10 +505,13 @@ async function extractAllStudentComments(buffer, targetCourseCode) {
 
             const yKeys = Object.keys(rowMap).map(Number).sort((a, b) => b - a);
 
-            // ═══ CRITICAL: Filter rows ONLY within section bounds ═══
+            // ═══ CRITICAL: Filter rows ONLY within section bounds (if bounds exist) ═══
             // PDF Y-axis is bottom-up, so sectionStartY > Y > sectionEndY
             const commentRows = yKeys
                 .filter(y => {
+                    // If no section filter, accept all rows
+                    if (!useSectionFilter) return true;
+                    
                     const inBounds = y < sectionStartY && y > sectionEndY;
                     if (!inBounds) {
                         // Debug: show what's being filtered out
