@@ -231,6 +231,36 @@ function isValidComment(text) {
     // Minimum length to be considered a real comment
     if (clean.length < 3) return false;
 
+    // ══════════════════════════════════════════════════════════════════════════
+    // PRIORITY 1: ACCEPT REAL FEEDBACK (bypass other checks)
+    // If comment contains actual feedback words, it's likely a real comment
+    // ══════════════════════════════════════════════════════════════════════════
+    const feedbackIndicators = /\b(sir|ma'?am|teacher|faculty|professor|teaching|class|lecture|explains?|teaches?|helpful|good|nice|best|worst|better|improve|slow|fast|clear|unclear|difficult|easy|understands?|doubts?|notes?|material|lab|practical|exam|quiz|test|assignments?|pace|speed|time|voice|audible|interactive|boring|interesting|patient|rude|polite|friendly|strict|lenient|knowledge|experience|method|style|way|approach|behavior|attitude|respect|support|guide|help|available|absent|late|punctual|regular|irregular)\b/i;
+    
+    const hasFeedbackWords = feedbackIndicators.test(clean);
+    
+    if (hasFeedbackWords && clean.length >= 10) {
+        // This looks like actual feedback - do minimal validation only
+        
+        // Still reject pure metadata
+        if (/^(faculty name|course code|semester|ffi|response|submitted|label|question):/i.test(clean)) {
+            return false;
+        }
+        
+        // Still reject page numbers and dates
+        if (/^\d+\s*\/\s*\d+$/.test(clean) || /\d{1,2}\/\d{1,2}\/\d{2,4}/.test(clean)) {
+            return false;
+        }
+        
+        // Otherwise accept it
+        console.log('[PDF] ✓ ACCEPTED (has feedback indicators): ' + clean.substring(0, 60));
+        return true;
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // PRIORITY 2: REJECT OBVIOUS NON-COMMENTS
+    // ══════════════════════════════════════════════════════════════════════════
+
     // ── Reject PDF rating-table rows ──────────────────────────────────────────
     // Pattern: starts with a row number immediately glued to a capital letter
     // e.g. "4Performance in...", "9Whether MMTLP...", "10Additional classes..."
@@ -278,14 +308,14 @@ function isValidComment(text) {
         'faculty name', 'course code', 'course name', 'semester', 'registered students',
         'link send', 'response %', 'submitted answers', 'label question', 'submitted answer',
         'signature', 'hod', 'pro - vc', 'ffi & suggestion', 'student feedback comments',
-        'below average', 'course outcomes', 'qv 1', 'qv 2', 'needs attention', 'appreciation',
+        'course outcomes', 'qv 1', 'qv 2',
         'question', 'answer', 'response count', 'total responses', 'feedback form',
         'submit', 'label', 'requirement', 'operating system', 'real world', 'purchased'
     ];
     const lower = clean.toLowerCase();
-    if (tableKeywords.some(kw => lower.includes(kw))) return false;
+    if (tableKeywords.some(kw => lower === kw || lower.startsWith(kw + ':') || lower.startsWith(kw + ' :'))) return false;
     
-    // ── NEW: Reject survey question patterns ──────────────────────────────────
+    // ── NEW: Reject survey question patterns (ONLY if they start the sentence) ──
     const surveyQuestionPatterns = [
         /^performance\s+in\s+(delivery|teaching|conduct)/i,
         /^whether\s+(MMTLP|faculty|teacher|material|notes)/i,
@@ -295,15 +325,15 @@ function isValidComment(text) {
         /^teacher'?s?\s+participation\s+in/i,
         /^completion\s+of\s+syllabus/i,
         /^fortnightly\s+(upload|submission)/i,
-        /^(discusses?|provides?|uploads?|encourages?|maintains?|allows?|gives?)\s+.*\s+regularly/i
     ];
     if (surveyQuestionPatterns.some(p => p.test(clean))) return false;
     
-    // ── NEW: Reject standalone rating scale options ──────────────────────────
+    // ── NEW: Reject standalone rating scale options (ONLY exact matches) ─────
     const ratingOptionsExact = [
         'excellent', 'very good', 'good', 'average', 'below average', 'poor',
         'strongly agree', 'agree', 'neutral', 'disagree', 'strongly disagree',
-        'always', 'often', 'sometimes', 'rarely', 'never'
+        'always', 'often', 'sometimes', 'rarely', 'never',
+        'needs attention', 'appreciation' // Section headers
     ];
     const cleanLower = clean.toLowerCase().replace(/[.,!?;:]+$/, '').trim();
     if (ratingOptionsExact.includes(cleanLower)) return false;
@@ -314,9 +344,6 @@ function isValidComment(text) {
     // Reject if it looks like a course/subject name followed by an answer
     // e.g. "Software Engineering 45" or "Data Structures Yes" or "operating system purchased"
     if (/^[A-Z][A-Za-z\s&]+\s+(?:\d+|yes|no|n\.?a\.?|purchased|required)$/i.test(clean)) return false;
-    
-    // Reject lines that look like questions or prompts
-    if (/\brequirement\b|\boperating system\b|\breal world\b|\bpurchased\b|\bproblem\b.*\bsoftware\b/i.test(clean)) return false;
     
     // Reject if it contains multiple tab-separated or pipe-separated values (table data)
     if (clean.split(/\t|\|/).length > 3) return false;
@@ -332,13 +359,9 @@ function isValidComment(text) {
     // Must have at least 1 letter
     if (!/[a-zA-Z]/.test(clean)) return false;
 
-    // Reject if it's ONLY a rating word with no additional content
-    const ratingOnlyPatterns = [
-        /^(good|nice|excellent|poor|best|worst|average|ok|okay)\.?$/i,
-        /^(very\s+good|very\s+nice|very\s+bad)\.?$/i
-    ];
-    if (ratingOnlyPatterns.some(p => p.test(clean))) return false;
-
+    // RELAXED: Allow single positive/negative words if in feedback context
+    // Don't reject short genuine feedback like "best", "worst", "poor teacher"
+    
     return true;
 }
 

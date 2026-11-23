@@ -62,8 +62,8 @@ function scoreWithConfidence(text) {
   });
   
   // Count general positive/negative words
-  const posWords = (lower.match(/\b(good|nice|clear|helpful|supportive|effective|organized|explains?\s+well|teaches?\s+well)\b/g) || []).length;
-  const negWords = (lower.match(/\b(bad|poor|weak|lacking|inadequate|confusing|late|low|unanswered)\b/g) || []).length;
+  const posWords = (lower.match(/\b(good|nice|clear|helpful|supportive|effective|organized|explains?\s+well|teaches?\s+well|best|great|excellent)\b/g) || []).length;
+  const negWords = (lower.match(/\b(bad|poor|weak|lacking|inadequate|confusing|late|low|unanswered|slow|fast|problem|issue|difficult)\b/g) || []).length;
   
   appreciationScore += posWords * 1.5; // Increased from 1
   attentionScore += negWords * 1.5;
@@ -87,11 +87,19 @@ function scoreWithConfidence(text) {
   
   const confidence = Math.abs(appreciationScore - attentionScore);
   
-  if (appreciationScore > attentionScore && confidence >= 1.5) {
+  // RELAXED THRESHOLD: Was 1.5, now 0.8
+  if (appreciationScore > attentionScore && confidence >= 0.8) {
     return { classification: 'appreciation', confidence: Math.round(confidence) };
-  } else if (attentionScore > appreciationScore && confidence >= 1.5) {
+  } else if (attentionScore > appreciationScore && confidence >= 0.8) {
     return { classification: 'attention', confidence: Math.round(confidence) };
   } else {
+    // If scores are very close or both zero, check for any sentiment
+    if (posWords > 0 && negWords === 0) {
+      return { classification: 'appreciation', confidence: 0 };
+    }
+    if (negWords > 0 && posWords === 0) {
+      return { classification: 'attention', confidence: 0 };
+    }
     return { classification: 'neutral', confidence: 0 };
   }
 }
