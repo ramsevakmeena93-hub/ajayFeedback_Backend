@@ -150,7 +150,7 @@ const ATTENTION_ISSUE_PHRASES = [
   /\b(code\s+ka\s+output\s+bataya\s+jata\s+lekin\s+debugging\s+nahi|sir\s+ready[\s-]made\s+code\s+copy\s+karne\s+ko\s+kehte)\b/i,
 
   // Questions / Doubts / Interaction
-  /\b(not\s+get\s+enough\s+time\s+to\s+ask|no\s+regular\s+doubt[\s-]clearing|questions?.*left\s+unanswered|uncomfortable\s+asking\s+doubts|lessons?\s+are\s+not\s+interactive|not\s+given\s+opportunities?\s+to\s+participate|follow[\s-]up\s+questions?\s+are\s+(often\s+)?discouraged|doubts?\s+are\s+not\s+resolved|hesitant\s+to\s+raise\s+concerns|not\s+encouraged\s+to\s+discuss|only\s+a\s+few\s+students\s+receive\s+guidance|individual\s+support\s+is\s+limited)\b/i,
+  /\b(not\s+get\s+enough\s+time\s+to\s+ask|no\s+regular\s+doubt[\s-]clearing|questions?.*left\s+unanswered|uncomfortable\s+asking\s+doubts|lessons?\s+are\s+not\s+interactive|not\s+given\s+opportunities?\s+to\s+participate|follow[\s-]up\s+questions?\s+are\s+(often\s+)?discouraged|doubts?\s+are\s+not\s+(cleared|resolved|answered|addressed|clarified)|doubts?\s+(not|never)\s+(cleared|resolved|answered)|hesitant\s+to\s+raise\s+concerns|not\s+encouraged\s+to\s+discuss|only\s+a\s+few\s+students\s+receive\s+guidance|individual\s+support\s+is\s+limited)\b/i,
   /\b(he\s+created\s+fear\s+in\s+classroom\s+to\s+ask\s+for\s+doubt|scared\s+to\s+ask|fear\s+of\s+asking|can'?t\s+ask\s+doubts?)\b/i,
   /\b(voice\s+is\s+low|not\s+audible|he\s+should\s+be\s+more\s+loud\s+and\s+clear|speak\s+louder|sound\s+is\s+low)\b/i,
   /\b(can\s+be\s+more\s+interactive|not\s+much\s+interactive|not\s+interactive\s+at\s+all|class\s+is\s+not\s+interactive)\b/i,
@@ -230,9 +230,11 @@ const APPRECIATION_PATTERNS = [
   // 8. Clarity & Understanding
   /\b(all\s+concepts?\s+(are\s+)?(clear|crystal\s+clear|well\s+understood|nicely\s+explained|very\s+clear))\b/i,
   /\b(easy\s+to\s+(understand|follow|grasp|learn)|makes?\s+(it\s+)?easy\s+to\s+understand)\b/i,
+  /\b(makes?\s+.*?\b(difficult|tough|hard)\b.*?\b(easy|simple|clear|understandable|interactive)\b)/i,
   /\b(makes?\s+difficult\s+topics?\s+(easy|simple|clear))\b/i,
   /\b(crystal\s+clear|crystal-clear)\b/i,
   /\b(concepts?\s+are\s+clear|clarity\s+in\s+teaching|conceptual\s+clarity)\b/i,
+  /\b(satisfying|satisfaction)\b/i,
 
   // 9. Extra Short Praise Patterns
   /\b(the\s+)?(teacher|faculty|instructor|professor|sir|ma'?am|lecturer)\s+(is|are)\s+(supportive|helpful|friendly|polite|patient|approachable|dedicated|experienced|respectful|encouraging|committed|knowledgeable|fair|good|positive)\b/i,
@@ -256,7 +258,7 @@ function fallbackScoreComment(text) {
   const lower = text.toLowerCase();
   
   // Strong positive markers
-  const POS_WORDS = /\b(good|great|nice|clear|clearly|well|helpful|supportive|best|superb|love|loved|enjoy|enjoyed|excellent|perfect|perfectly|easy|understand|understood|interactive|proper|properly|structured|organized|punctual|kind|polite|patient|patiently|dedicat|encourag|appreciat|thanks?|crystal\s+clear|all\s+clear)\b/gi;
+  const POS_WORDS = /\b(good|great|nice|clear|clearly|well|helpful|supportive|best|superb|love|loved|enjoy|enjoyed|excellent|perfect|perfectly|easy|understand|understood|interactive|proper|properly|structured|organized|punctual|kind|polite|patient|patiently|dedicat|encourag|appreciat|thanks?|crystal\s+clear|all\s+clear|satisfying|satisfaction|clarity)\b/gi;
   // Strong negative markers
   const NEG_WORDS = /\b(bad|poor|slow|too\s+fast|fast\s+pace|unclear|late|missing|lack|difficult|hard|trouble|waste|rush|rushed|confus|low|inaudible|strict|rude|partial|unfair|cheat|force|skip|skipped|incomplete|error|bug|fail|complaint|problem|issue)\b/gi;
 

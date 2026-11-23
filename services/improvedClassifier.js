@@ -12,25 +12,30 @@ const https = require('https');
 // ── CRITICAL ATTENTION KEYWORDS (Always needs attention) ────────────────────
 const CRITICAL_ATTENTION_KEYWORDS = [
   /\b(problem|issue|complaint|concern|difficulty|struggle|trouble|challenge|obstacle)\b/i,
-  /\b(not\s+(good|clear|helpful|understandable|explained|teaching|interactive))\b/i,
-  /\b(too\s+(fast|slow|difficult|hard|complex|rushed))\b/i,
+  /\b(not\s+(good|clear|helpful|understandable|explained|teaching|interactive|cleared|resolved|shared|given|uploaded))\b/i,
+  /\b(too\s+(fast|slow|difficult|hard|complex|rushed|low))\b/i,
   /\b(should\s+(improve|change|fix|address|resolve))\b/i,
   /\b(need\s+(more|better|improvement|attention))\b/i,
   /\b(lacking|missing|absent|insufficient|inadequate|poor|weak)\b/i,
   /\b(confused|confusing|unclear|ambiguous|vague)\b/i,
-  /\b(never|rarely|hardly|barely|seldom)\s+(help|explain|respond|answer|available)\b/i,
-  /\b(does\s+not|doesn't|don't|cannot|can't)\s+(explain|help|answer|respond|clarify)\b/i,
+  /\b(never|rarely|hardly|barely|seldom)\s+(help|explain|respond|answer|available|shared|cleared)\b/i,
+  /\b(does\s+not|doesn't|don't|cannot|can't)\s+(explain|help|answer|respond|clarify|clear)\b/i,
   /\b(late|delayed|missed|skipped|rushed|hurried)\b/i,
+  /\b(never\s+shared|not\s+shared|shared\s+late|doubts?\s+are\s+not\s+cleared|doubts?\s+not\s+cleared)\b/i,
 ];
 
 // ── CRITICAL APPRECIATION KEYWORDS (Always appreciation) ────────────────────
 const CRITICAL_APPRECIATION_KEYWORDS = [
   /\b(excellent|outstanding|amazing|fantastic|wonderful|superb|brilliant|exceptional)\b/i,
-  /\b(best|perfect|great|awesome|incredible|remarkable)\b/i,
+  /\b(best|perfect|great|awesome|incredible|remarkable|satisfying)\b/i,
   /\b(love|loved|enjoy|enjoyed|appreciate|grateful|thankful)\b/i,
   /\b(very\s+(good|helpful|clear|patient|knowledgeable|dedicated))\b/i,
   /\b(well\s+(explained|taught|organized|structured))\b/i,
   /\b(crystal\s+clear|easy\s+to\s+understand)\b/i,
+  /\b(makes?\s+.*?\b(difficult|tough)\b.*?\b(easy|simple|clear|understandable|interactive)\b)/i,
+  /\b(clears?\s+(all|every)?\s*doubts?)\b/i,
+  /\b(questions?\s+.*?\bhelps?\s+to\s+understand)\b/i,
+  /\b(teaches?\s+very\s+well)\b/i,
 ];
 
 // ── NEGATION PATTERNS (Context-aware) ────────────────────────────────────────
