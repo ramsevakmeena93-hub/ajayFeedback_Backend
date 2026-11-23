@@ -343,10 +343,57 @@ function isValidComment(text) {
 }
 
 // ─────────────────────────────────────────────────────────────────
-// EXTRACT ALL STUDENT COMMENTS FROM PDF TEXT
-// Handles:
-// 1. Raw comment pages with individual rows (Page 4, 5, 7, 9)
-// 2. Action Taken Report summary tables (Page 1-2) with bullet points
+// HELPER: Find "Student Feedback Comments" section boundaries
+// ─────────────────────────────────────────────────────────────────
+function findCommentSectionBounds(textContent) {
+    const items = textContent.items;
+    let sectionStartY = null;
+    let sectionEndY = null;
+    
+    console.log('[PDF] Searching for "Student Feedback Comments" section...');
+    
+    for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        const text = (item.str || '').toLowerCase().trim();
+        const y = item.transform[5];
+        
+        // Look for section header "Student Feedback Comments"
+        if (!sectionStartY) {
+            if ((text.includes('student') && text.includes('feedback') && text.includes('comment')) ||
+                text === 'student feedback comments' ||
+                (text.includes('feedback') && text.includes('comment'))) {
+                sectionStartY = y - 30; // Start 30px below header
+                console.log(`[PDF] ✓ Found section header at Y=${y}, starting extraction at Y=${sectionStartY}`);
+            }
+        }
+        
+        // Look for section end markers (signature, next section header)
+        if (sectionStartY && !sectionEndY) {
+            if (text.includes('signature') || 
+                text.includes('faculty signature') ||
+                text.includes('hod signature') ||
+                text.includes('pro-vc') ||
+                text.includes('pro - vc') ||
+                text.includes('action taken by')) {
+                sectionEndY = y + 15; // End 15px above footer
+                console.log(`[PDF] ✓ Found section end at Y=${y}, stopping extraction at Y=${sectionEndY}`);
+                break;
+            }
+        }
+    }
+    
+    // If we found start but not end, use page bottom
+    if (sectionStartY && !sectionEndY) {
+        sectionEndY = 30; // Typical footer area
+        console.log(`[PDF] ✓ Using page bottom as section end (Y=${sectionEndY})`);
+    }
+    
+    return { sectionStartY, sectionEndY };
+}
+
+// ─────────────────────────────────────────────────────────────────
+// EXTRACT ALL STUDENT COMMENTS FROM PDF TEXT - SECTION-BASED
+// ONLY extracts text from "Student Feedback Comments" section
 // ─────────────────────────────────────────────────────────────────
 async function extractAllStudentComments(buffer, targetCourseCode) {
     const uint8 = new Uint8Array(buffer);
@@ -354,37 +401,54 @@ async function extractAllStudentComments(buffer, targetCourseCode) {
     let comments = [];
     const rawCommentPages = [];
 
-    // Pass 1: Identify pages that have raw student comments
+    // Pass 1: Identify pages that have "Student Feedback Comments" section
     for (let p = 1; p <= doc.numPages; p++) {
         const page = await doc.getPage(p);
         const tc = await page.getTextContent();
         const fullText = tc.items.map(i => i.str).join(' ').toLowerCase();
 
-        const hasSubmitted = fullText.includes('submitted') && (fullText.includes('answer') || fullText.includes('response'));
-        const hasStudentFeedbackHeader = fullText.includes('feedback') && (fullText.includes('comment') || fullText.includes('student'));
-        const hasQuestionsTable = fullText.includes('label') && fullText.includes('question') && fullText.includes('qv');
+        // CRITICAL: Only process pages with the actual section header
+        const hasStudentFeedbackHeader = 
+            (fullText.includes('student') && fullText.includes('feedback') && fullText.includes('comment')) ||
+            fullText.includes('student feedback comments');
 
-        // Prefer pages dedicated to comments, but keep all potential pages
-        if (hasSubmitted || hasStudentFeedbackHeader || !hasQuestionsTable) {
-            rawCommentPages.push({ pageNum: p, page, tc, fullText, hasQuestionsTable });
+        if (hasStudentFeedbackHeader) {
+            console.log(`[PDF] ✓ Page ${p} has "Student Feedback Comments" section`);
+            rawCommentPages.push({ pageNum: p, page, tc, fullText });
         }
+    }
+    
+    if (rawCommentPages.length === 0) {
+        console.warn('[PDF] ⚠ No pages found with "Student Feedback Comments" section!');
+        return [];
     }
 
     const extractRowsFromPages = (pages, filterCode) => {
         const res = [];
         for (const { pageNum, tc, fullText } of pages) {
+            console.log(`[PDF] Processing page ${pageNum}...`);
+            
             if (filterCode) {
                 const cleanTarget = filterCode.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
                 const pageCodeMatch = fullText.match(/\d{5,}\s*-?\s*batch\s*-?\s*[a-z0-9]+/i);
                 if (pageCodeMatch) {
                     const pageCode = pageCodeMatch[0].replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
                     if (pageCode !== cleanTarget) {
-                        continue; // belongs to another course in multi-course PDF
+                        console.log(`[PDF] Skipping page ${pageNum} - different course code`);
+                        continue;
                     }
                 }
             }
 
             const items = tc.items.filter(i => i.str && i.str.trim());
+
+            // ═══ CRITICAL: Find section boundaries ═══
+            const { sectionStartY, sectionEndY } = findCommentSectionBounds(tc);
+            
+            if (!sectionStartY) {
+                console.warn(`[PDF] ⚠ No "Student Feedback Comments" section found on page ${pageNum}`);
+                continue;
+            }
 
             // Group text items by row Y (tolerance 3pt)
             const rowMap = {};
@@ -396,18 +460,19 @@ async function extractAllStudentComments(buffer, targetCourseCode) {
 
             const yKeys = Object.keys(rowMap).map(Number).sort((a, b) => b - a);
 
-            // Find the header line after which comments start
-            let commentStartY = 750;
-            for (const y of yKeys) {
-                const line = rowMap[y].sort((a, b) => a.transform[4] - b.transform[4]).map(i => i.str).join(' ').toLowerCase();
-                if ((line.includes('submitted') && (line.includes('answer') || line.includes('response'))) || (line.includes('student') && line.includes('feedback'))) {
-                    commentStartY = y;
-                    break;
-                }
-            }
-
-            // Filter rows below header line and above bottom page footer (y > 30)
-            const commentRows = yKeys.filter(y => y < commentStartY - 10 && y > 30).map(y => {
+            // ═══ CRITICAL: Filter rows ONLY within section bounds ═══
+            // PDF Y-axis is bottom-up, so sectionStartY > Y > sectionEndY
+            const commentRows = yKeys
+                .filter(y => {
+                    const inBounds = y < sectionStartY && y > sectionEndY;
+                    if (!inBounds) {
+                        // Debug: show what's being filtered out
+                        const line = rowMap[y].map(i => i.str).join(' ').substring(0, 60);
+                        console.log(`[PDF] ✗ Filtered (Y=${y}): ${line}...`);
+                    }
+                    return inBounds;
+                })
+                .map(y => {
                 // Sort items left-to-right by X position
                 const rowItems = rowMap[y].sort((a, b) => a.transform[4] - b.transform[4]);
 
@@ -445,7 +510,10 @@ async function extractAllStudentComments(buffer, targetCourseCode) {
                 // Clean embedded table numbers, then validate
                 curr = cleanCommentText(curr);
                 if (isValidComment(curr)) {
+                    console.log(`[PDF] ✓ Valid comment: "${curr.substring(0, 80)}${curr.length > 80 ? '...' : ''}"`);
                     res.push(curr);
+                } else {
+                    console.log(`[PDF] ✗ Rejected: "${curr.substring(0, 60)}..."`);
                 }
                 i++;
             }
@@ -453,15 +521,20 @@ async function extractAllStudentComments(buffer, targetCourseCode) {
         return res;
     };
 
-    // Pass 2: Extract rows from identified pages
+    // Pass 2: Extract rows from identified pages (ONLY from Student Feedback Comments section)
     if (rawCommentPages.length > 0) {
         comments = extractRowsFromPages(rawCommentPages, targetCourseCode);
         if (comments.length === 0 && targetCourseCode) {
+            console.log('[PDF] Retrying without course code filter...');
             comments = extractRowsFromPages(rawCommentPages, null);
         }
     }
+    
+    console.log(`[PDF] ✓ Extracted ${comments.length} comments from dedicated section`);
 
-    // Pass 3: Action Taken Report summary tables (Page 1-2) with bullet points
+    // Pass 3: Action Taken Report - DISABLED
+    // This extracts from summary tables on first pages, which you want to avoid
+    /*
     if (comments.length === 0) {
         for (let p = 1; p <= doc.numPages; p++) {
             const page = await doc.getPage(p);
@@ -477,7 +550,6 @@ async function extractAllStudentComments(buffer, targetCourseCode) {
 
                 const bullets = tableComments.split(/•/).map(s => s.trim()).filter(Boolean);
                 bullets.forEach(b => {
-                    // Clean and validate
                     const cleaned = cleanCommentText(b.trim().replace(/\s+/g, ' '));
                     if (!/^(good|very good|excellent|below average):\s*\d+%/i.test(cleaned) && isValidComment(cleaned)) {
                         comments.push(cleaned);
@@ -486,6 +558,7 @@ async function extractAllStudentComments(buffer, targetCourseCode) {
             }
         }
     }
+    */
 
     // Pass 4: Fallback scan disabled - was too aggressive and extracted form text
     // This pass would extract ANY text with feedback keywords, including:
