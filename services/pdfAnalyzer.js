@@ -235,7 +235,7 @@ function isValidComment(text) {
     // PRIORITY 1: ACCEPT REAL FEEDBACK (bypass other checks)
     // If comment contains actual feedback words, it's likely a real comment
     // ══════════════════════════════════════════════════════════════════════════
-    const feedbackIndicators = /\b(sir|ma'?am|teacher|faculty|professor|teaching|class|lecture|explains?|teaches?|helpful|good|nice|best|worst|better|improve|slow|fast|clear|unclear|difficult|easy|understands?|doubts?|notes?|material|lab|practical|exam|quiz|test|assignments?|pace|speed|time|voice|audible|interactive|boring|interesting|patient|rude|polite|friendly|strict|lenient|knowledge|experience|method|style|way|approach|behavior|attitude|respect|support|guide|help|available|absent|late|punctual|regular|irregular|excellent|decent|supporting|outstanding|amazing|great|cool|nil|nothing|blank|na)\b/i;
+    const feedbackIndicators = /\b(sir|ma'?am|teacher|faculty|professor|teaching|class|lecture|explains?|teaches?|helpful|good|nice|best|worst|better|improve|slow|fast|clear|unclear|difficult|easy|understands?|doubts?|notes?|material|lab|practical|exam|quiz|test|assignments?|pace|speed|time|voice|audible|interactive|boring|interesting|patient|rude|polite|friendly|strict|lenient|knowledge|experience|method|style|way|approach|behavior|attitude|respect|support|guide|help|available|absent|late|punctual|regular|irregular|excellent|decent|supporting|outstanding|amazing|great|cool|nil|nothing|blank|na|notice|noticeably|observed)\b/i;
     
     const hasFeedbackWords = feedbackIndicators.test(clean);
     
@@ -389,14 +389,17 @@ function findCommentSectionBounds(textContent) {
             if ((text.includes('student') && text.includes('feedback') && text.includes('comment')) ||
                 text === 'student feedback comments' ||
                 (text.includes('feedback') && text.includes('comment'))) {
-                sectionStartY = y - 30; // Start 30px below header
-                console.log(`[PDF] ✓ Found explicit section header at Y=${y}, starting extraction at Y=${sectionStartY}`);
+                // PDF Y-axis is bottom-up: larger Y = higher on page
+                // Header at Y=700, comments start at Y=695, Y=690, etc. (below header)
+                // We want to include text just below the header, so add a small buffer
+                sectionStartY = y + 5; // Include text starting from just below header
+                console.log(`[PDF] ✓ Found explicit section header "${item.str}" at Y=${y}, starting extraction at Y=${sectionStartY}`);
             }
         }
         
         // NEW: Track first line with feedback words (fallback for PDFs without headers)
         if (!firstFeedbackY && text.length >= 3) {
-            const feedbackWords = /\b(good|excellent|nice|best|worst|poor|teacher|mam|sir|teaching|helpful|explains|slow|fast|clear|boring|interesting)\b/i;
+            const feedbackWords = /\b(good|excellent|nice|best|worst|poor|teacher|mam|sir|teaching|helpful|explains|slow|fast|clear|boring|interesting|supporting|decent|notice|cool|great)\b/i;
             if (feedbackWords.test(text)) {
                 firstFeedbackY = y;
             }
