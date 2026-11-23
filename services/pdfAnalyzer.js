@@ -346,8 +346,14 @@ function isValidComment(text) {
         /remedial\s+purpose/i,
         /cleared\s+by\s+giving\s+examples/i,
         /identifying\s+strengths\s+and\s+connecting/i,
+        // NEW: Specific rejection for generic ethics statement
+        /demonstrates?\s+a\s+consistently\s+positive.*supportive.*helpful.*attitude.*ethical.*behaviour.*gender\s+bias/i,
     ];
     if (surveyQuestionPatterns.some(p => p.test(clean))) return false;
+    
+    // ── Reject table headers with rating column labels ──
+    if (/\d+\s*-?\s*below\s+average.*\d+\s*-?\s*average.*\d+\s*-?\s*good.*\d+\s*-?\s*very\s+good.*excellent/i.test(clean)) return false;
+    if (/label\s+question.*below\s+average.*average.*good.*very\s+good.*excellent.*qv/i.test(clean)) return false;
     
     // ── NEW: Reject standalone rating scale options (ONLY exact matches) ─────
     const ratingOptionsExact = [
