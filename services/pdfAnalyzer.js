@@ -1383,16 +1383,20 @@ async function analyzePDFBuffer(buffer) {
         console.log('[PDF] Using rating table percentages:', commentPercentages);
     }
 
-    // STEP 8: Ensure only clean, non-filler comments in appreciation list (deduplicated & meaningful)
+    // STEP 8: Ensure only clean, non-filler comments with >= 5 words in appreciation & need attention lists
     const FILLER_ONLY_RX = /^(ok|okay|fine|na|n\/a|nil|none|nothing|no remark|no remarks|no feedback)$/i;
-    appreciation = appreciation.filter(c => {
+    const meetsWordCount = c => {
+        if (!c || typeof c !== 'string') return false;
         const trimmed = c.trim().replace(/[.,!?;:]+$/, '');
         if (!trimmed || trimmed.length < 3) return false;
         if (FILLER_ONLY_RX.test(trimmed)) return false;
-        return true;
-    });
+        return trimmed.split(/\s+/).filter(Boolean).length >= 5;
+    };
 
-    console.log(`[PDF] Analysis complete: ${allComments.length} total comments extracted, ${appreciation.length} substantive appreciation comments kept`);
+    appreciation = appreciation.filter(meetsWordCount);
+    commentsNeedingAttention = commentsNeedingAttention.filter(meetsWordCount);
+
+    console.log(`[PDF] Analysis complete: ${allComments.length} total comments extracted, ${appreciation.length} appreciation and ${commentsNeedingAttention.length} attention comments kept (>= 5 words)`);
 
     return {
         appreciation,

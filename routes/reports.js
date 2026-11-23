@@ -26,7 +26,7 @@ function filterShortComments(list) {
     const t = c.trim();
     if (t.length < 3) return false;                          // ignore single chars or empty
     if (FILLER_PHRASES.has(t.toLowerCase().replace(/[.,!?]+$/, ''))) return false;
-    return true;                                             // accept all genuine comments (including short ones like 'Too fast', 'Voice is low')
+    return t.split(/\s+/).filter(Boolean).length >= 5;       // less than 5 words not added to appreciation/needs attention
   });
 }
 
