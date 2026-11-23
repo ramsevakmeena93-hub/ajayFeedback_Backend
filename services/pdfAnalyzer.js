@@ -318,7 +318,7 @@ function isValidComment(text) {
     
     // ── NEW: Reject survey question patterns (ONLY if they start the sentence) ──
     const surveyQuestionPatterns = [
-        /^performance\s+in\s+(delivery|teaching|conduct)/i,
+        /^performance\s+in\s+(delivery|teaching|conduct|assignments)/i,
         /^whether\s+(MMTLP|faculty|teacher|material|notes)/i,
         /^additional\s+classes?\s+(conducted|arranged|held)/i,
         /^(teaching|learning|availability)\s+(methodology|manner|performance|of\s+faculty)/i,
@@ -326,6 +326,26 @@ function isValidComment(text) {
         /^teacher'?s?\s+participation\s+in/i,
         /^completion\s+of\s+syllabus/i,
         /^fortnightly\s+(upload|submission)/i,
+        // NEW: Survey questions from the image
+        /^the\s+(weekly\s+quiz|classes\s+are\s+engaged|ppn?\/notes|concepts\s+are)/i,
+        /^demonstrate\s+a\s+consistently/i,
+        /^overall\s+rating\s+of\s+the\s+course/i,
+        /^evaluation\/assessment/i,
+        /^rate\s+the\s+communication/i,
+        /^expected\s+course\s+outcomes/i,
+        /^coverage\s+of\s+syllabus/i,
+        /^classes\s+are\s+useful/i,
+        /assignment.*motivate.*revise/i,
+        /maintaining\s+ethical\s+behaviour/i,
+        /engaged\s+with\s+good\s+preparation/i,
+        /course\s+covered\s+so\s+far/i,
+        /shared\s+in\s+a\s+timely\s+manner/i,
+        /communication\s+skills\s+of\s+the\s+faculty/i,
+        /program.*outcomes.*discussed/i,
+        /mmtlp\s+modes\s+were\s+used/i,
+        /remedial\s+purpose/i,
+        /cleared\s+by\s+giving\s+examples/i,
+        /identifying\s+strengths\s+and\s+connecting/i,
     ];
     if (surveyQuestionPatterns.some(p => p.test(clean))) return false;
     
