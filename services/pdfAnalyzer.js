@@ -285,6 +285,32 @@ function isValidComment(text) {
     const lower = clean.toLowerCase();
     if (tableKeywords.some(kw => lower.includes(kw))) return false;
     
+    // ── NEW: Reject survey question patterns ──────────────────────────────────
+    const surveyQuestionPatterns = [
+        /^performance\s+in\s+(delivery|teaching|conduct)/i,
+        /^whether\s+(MMTLP|faculty|teacher|material|notes)/i,
+        /^additional\s+classes?\s+(conducted|arranged|held)/i,
+        /^(teaching|learning|availability)\s+(methodology|manner|performance|of\s+faculty)/i,
+        /^relevance\s+of\s+(course|content|material)/i,
+        /^teacher'?s?\s+participation\s+in/i,
+        /^completion\s+of\s+syllabus/i,
+        /^fortnightly\s+(upload|submission)/i,
+        /^(discusses?|provides?|uploads?|encourages?|maintains?|allows?|gives?)\s+.*\s+regularly/i
+    ];
+    if (surveyQuestionPatterns.some(p => p.test(clean))) return false;
+    
+    // ── NEW: Reject standalone rating scale options ──────────────────────────
+    const ratingOptionsExact = [
+        'excellent', 'very good', 'good', 'average', 'below average', 'poor',
+        'strongly agree', 'agree', 'neutral', 'disagree', 'strongly disagree',
+        'always', 'often', 'sometimes', 'rarely', 'never'
+    ];
+    const cleanLower = clean.toLowerCase().replace(/[.,!?;:]+$/, '').trim();
+    if (ratingOptionsExact.includes(cleanLower)) return false;
+    
+    // ── NEW: Reject rating percentages (e.g. "Excellent: 45%") ───────────────
+    if (/^(excellent|very good|good|average|below average|poor):\s*\d+%$/i.test(clean)) return false;
+    
     // Reject if it looks like a course/subject name followed by an answer
     // e.g. "Software Engineering 45" or "Data Structures Yes" or "operating system purchased"
     if (/^[A-Z][A-Za-z\s&]+\s+(?:\d+|yes|no|n\.?a\.?|purchased|required)$/i.test(clean)) return false;
@@ -461,8 +487,15 @@ async function extractAllStudentComments(buffer, targetCourseCode) {
         }
     }
 
-    // Pass 4: Fallback scan for valid feedback comments anywhere in doc
+    // Pass 4: Fallback scan disabled - was too aggressive and extracted form text
+    // This pass would extract ANY text with feedback keywords, including:
+    // - Survey question text ("Performance in delivery...")
+    // - Rating scale options ("Excellent", "Good", "Average")
+    // - Form labels and table headers
+    // If Pass 1-3 don't find comments, the PDF likely has no student comments section
+    /*
     if (comments.length === 0) {
+        console.log('[PDF] Warning: No comments found in dedicated sections. Fallback disabled to prevent form text extraction.');
         for (let p = 1; p <= doc.numPages; p++) {
             const page = await doc.getPage(p);
             const tc = await page.getTextContent();
@@ -478,6 +511,7 @@ async function extractAllStudentComments(buffer, targetCourseCode) {
             }
         }
     }
+    */
 
     // Deduplicate using case-insensitive normalization
     const seen = new Set();
