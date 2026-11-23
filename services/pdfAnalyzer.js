@@ -389,10 +389,13 @@ function findCommentSectionBounds(textContent) {
             if ((text.includes('student') && text.includes('feedback') && text.includes('comment')) ||
                 text === 'student feedback comments' ||
                 (text.includes('feedback') && text.includes('comment'))) {
-                // PDF Y-axis is bottom-up: larger Y = higher on page
-                // Header at Y=700, comments start at Y=695, Y=690, etc. (below header)
-                // We want to include text just below the header, so add a small buffer
-                sectionStartY = y + 5; // Include text starting from just below header
+                // PDF Y-axis is bottom-up: comments BELOW header have LOWER Y values
+                // Header at Y=700, first comment at Y=680
+                // Filter is: y < sectionStartY
+                // So sectionStartY should be LESS than header Y to exclude header itself
+                // But GREATER than comment Y values to include them
+                // Solution: sectionStartY = header Y - 5 (just below header line)
+                sectionStartY = y - 5;
                 console.log(`[PDF] ✓ Found explicit section header "${item.str}" at Y=${y}, starting extraction at Y=${sectionStartY}`);
             }
         }
