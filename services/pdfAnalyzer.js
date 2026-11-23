@@ -232,34 +232,9 @@ function isValidComment(text) {
     if (clean.length < 3) return false;
 
     // ══════════════════════════════════════════════════════════════════════════
-    // PRIORITY 1: ACCEPT REAL FEEDBACK (bypass other checks)
-    // If comment contains actual feedback words, it's likely a real comment
-    // ══════════════════════════════════════════════════════════════════════════
-    const feedbackIndicators = /\b(sir|ma'?am|teacher|faculty|professor|teaching|class|lecture|explains?|teaches?|helpful|good|nice|best|worst|better|improve|slow|fast|clear|unclear|difficult|easy|understands?|doubts?|notes?|material|lab|practical|exam|quiz|test|assignments?|pace|speed|time|voice|audible|interactive|boring|interesting|patient|rude|polite|friendly|strict|lenient|knowledge|experience|method|style|way|approach|behavior|attitude|respect|support|guide|help|available|absent|late|punctual|regular|irregular|excellent|decent|supporting|outstanding|amazing|great|cool|nil|nothing|blank|na|notice|noticeably|observed)\b/i;
-    
-    const hasFeedbackWords = feedbackIndicators.test(clean);
-    
-    // RELAXED: Accept feedback indicators with length >= 3 (was 10)
-    if (hasFeedbackWords && clean.length >= 3) {
-        // This looks like actual feedback - do minimal validation only
-        
-        // Still reject pure metadata
-        if (/^(faculty name|course code|semester|ffi|response|submitted|label|question):/i.test(clean)) {
-            return false;
-        }
-        
-        // Still reject page numbers and dates
-        if (/^\d+\s*\/\s*\d+$/.test(clean) || /\d{1,2}\/\d{1,2}\/\d{2,4}/.test(clean)) {
-            return false;
-        }
-        
-        // Otherwise accept it (including "Good", "Excellent", etc. as they ARE real comments in some PDFs)
-        console.log('[PDF] ✓ ACCEPTED (has feedback indicators): ' + clean.substring(0, 60));
-        return true;
-    }
-
-    // ══════════════════════════════════════════════════════════════════════════
-    // PRIORITY 2: REJECT OBVIOUS NON-COMMENTS
+    // PRIORITY 1: REJECT METADATA, HEADERS, SURVEY QUESTIONS & TABLE ARTIFACTS
+    // MUST run before positive keyword matching to prevent questions/headers
+    // from being falsely accepted as comments!
     // ══════════════════════════════════════════════════════════════════════════
 
     // ── Reject PDF rating-table rows ──────────────────────────────────────────
@@ -287,6 +262,11 @@ function isValidComment(text) {
     // Reject URLs
     if (/http|www\./i.test(clean)) return false;
 
+    // Reject Total row or FFI suggestions row
+    if (/^(?:\d+\s+)?total(?:\s*[:\-]?\s*[\d.]*)?$/i.test(clean)) return false;
+    if (/^ffi\s*&\s*suggestions?\s*(?:are\s*noted.*)?/i.test(clean)) return false;
+    if (/noted\s+for\s+further\s+improvement/i.test(clean)) return false;
+
     // Reject institution & report headers
     const headerPatterns = [
         /madhav\s+institute/i,
@@ -301,61 +281,86 @@ function isValidComment(text) {
         /feedback\s+submitted/i,
         /report\s+generated/i
     ];
-
     if (headerPatterns.some(p => p.test(clean))) return false;
+
+    // Reject rating scale table header rows (e.g., "1-Below Average 3-Good 4-Very Good 5-Excellent QV")
+    if (/label\s+question/i.test(clean)) return false;
+    if (/\b(?:1\s*-?\s*)?below\s+average\b.*\b(?:average|good|excellent)\b/i.test(clean)) return false;
+    if (/\bqv\b/i.test(clean) && /\b(?:good|average|excellent|question)\b/i.test(clean)) return false;
 
     // Reject table header keywords and metadata
     const tableKeywords = [
         'faculty name', 'course code', 'course name', 'semester', 'registered students',
         'link send', 'response %', 'submitted answers', 'label question', 'submitted answer',
-        'signature', 'hod', 'pro - vc', 'ffi & suggestion', 'student feedback comments',
+        'signature', 'hod', 'pro - vc', 'pro-vc', 'ffi & suggestion', 'student feedback comments',
         'course outcomes', 'qv 1', 'qv 2',
         'question', 'answer', 'response count', 'total responses', 'feedback form',
-        'submit', 'label', 'requirement', 'operating system', 'real world', 'purchased'
+        'submit', 'label', 'requirement', 'operating system', 'real world', 'purchased', 'total'
     ];
     const lower = clean.toLowerCase();
     if (tableKeywords.some(kw => lower === kw || lower.startsWith(kw + ':') || lower.startsWith(kw + ' :'))) return false;
-    
-    // ── NEW: Reject survey question patterns (ONLY if they start the sentence) ──
+
+    // ── Reject survey question patterns (MITS feedback standard questions 1-13) ──
     const surveyQuestionPatterns = [
-        /^performance\s+in\s+(delivery|teaching|conduct|assignments)/i,
-        /^whether\s+(MMTLP|faculty|teacher|material|notes)/i,
+        // 1. Weekly quiz & fortnightly assignments
+        /weekly\s+quiz\s+and\s+fortnightly\s+assignments/i,
+        /assignments?\s+motivate\s+you\s+to\s+revise/i,
+        // 2. Positive, supportive, helpful attitude, ethical behaviour, gender bias
+        /demonstrates?\s+a\s+consistently\s+positive/i,
+        /supportive,?\s+and\s+helpful\s+attitude/i,
+        /maintaining\s+ethical\s+behaviou?r/i,
+        /gender\s+bias/i,
+        // 3. Classes engaged with good preparation
+        /classes\s+are\s+engaged\s+with\s+good\s+preparation/i,
+        /engaged\s+with\s+good\s+preparation/i,
+        // 4. Performance in Assignments/Quiz/Minor exams discussed in class
+        /performance\s+in\s+assignments?\/quiz\/minor/i,
+        /performance\s+in\s+(?:delivery|teaching|conduct|assignments)/i,
+        /discussed\s+in\s+class/i,
+        // 5. Evaluation/assessment fair and justified
+        /evaluation\/assessment\s*\(minor/i,
+        /fair\s+and\s+justified/i,
+        // 6. Rate communication skills of the faculty
+        /rate\s+the\s+communication\s+skills/i,
+        /communication\s+skills\s+of\s+the\s+faculty/i,
+        // 7. Whether MMTLP modes were used
+        /whether\s+mmtlp\s+modes\s+were\s+used/i,
+        /mmtlp\s+modes/i,
+        /^whether\s+(?:mmtlp|faculty|teacher|material|notes)/i,
+        // 8. PPTs/Notes shared in a timely manner
+        /ppts?\/notes\s+are\s+shared/i,
+        /shared\s+in\s+a\s+timely\s+manner/i,
+        // 9. Coverage of syllabus/course content is good
+        /coverage\s+of\s+syllabus\/course\s+content/i,
+        /coverage\s+of\s+syllabus/i,
+        /course\s+covered\s+so\s+far/i,
+        // 10. Classes are useful and help in identifying strengths and correcting weaknesses
+        /classes\s+are\s+useful\s+and\s+help\s+in\s+identifying\s+strengths/i,
+        /identifying\s+strengths\s+and\s+(?:correcting|connecting)\s+weaknesses/i,
+        // Other general survey question headers
         /^additional\s+classes?\s+(conducted|arranged|held)/i,
         /^(teaching|learning|availability)\s+(methodology|manner|performance|of\s+faculty)/i,
         /^relevance\s+of\s+(course|content|material)/i,
         /^teacher'?s?\s+participation\s+in/i,
         /^completion\s+of\s+syllabus/i,
         /^fortnightly\s+(upload|submission)/i,
-        // NEW: Survey questions from the image
-        /^the\s+(weekly\s+quiz|classes\s+are\s+engaged|ppn?\/notes|concepts\s+are)/i,
-        /^demonstrate\s+a\s+consistently/i,
         /^overall\s+rating\s+of\s+the\s+course/i,
-        /^evaluation\/assessment/i,
-        /^rate\s+the\s+communication/i,
         /^expected\s+course\s+outcomes/i,
-        /^coverage\s+of\s+syllabus/i,
-        /^classes\s+are\s+useful/i,
-        /assignment.*motivate.*revise/i,
-        /maintaining\s+ethical\s+behaviour/i,
-        /engaged\s+with\s+good\s+preparation/i,
-        /course\s+covered\s+so\s+far/i,
-        /shared\s+in\s+a\s+timely\s+manner/i,
-        /communication\s+skills\s+of\s+the\s+faculty/i,
         /program.*outcomes.*discussed/i,
-        /mmtlp\s+modes\s+were\s+used/i,
         /remedial\s+purpose/i,
-        /cleared\s+by\s+giving\s+examples/i,
-        /identifying\s+strengths\s+and\s+connecting/i,
-        // NEW: Specific rejection for generic ethics statement
-        /demonstrates?\s+a\s+consistently\s+positive.*supportive.*helpful.*attitude.*ethical.*behaviour.*gender\s+bias/i,
+        /cleared\s+by\s+giving\s+examples/i
     ];
-    if (surveyQuestionPatterns.some(p => p.test(clean))) return false;
-    
-    // ── Reject table headers with rating column labels ──
-    if (/\d+\s*-?\s*below\s+average.*\d+\s*-?\s*average.*\d+\s*-?\s*good.*\d+\s*-?\s*very\s+good.*excellent/i.test(clean)) return false;
-    if (/label\s+question.*below\s+average.*average.*good.*very\s+good.*excellent.*qv/i.test(clean)) return false;
-    
-    // ── NEW: Reject standalone rating scale options (ONLY exact matches) ─────
+    if (surveyQuestionPatterns.some(p => p.test(clean))) {
+        console.log('[PDF] ✗ Rejected survey question: ' + clean.substring(0, 60));
+        return false;
+    }
+
+    // ── Reject survey questions prefixed with numbers (e.g., "1. The weekly quiz...", "2 Demonstrates...") ──
+    if (/^\d{1,2}[\.\s\-]+(?:the\s+weekly\s+quiz|demonstrates?|the\s+classes|performance|evaluation|rate|whether|the\s+ppts?|coverage|classes\s+are|total)/i.test(clean)) {
+        return false;
+    }
+
+    // ── Reject standalone rating scale options (ONLY exact matches) ─────
     const ratingOptionsExact = [
         'excellent', 'very good', 'good', 'average', 'below average', 'poor',
         'strongly agree', 'agree', 'neutral', 'disagree', 'strongly disagree',
@@ -364,9 +369,25 @@ function isValidComment(text) {
     ];
     const cleanLower = clean.toLowerCase().replace(/[.,!?;:]+$/, '').trim();
     if (ratingOptionsExact.includes(cleanLower)) return false;
-    
-    // ── NEW: Reject rating percentages (e.g. "Excellent: 45%") ───────────────
+
+    // ── Reject rating percentages (e.g. "Excellent: 45%") ───────────────
     if (/^(excellent|very good|good|average|below average|poor):\s*\d+%$/i.test(clean)) return false;
+
+    // Reject if it looks like a course/subject name followed by an answer
+    if (/^[A-Z][A-Za-z\s&]+\s+(?:\d+|yes|no|n\.?a\.?|purchased|required)$/i.test(clean)) return false;
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // PRIORITY 2: ACCEPT REAL FEEDBACK
+    // If text passed rejection checks and contains feedback words, accept it!
+    // ══════════════════════════════════════════════════════════════════════════
+    const feedbackIndicators = /\b(sir|ma'?am|teacher|faculty|professor|teaching|class|lecture|explains?|teaches?|helpful|good|nice|best|worst|better|improve|slow|fast|clear|unclear|difficult|easy|understands?|doubts?|notes?|material|lab|practical|exam|quiz|test|assignments?|pace|speed|time|voice|audible|interactive|boring|interesting|patient|rude|polite|friendly|strict|lenient|knowledge|experience|method|style|way|approach|behavior|attitude|support|guide|help|available|absent|late|punctual|regular|irregular|excellent|decent|supporting|outstanding|amazing|great|cool|nil|nothing|blank|na|notice|noticeably|observed)\b/i;
+
+    const hasFeedbackWords = feedbackIndicators.test(clean);
+
+    if (hasFeedbackWords && clean.length >= 3) {
+        console.log('[PDF] ✓ ACCEPTED (has feedback indicators): ' + clean.substring(0, 60));
+        return true;
+    }
     
     // Reject if it looks like a course/subject name followed by an answer
     // e.g. "Software Engineering 45" or "Data Structures Yes" or "operating system purchased"
@@ -414,9 +435,9 @@ function findCommentSectionBounds(textContent) {
         if (!sectionStartY) {
             if ((text.includes('student') && text.includes('feedback') && text.includes('comment')) ||
                 text === 'student feedback comments' ||
-                (text.includes('feedback') && text.includes('comment'))) {
+                text.includes('student comments')) {
                 // PDF Y-axis is bottom-up: comments BELOW header have LOWER Y values
-                // Header at Y=700, first comment at Y=680
+                // Header at Y=93, first comment at Y=63
                 // Filter is: y < sectionStartY
                 // So sectionStartY should be LESS than header Y to exclude header itself
                 // But GREATER than comment Y values to include them
@@ -426,8 +447,9 @@ function findCommentSectionBounds(textContent) {
             }
         }
         
-        // NEW: Track first line with feedback words (fallback for PDFs without headers)
-        if (!firstFeedbackY && text.length >= 3) {
+        // Disallow rating table headers from being treated as feedback (e.g. "1-Below Average", "Label Question")
+        const isSurveyTableArtifact = /label\s+question|below\s+average|qv|total|ffi\s*&/i.test(text);
+        if (!firstFeedbackY && text.length >= 3 && !isSurveyTableArtifact) {
             const feedbackWords = /\b(good|excellent|nice|best|worst|poor|teacher|mam|sir|teaching|helpful|explains|slow|fast|clear|boring|interesting|supporting|decent|notice|cool|great)\b/i;
             if (feedbackWords.test(text)) {
                 firstFeedbackY = y;
@@ -435,7 +457,8 @@ function findCommentSectionBounds(textContent) {
         }
         
         // Look for section end markers (signature, next section header)
-        if ((sectionStartY || firstFeedbackY) && !sectionEndY) {
+        // CRITICAL: End markers must only apply BELOW the sectionStartY (y < sectionStartY)
+        if (sectionStartY && !sectionEndY && y < sectionStartY) {
             if (text.includes('signature') || 
                 text.includes('faculty signature') ||
                 text.includes('hod signature') ||
@@ -444,7 +467,6 @@ function findCommentSectionBounds(textContent) {
                 text.includes('action taken by')) {
                 sectionEndY = y + 15; // End 15px above footer
                 console.log(`[PDF] ✓ Found section end at Y=${y}, stopping extraction at Y=${sectionEndY}`);
-                break;
             }
         }
     }
@@ -480,14 +502,27 @@ async function extractAllStudentComments(buffer, targetCourseCode) {
         const tc = await page.getTextContent();
         const fullText = tc.items.map(i => i.str).join(' ').toLowerCase();
 
-        // FLEXIBLE: Check for various comment section indicators
-        const hasStudentFeedbackHeader = 
+        // Check for comment section indicators:
+        // Page 1 & 2 are the Action Taken Report summary table
+        // Notice that summary pages have '• no suggestion' or bulleted percentages '• good:' or faculty summary signatures 'hod pro - vc'
+        const isActionTakenReport = 
+            fullText.includes('action taken report') || 
+            (fullText.includes('needs attention') && fullText.includes('appreciation')) ||
+            (fullText.includes('s.no') && fullText.includes('code/batch')) ||
+            (fullText.includes('• no suggestion') || fullText.includes('• good:') || fullText.includes('• excellent:')) ||
+            (fullText.includes('batch-a') && fullText.includes('hod') && fullText.includes('pro - vc') && !fullText.includes('student feedback comments'));
+        
+        const hasExplicitCommentsHeader = 
             (fullText.includes('student') && fullText.includes('feedback') && fullText.includes('comment')) ||
-            fullText.includes('student feedback comments') ||
-            // NEW: Also accept pages with common feedback words (for PDFs without explicit section headers)
-            (fullText.match(/(good|excellent|nice|best|teacher|mam|sir|teaching|helpful)/gi) || []).length >= 3;
+            fullText.includes('student feedback comments');
 
-        if (hasStudentFeedbackHeader) {
+        const hasSubmittedAnswersHeader = fullText.includes('submitted answers');
+
+        const hasCommonFeedbackWords = 
+            (fullText.match(/\b(good|excellent|nice|best|teacher|mam|sir|teaching|helpful)\b/gi) || []).length >= 3;
+
+        // Only include page if it has feedback header or content, and is NOT the Action Taken Report summary page
+        if (!isActionTakenReport && (hasExplicitCommentsHeader || hasSubmittedAnswersHeader || hasCommonFeedbackWords)) {
             console.log(`[PDF] ✓ Page ${p} has feedback content`);
             rawCommentPages.push({ pageNum: p, page, tc, fullText });
         }

@@ -24,9 +24,9 @@ function filterShortComments(list) {
   return list.filter(c => {
     if (!c || typeof c !== 'string') return false;
     const t = c.trim();
-    if (t.length < 10) return false;                          // too short
+    if (t.length < 3) return false;                          // ignore single chars or empty
     if (FILLER_PHRASES.has(t.toLowerCase().replace(/[.,!?]+$/, ''))) return false;
-    return t.split(/\s+/).length >= 5;                        // less than 5 words → skip
+    return true;                                             // accept all genuine comments (including short ones like 'Too fast', 'Voice is low')
   });
 }
 
