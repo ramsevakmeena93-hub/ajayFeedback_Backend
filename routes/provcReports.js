@@ -298,7 +298,7 @@ router.get('/:id/download', authMiddleware, async (req, res) => {
     const isPrivileged = callerRoles.has('vc') || callerRoles.has('provc') || callerRoles.has('admin');
     const isHod = callerRoles.has('hod');
 
-    // Fix: explicit allowlist — only vc/provc/admin and hod (with dept match) are permitted
+    // explicit allowlist — only vc/provc/admin and hod (with dept match) are permitted
     if (!isPrivileged && !isHod) {
       return res.status(403).json({ error: 'Access denied — insufficient role' });
     }
@@ -306,9 +306,27 @@ router.get('/:id/download', authMiddleware, async (req, res) => {
     // HOD can only download their own department's reports
     if (isHod && !isPrivileged) {
       const userDept = req.user.departmentScope || req.user.department || '';
-      if (report.department !== userDept) {
-        return res.status(403).json({ error: 'Access denied — wrong department' });
+      const reportDept = report.department || '';
+      if (reportDept && userDept && reportDept !== userDept) {
+        return res.status(403).json({
+          error: 'Access denied — wrong department',
+          yourDepartment: userDept,
+          reportDepartment: reportDept,
+        });
       }
+    }
+
+    // Convert MongoDB Binary (BSON) to Node.js Buffer
+    let pdfBuffer;
+    if (!report.pdfData) {
+      return res.status(404).json({ error: 'PDF data not found in this report record' });
+    } else if (Buffer.isBuffer(report.pdfData)) {
+      pdfBuffer = report.pdfData;
+    } else if (report.pdfData.buffer) {
+      // MongoDB Binary object from .lean() — has a .buffer property (ArrayBuffer or Buffer)
+      pdfBuffer = Buffer.from(report.pdfData.buffer);
+    } else {
+      pdfBuffer = Buffer.from(report.pdfData);
     }
 
     const facPart  = report.reportType === 'faculty-wise'
@@ -318,9 +336,11 @@ router.get('/:id/download', authMiddleware, async (req, res) => {
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    res.setHeader('Content-Length', report.pdfData.length);
-    res.send(report.pdfData);
+    res.setHeader('Content-Length', pdfBuffer.length);
+    res.setHeader('Cache-Control', 'no-cache');
+    res.send(pdfBuffer);
   } catch (err) {
+    console.error('[ProVC Download Error]:', err);
     res.status(500).json({ error: err.message });
   }
 });
