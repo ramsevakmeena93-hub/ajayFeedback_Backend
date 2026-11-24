@@ -1,13 +1,3 @@
-// pdfGenerator.js
-// Action Taken Report PDF.
-// - White table header with black text
-// - Code and Batch always on separate lines (code / "Batch A")
-// - Every comment line starts at the same x position
-// - ALL comments printed (no word-count filter), including object-style comments
-// - Course name resolved from many possible field names
-// - Appreciation / Needs-Attention merged from every known field + tagged comment arrays
-// - Signatures scaled to fit inside their cell
-// - Original faculty PDFs (Drive links) appended at the end with signature stamps
 const { PDFDocument, rgb, StandardFonts, degrees } = require("pdf-lib");
 const fs2 = require("fs");
 const path = require("path");
@@ -24,12 +14,36 @@ try {
 // Real comments never start with 1-2 digits glued to a letter. Set false to keep everything.
 const FILTER_RATING_ROWS = true;
 
-// Continuation pages (when the table runs past page 1):
-// set to true to repeat the MITS letterhead / the column titles on every page.
-const REPEAT_LETTERHEAD = false;
-const REPEAT_TABLE_HEADER = false;
-
 function escapeRegExp(s) {
+  // Escape special regex characters
+  return String(s || "").replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&");
+}
+
+// Normalizes a faculty name for comparison
+// Normalizes a faculty name for comparison
+function normalizeName(name) {
+  if (!name) return "";
+  let n = String(name).toLowerCase().trim();
+  // Common misspelling handling
+  n = n.replace(/\bmithoon\b/g, "mithun");
+  // Normalize Dr. Manjaree Pandit variations
+  n = n.replace(/\bdr\.?\s*manjaree\s*pandit\b/g, "dr. manjaree pandit");
+  // Also handle missing dot or extra spaces
+  n = n.replace(/\bd\.?\s*manjaree\s*pandit\b/g, "dr. manjaree pandit");
+  // Catch common typo without 'e' or with extra letters
+  n = n.replace(/\bd\.?\s*manjara?e?\s*pandit\b/g, "dr. manjaree pandit");
+  // Remove extra spaces and optional dot, ensure proper spacing
+  n = n.replace(/\bd\.?\s*manjaree\s*pandit\b/g, "d. manjaree pandit");
+  // Catch common typo without 'e' or with extra letters
+  n = n.replace(/\bd\.?\s*manjara?e?\s*pandit\b/g, "d. manjaree pandit");
+  return n;
+}
+  if (!name) return "";
+  let n = String(name).toLowerCase().trim();
+  // Common misspelling handling
+  n = n.replace(/\bmithoon\b/g, "mithun");
+  return n;
+}
   return String(s || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
@@ -62,9 +76,8 @@ async function generateFeedbackReportPDF({
   isPreview = false,
   withoutSignatures = false,
   hideVCSignature = false,
-  appendOriginals = true, // append the faculty original PDFs at the end (set false to skip)
+  appendOriginals = true, // append the faculty's original PDFs at the end (skipped for preview)
 }) {
-  console.log(`[PDF] Starting PDF generation for ${reports.length} reports`);
   const User = require("../models/User");
   const HODComment = require("../models/HODComment");
 
@@ -261,9 +274,9 @@ async function generateFeedbackReportPDF({
   function cleanCourseName(name) {
     if (!name) return "";
     return String(name)
-      .replace(/\bsubmitted\s+answers?\s*:?\s*-?\s*/gi, "")
-      .replace(/\bsubmitted\s+responses?\s*:?\s*-?\s*/gi, "")
-      .replace(/\bstudent\s+feedback\s*:?\s*-?\s*/gi, "")
+      .replace(/\bsubmitted\s+answers?:?\s*-?\s*/gi, "")
+      .replace(/\bsubmitted\s+responses?:?\s*-?\s*/gi, "")
+      .replace(/\bstudent\s+feedback?:?\s*-?\s*/gi, "")
       .replace(/\s+/g, " ")
       .trim();
   }
@@ -279,7 +292,6 @@ async function generateFeedbackReportPDF({
   const isGenericTitle = (s) =>
     /^(faculty\s+)?feedback(\s*[-\u2013]?\s*([ivx]+|\d+))?$/i.test(s.trim());
 
-  // Specific course keys first, generic "programme" later.
   const COURSE_KEYS = [
     "courseName", "course_name", "subjectName", "subject_name", "courseTitle",
     "subjectTitle", "paperName", "paperTitle", "course", "subject",
@@ -295,12 +307,10 @@ async function generateFeedbackReportPDF({
       const c = ok(r[k]);
       if (c) return c;
     }
-    // nested objects e.g. r.subjectDetails.name
     for (const k of ["subjectDetails", "courseDetails", "subjectInfo", "courseInfo"]) {
       const c = ok(r[k]);
       if (c) return c;
     }
-    // last resort: any key that looks like a course/subject/paper name
     for (const k of Object.keys(r)) {
       if (/(course|subject|paper|programme|program)/i.test(k) && !/(code|id$|link|count|score|sem)/i.test(k)) {
         const c = ok(r[k]);
@@ -339,7 +349,6 @@ async function generateFeedbackReportPDF({
   ];
   const MIXED_KEYS = ["comments", "allComments", "studentComments", "feedbackComments"];
 
-  // Returns { app: [...], att: [...] } – every non-empty, de-duplicated comment.
   function collectComments(r) {
     const app = [];
     const att = [];
@@ -355,7 +364,6 @@ async function generateFeedbackReportPDF({
     };
     APP_KEYS.forEach((k) => toList(r[k]).forEach((c) => add(app, seenApp, c)));
     ATT_KEYS.forEach((k) => toList(r[k]).forEach((c) => add(att, seenAtt, c)));
-    // mixed arrays of tagged comment objects
     MIXED_KEYS.forEach((k) =>
       toList(r[k]).forEach((c) => {
         if (!c || typeof c !== "object") return;
@@ -368,7 +376,6 @@ async function generateFeedbackReportPDF({
   }
   const bullets = (arr) => arr.map((x) => "\u2022 " + x);
 
-  // Code on line 1, Batch on line 2 (e.g. "30261103" / "Batch A").
   function splitCodeBatch(subjectCode, batch) {
     const code0 = String(subjectCode || "").trim();
     const b0 = String(batch || "").trim();
@@ -380,21 +387,21 @@ async function generateFeedbackReportPDF({
     return full;
   }
 
-  // ── Reports: keep all, sort by faculty then subject code ──────────────────
   console.log(`[PDF] Total reports received: ${reports.length}`);
   const uniqueReports = [...reports];
   uniqueReports.sort((a, b) => {
-    const nameA = (a.facultyName || "").toLowerCase();
-    const nameB = (b.facultyName || "").toLowerCase();
+    // Normalized name for sorting and deduplication
+const nameA = normalizeName(a.facultyName);
+
+    const nameB = normalizeName(b.facultyName);
     if (nameA !== nameB) return nameA.localeCompare(nameB);
     return (a.subjectCode || "").toLowerCase().localeCompare((b.subjectCode || "").toLowerCase());
   });
 
-  // ── Faculty signatures ────────────────────────────────────────────────────
   const facultySigMap = {};
   if (!withoutSignatures) {
     for (const r of uniqueReports) {
-      const key = (r.facultyName || "").toLowerCase().trim();
+      const key = normalizeName(r.facultyName);
       if (facultySigMap[key]) continue;
       if (r.facultyUserId) {
         try {
@@ -422,7 +429,6 @@ async function generateFeedbackReportPDF({
   const vcSig = withoutSignatures || hideVCSignature ? null : await cropAndEmbedSig(vcUser && vcUser.signatureImage);
   console.log("[PDF] Sigs — HOD:", !!hodSig, "VC:", !!vcSig, "Faculty:", Object.keys(facultySigMap).length);
 
-  // ── Header image (cached) ─────────────────────────────────────────────────
   let _embH = null;
   async function drawHeader(pg, y) {
     if (_headerBytes) {
@@ -443,19 +449,18 @@ async function generateFeedbackReportPDF({
     return y - 36;
   }
 
-  // ── Column definitions (widths add up to exactly CW = 802) ────────────────
   const COL_DEFS = [
-    { key: "sno",     w: 24,  hdr: ["S.No"] },
-    { key: "faculty", w: 76,  hdr: ["Faculty", "Name"] },
-    { key: "code",    w: 70,  hdr: ["Code /", "Batch"] },
-    { key: "course",  w: 90,  hdr: ["Course", "Name"] },
-    { key: "sem",     w: 24,  hdr: ["Sem"] },
-    { key: "ffi",     w: 34,  hdr: ["FFI"] },
-    { key: "resp",    w: 46,  hdr: ["Resp.", "%"] },
-    { key: "attn",    w: 132, hdr: ["Needs", "Attention"] },
-    { key: "appr",    w: 146, hdr: ["Appreciation"] },
-    { key: "action",  w: 96,  hdr: ["Action", "Taken"] },
-    { key: "sig",     w: 64,  hdr: ["Faculty", "Signature"] },
+    { key: "sno", w: 24, hdr: ["S.No"] },
+    { key: "faculty", w: 76, hdr: ["Faculty", "Name"] },
+    { key: "code", w: 70, hdr: ["Code /", "Batch"] },
+    { key: "course", w: 90, hdr: ["Course", "Name"] },
+    { key: "sem", w: 24, hdr: ["Sem"] },
+    { key: "ffi", w: 34, hdr: ["FFI"] },
+    { key: "resp", w: 46, hdr: ["Resp.", "%"] },
+    { key: "attn", w: 132, hdr: ["Needs", "Attention"] },
+    { key: "appr", w: 146, hdr: ["Appreciation"] },
+    { key: "action", w: 96, hdr: ["Action", "Taken"] },
+    { key: "sig", w: 64, hdr: ["Faculty", "Signature"] },
   ];
   let _cx = ML;
   const COLS = COL_DEFS.map((c) => {
@@ -464,7 +469,6 @@ async function generateFeedbackReportPDF({
     return o;
   });
   const sigColIdx = COLS.length - 1;
-
   const TH = 30;
 
   function drawTableHeader(pg, y) {
@@ -486,7 +490,6 @@ async function generateFeedbackReportPDF({
     return y - TH;
   }
 
-  // ── Page state ────────────────────────────────────────────────────────────
   let page = pdfDoc.addPage([PW, PH]);
   let y = PH - 15;
 
@@ -497,12 +500,10 @@ async function generateFeedbackReportPDF({
   async function newTablePage() {
     page = pdfDoc.addPage([PW, PH]);
     y = PH - 15;
-    if (REPEAT_LETTERHEAD) y = await drawHeader(page, y);
-    else y = PH - TOP_MARGIN;
-    if (REPEAT_TABLE_HEADER) y = drawTableHeader(page, y);
+    y = await drawHeader(page, y);
+    y = drawTableHeader(page, y);
   }
 
-  // ── Cover section ─────────────────────────────────────────────────────────
   y = await drawHeader(page, y);
   y -= 10;
 
@@ -520,7 +521,7 @@ async function generateFeedbackReportPDF({
   y -= 16;
 
   const sessionLabel = submission.session === "jan-may" ? "January \u2013 May" : "July \u2013 December";
-  const ayText = "Academic Year: " + (submission.academicYear || "2026-2027");
+  const ayText = "Academic Year \u2013 " + (submission.academicYear || "2025-26");
   const sessText = "Session: " + sessionLabel;
   txt(page, ayText, ML, y, 11, timesFont, black);
   txt(page, sessText, PW - MR - timesFont.widthOfTextAtSize(sessText, 11), y, 11, timesFont, black);
@@ -550,14 +551,12 @@ async function generateFeedbackReportPDF({
   txt(page, avgRespText, PW - MR - timesBoldFont.widthOfTextAtSize(avgRespText, 11), y, 11, timesBoldFont, black);
   y -= 18;
 
-  // ── HOD comments (department-level + individual remarks) ──────────────────
   const hasComments = (hodCommentText && hodCommentText.trim()) || individualComments.length > 0;
   if (hasComments) {
     const CFS = 9;
     const CLH = 11;
     const maxW = CW - 8;
     const cLines = [];
-
     if (hodCommentText && hodCommentText.trim()) {
       cLines.push({ text: "Department-level Remarks:", bold: true, indent: 0, h: CLH });
       wrapCell(hodCommentText.trim(), maxW, timesFont, CFS, CLH, 4).forEach((l) =>
@@ -574,7 +573,6 @@ async function generateFeedbackReportPDF({
         );
       });
     }
-
     cLines.forEach((l) => {
       if (y - l.h < BOTTOM_MARGIN + TH + 40) newPlainPage();
       if (!l.spacer && l.text) {
@@ -585,11 +583,9 @@ async function generateFeedbackReportPDF({
     y -= 8;
   }
 
-  // ── Table start ───────────────────────────────────────────────────────────
   if (y - BOTTOM_MARGIN < TH + 60) newPlainPage();
   y = drawTableHeader(page, y);
 
-  // ── Table rows ────────────────────────────────────────────────────────────
   const SIG_IMG_H = 22;
   const SIG_NAME_FS = 6;
   const SIG_NAME_LH = 7;
@@ -601,13 +597,9 @@ async function generateFeedbackReportPDF({
 
   for (let i = 0; i < uniqueReports.length; i++) {
     const r = uniqueReports[i];
-
-    // ---- cell texts ----
     const codeBatch = splitCodeBatch(r.subjectCode, r.batch);
-
     const { app: appList, att: attList } = collectComments(r);
     const attText = bullets(attList).join("\n") || "-";
-
     const pcts = r.commentPercentages || {};
     const pctLines = Object.entries(pcts)
       .filter(([, v]) => v > 0)
@@ -615,29 +607,19 @@ async function generateFeedbackReportPDF({
       .map(([k, v]) => "\u2022 " + k + ": " + v + "%")
       .join("\n");
     const appText = [pctLines, ...bullets(appList)].filter(Boolean).join("\n") || "-";
-
-    console.log(
-      `[PDF] #${i + 1} ${r.facultyName}: appreciation=${appList.length}, needsAttention=${attList.length}`
-    );
-
-    const actionText = String(
-      toText(r.actionTaken || r.action_taken || r.hodAction || r.hodActionTaken) || "-"
-    );
-
+    console.log(`[PDF] #${i + 1} ${r.facultyName}: appreciation=${appList.length}, needsAttention=${attList.length}`);
+    const actionText = String(toText(r.actionTaken || r.action_taken || r.hodAction || r.hodActionTaken) || "-");
     const ffi = r.ffiScore;
     const ffiNum = ffi != null ? Number(ffi) : null;
     const ffiColor = ffiNum != null && !isNaN(ffiNum) ? (ffiNum >= 4 ? green : ffiNum >= 3 ? amber : red) : black;
     const ffiDisplay = ffiNum != null && !isNaN(ffiNum) ? ffiNum.toFixed(2) : "-";
-    const respDisplay =
-      r.responsePercent != null && r.responsePercent !== ""
-        ? (isNaN(Number(r.responsePercent)) ? String(r.responsePercent) : Number(r.responsePercent).toFixed(2)) + "%"
-        : "-";
+    const respDisplay = r.responsePercent != null && r.responsePercent !== ""
+      ? (isNaN(Number(r.responsePercent)) ? String(r.responsePercent) : Number(r.responsePercent).toFixed(2)) + "%"
+      : "-";
     const courseName = resolveCourseName(r) || "-";
     const sem = r.semester != null && r.semester !== "" ? String(r.semester) : r.sem != null ? String(r.sem) : "-";
-
     const facKey = (r.facultyName || "").toLowerCase().trim();
     const sigImg = facultySigMap[facKey] || null;
-
     const cells = [
       { lines: single(String(i + 1)), font: timesBoldFont, center: true },
       { lines: wrapIn(r.facultyName || "-", 1), font: timesFont },
@@ -649,28 +631,20 @@ async function generateFeedbackReportPDF({
       { lines: wrapIn(attText, 7), font: timesFont },
       { lines: wrapIn(appText, 8), font: timesFont },
       { lines: wrapIn(actionText, 9), font: timesFont },
-      { lines: [], font: timesFont }, // signature column drawn separately
+      { lines: [], font: timesFont },
     ];
-
     const sigCol = COLS[sigColIdx];
     const sigNameLines = wrapName(r.facultyName || "", sigCol.w - 6, font, SIG_NAME_FS);
     const sigImgH = sigImg ? SIG_IMG_H : 0;
     const sigNeeded = PAD_TOP + sigImgH + (sigImg ? 2 : 0) + sigNameLines.length * SIG_NAME_LH + PAD_BOT;
-
-    // ---- draw (splitting across pages when needed) ----
     let pending = cells.map((c) => c.lines.slice());
     let guard = 0;
     while (guard++ < 200) {
       const avail = y - BOTTOM_MARGIN;
       const contentNeeded = Math.max(...pending.map((l) => (l.length ? sumH(l) : 0))) + PAD_TOP + PAD_BOT;
       const needed = Math.max(contentNeeded, sigNeeded);
-
       const isLast = needed <= avail;
-      if (!isLast && avail < MIN_SPLIT) {
-        await newTablePage();
-        continue;
-      }
-
+      if (!isLast && avail < MIN_SPLIT) { await newTablePage(); continue; }
       const take = pending.map(() => []);
       if (isLast) {
         pending.forEach((l, ci) => { take[ci] = l; });
@@ -687,16 +661,13 @@ async function generateFeedbackReportPDF({
           if (ci >= 0) take[ci] = pending[ci].slice(0, 1);
         }
       }
-
       const usedH = Math.max(...take.map((t) => sumH(t)), 0);
       let rowH = isLast ? needed : Math.min(avail, usedH + PAD_TOP + PAD_BOT);
       if (!isLast) rowH = Math.max(rowH, usedH + PAD_TOP + PAD_BOT);
-
       rect(page, ML, y - rowH, CW, rowH, { borderColor: black, borderWidth: 0.5 });
       COLS.forEach((col, ci) => {
         if (ci > 0) line(page, col.x, y, col.x, y - rowH, 0.5, black);
       });
-
       take.forEach((lines, ci) => {
         const col = COLS[ci];
         const c = cells[ci];
@@ -713,7 +684,6 @@ async function generateFeedbackReportPDF({
           ly -= l.h;
         });
       });
-
       if (isLast) {
         let sy = y - PAD_TOP;
         if (sigImg) {
@@ -726,24 +696,19 @@ async function generateFeedbackReportPDF({
           sy -= SIG_NAME_LH;
         });
       }
-
       y -= rowH;
-
       if (isLast) break;
       pending = pending.map((l, ci) => l.slice(take[ci].length));
       await newTablePage();
     }
   }
 
-  // ── Footer: HOD / Pro-VC signatures ───────────────────────────────────────
   const FOOT_H = 52;
   const NOTE_H = 16;
   if (y - BOTTOM_MARGIN < FOOT_H + NOTE_H + 10) await newTablePage();
   y -= 6;
-
   txt(page, "FFI & Suggestions are noted for further improvement.", ML, y - 9, 9, timesBoldFont, black);
   y -= NOTE_H;
-
   function drawSigCell(pg, { x, w, h, label, name, img }) {
     const yBot = y - h;
     rect(pg, x, yBot, w, h, { borderColor: black, borderWidth: 0.6 });
@@ -756,13 +721,10 @@ async function generateFeedbackReportPDF({
     nm.forEach((l) => { txt(pg, l, x + 5, ty - 7, 7, font, black); ty -= 8; });
     if (img) drawFitted(pg, img, x + labelW, yBot + 3, w - labelW - 5, h - 6);
   }
-
   const halfW = CW / 2;
   drawSigCell(page, { x: ML, w: halfW, h: FOOT_H, label: "HOD", name: hodUser && hodUser.name, img: hodSig });
   drawSigCell(page, { x: ML + halfW, w: halfW, h: FOOT_H, label: "PRO - VC", name: vcUser && vcUser.name, img: vcSig });
   y -= FOOT_H;
-
-  // ── Preview watermark + page numbers (summary pages only) ─────────────────
   const summaryPages = pdfDoc.getPages();
   summaryPages.forEach((pg, idx) => {
     if (isPreview) {
@@ -777,7 +739,6 @@ async function generateFeedbackReportPDF({
     txt(pg, label, PW - MR - font.widthOfTextAtSize(label, 7), 14, 7, font, black);
   });
 
-  // ── Append original faculty PDFs (with signature stamps) ──────────────────
   function convertDriveLink(url) {
     if (!url) return null;
     const m1 = String(url).match(/\/d\/([a-zA-Z0-9_-]+)/);
@@ -789,9 +750,9 @@ async function generateFeedbackReportPDF({
 
   async function downloadPdfBuffer(url, retries = 3) {
     const axios = require("axios");
-    const idm = String(url).match(/\/d\/([a-zA-Z0-9_-]+)|[?&]id=([a-zA-Z0-9_-]+)/);
-    const fileId = idm ? idm[1] || idm[2] : null;
-    if (fileId) {
+    const fileIdMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)|[?&]id=([a-zA-Z0-9_-]+)/);
+    if (fileIdMatch) {
+      const fileId = fileIdMatch[1] || fileIdMatch[2];
       try {
         const { google } = require("googleapis");
         const clientEmail = process.env.GOOGLE_DRIVE_CLIENT_EMAIL;
@@ -808,96 +769,27 @@ async function generateFeedbackReportPDF({
           throw new Error("Service account response is not a PDF");
         }
       } catch (e) {
-        console.warn("[PDF] Service account failed (is the file shared with it?), falling back:", e.message);
+        console.warn("[PDF] Service account failed, falling back:", e.message);
       }
     }
-    const urls = [url];
-    if (fileId) urls.push(`https://drive.usercontent.google.com/download?id=${fileId}&export=download&confirm=t`);
-    for (const u of urls) {
-      for (let attempt = 1; attempt <= retries; attempt++) {
-        try {
-          const res = await axios.get(u, {
-            responseType: "arraybuffer",
-            timeout: 40000,
-            headers: { "User-Agent": "Mozilla/5.0", Accept: "application/pdf,*/*" },
-            maxRedirects: 10,
-          });
-          const buf = Buffer.from(res.data);
-          if (buf.subarray(0, 5).toString("latin1") !== "%PDF-") throw new Error("Response is not a PDF (file is probably private)");
-          if (buf.length < 1000) throw new Error("PDF too small");
-          return buf;
-        } catch (err) {
-          console.warn(`[PDF] Download attempt ${attempt}/${retries}: ${err.message}`);
-          if (attempt < retries) await new Promise((r) => setTimeout(r, 1500 * attempt));
-        }
-      }
-    }
-    console.warn("[PDF] Could not download:", url, "- share the file with the service account or set 'Anyone with the link'.");
-    return null;
-  }
-
-  // Locally uploaded file: "uploaded:<name or path>"
-  function readLocalPdf(ref) {
-    const name = String(ref).replace(/^uploaded:/, "").trim();
-    const dirs = [
-      process.env.UPLOAD_DIR,
-      path.join(__dirname, "../uploads"),
-      path.join(__dirname, "../../uploads"),
-      path.join(process.cwd(), "uploads"),
-    ].filter(Boolean);
-    const tries = path.isAbsolute(name) ? [name] : [];
-    dirs.forEach((d) => {
-      tries.push(path.join(d, name));
-      tries.push(path.join(d, path.basename(name)));
-    });
-    for (const f of tries) {
+    for (let attempt = 1; attempt <= retries; attempt++) {
       try {
-        if (fs2.existsSync(f)) {
-          const buf = fs2.readFileSync(f);
-          if (buf.subarray(0, 5).toString("latin1") === "%PDF-") return buf;
-        }
-      } catch (e) {}
-    }
-    console.warn("[PDF] Uploaded file not found:", name, "(set UPLOAD_DIR in .env)");
-    return null;
-  }
-
-  const LINK_KEYS = [
-    "driveLink", "pdfLink", "driveUrl", "pdfUrl", "fileUrl", "fileLink", "googleDriveLink",
-    "reportLink", "reportUrl", "originalPdf", "originalPdfUrl", "sourcePdf",
-    "attachment", "attachmentUrl", "link", "url", "file",
-  ];
-
-  // Find where this report's original PDF lives (link, local upload, or stored bytes).
-  function findSource(rp) {
-    for (const k of ["pdfBuffer", "pdfData", "pdfBase64", "fileData"]) {
-      const v = rp[k];
-      if (Buffer.isBuffer(v) && v.length > 1000) return { key: "buf:" + k + ":" + (rp._id || rp.facultyName), kind: "buffer", value: v };
-      if (v && Buffer.isBuffer(v.buffer) && v.buffer.length > 1000) return { key: "buf:" + k + ":" + (rp._id || rp.facultyName), kind: "buffer", value: v.buffer };
-      if (typeof v === "string" && v.length > 2000 && !/^https?:/i.test(v)) {
-        return { key: "b64:" + k + ":" + (rp._id || rp.facultyName), kind: "buffer", value: Buffer.from(v.replace(/^data:.*?;base64,/, ""), "base64") };
-      }
-    }
-    const cands = LINK_KEYS.map((k) => rp[k]);
-    Object.keys(rp).forEach((k) => {
-      const v = rp[k];
-      if (typeof v === "string" && /drive\.google\.com|docs\.google\.com|^uploaded:|\.pdf(\?|#|$)/i.test(v)) cands.push(v);
-    });
-    for (const c of cands) {
-      if (typeof c !== "string" || !c.trim()) continue;
-      const v = c.trim();
-      if (v.startsWith("uploaded:")) return { key: v, kind: "local", value: v };
-      if (/^https?:\/\//i.test(v)) {
-        const lk = convertDriveLink(v);
-        return { key: lk, kind: "url", value: lk };
+        const res = await axios.get(url, {
+          responseType: "arraybuffer",
+          timeout: 40000,
+          headers: { "User-Agent": "Mozilla/5.0", Accept: "application/pdf,*/*" },
+          maxRedirects: 10,
+        });
+        const buf = Buffer.from(res.data);
+        if (buf.subarray(0, 5).toString("latin1") !== "%PDF-") throw new Error("Response is not a PDF");
+        if (buf.length < 1000) throw new Error("PDF too small");
+        return buf;
+      } catch (err) {
+        console.warn(`[PDF] Download attempt ${attempt}/${retries}: ${err.message}`);
+        if (attempt < retries) await new Promise((r) => setTimeout(r, 1500 * attempt));
       }
     }
     return null;
-  }
-  async function loadSource(src) {
-    if (src.kind === "buffer") return src.value;
-    if (src.kind === "local") return readLocalPdf(src.value);
-    return downloadPdfBuffer(src.value, 3);
   }
 
   async function loadPdfJs() {
@@ -912,34 +804,27 @@ async function generateFeedbackReportPDF({
     }
   }
 
-  if (appendOriginals) {
+  if (!isPreview && appendOriginals) {
     try {
       const seenLinks = new Set();
       const queue = [];
-      let _missLogged = false;
       for (const rp of uniqueReports) {
-        const src = findSource(rp);
-        if (!src) {
-          if (!_missLogged) {
-            _missLogged = true;
-            console.warn("[PDF] No PDF link/file found on report for", rp.facultyName, "- keys:", Object.keys(rp).join(", "));
-          }
-          continue;
-        }
-        if (seenLinks.has(src.key)) continue;
-        seenLinks.add(src.key);
-        queue.push({ rp, src });
+        const raw = rp.driveLink || rp.pdfLink;
+        if (!raw || String(raw).startsWith("uploaded:")) continue;
+        const lk = convertDriveLink(raw);
+        if (!lk || seenLinks.has(lk)) continue;
+        seenLinks.add(lk);
+        queue.push({ rp, lk });
       }
       console.log(`[PDF] Appending ${queue.length} original faculty PDF(s)`);
 
       const limit = makeLimiter(3);
       const results = await Promise.all(
-        queue.map(({ rp, src }) =>
-          limit(async () => ({ rp, data: await loadSource(src) }))
+        queue.map(({ rp, lk }) =>
+          limit(async () => ({ rp, data: await downloadPdfBuffer(lk, 3) }))
         )
       );
 
-      console.log(`[PDF] Downloaded ${results.filter((x) => x.data).length} of ${results.length} original PDF(s)`);
       const pdfjsLib = withoutSignatures ? null : await loadPdfJs();
 
       for (const { rp, data } of results) {
@@ -951,13 +836,11 @@ async function generateFeedbackReportPDF({
           const srcDoc = await PDFDocument.load(data, { ignoreEncryption: true });
           const indices = srcDoc.getPageIndices();
           if (!indices.length) continue;
-
           const pagesBefore = pdfDoc.getPageCount();
           const copied = await pdfDoc.copyPages(srcDoc, indices);
           for (const pg of copied) pdfDoc.addPage(pg);
           console.log(`[PDF] Appended ${copied.length} page(s) for ${rp.facultyName}`);
 
-          // ── Stamp signatures on the signature page ──────────────────────
           if (!withoutSignatures && pdfjsLib) {
             try {
               const pdfJsDoc = await pdfjsLib.getDocument({
@@ -975,9 +858,7 @@ async function generateFeedbackReportPDF({
                 const pg = await pdfJsDoc.getPage(pi);
                 const tc = await pg.getTextContent();
                 const items = (tc.items || []).filter((it) => String(it.str || "").trim());
-                const foundHod = items.find((it) =>
-                  /^HOD$|Head of Department/i.test(String(it.str || "").trim())
-                );
+                const foundHod = items.find((it) => /^HOD$|Head of Department/i.test(String(it.str || "").trim()));
                 if (!foundHod) continue;
                 sigPageIdx = pi - 1;
                 const hy = Number(foundHod.transform?.[5]) || 0;
@@ -999,12 +880,10 @@ async function generateFeedbackReportPDF({
                 const GAP = 8;
                 const RIGHT_EDGE = pageW - 20;
 
-                // Text groups of each label cell on the signature row
                 const facGroup = rowItems.filter((it) => R(it) <= hodX + 1);
                 const hodGroup = rowItems.filter((it) => X(it) >= hodX - 1 && (vcX == null || X(it) < vcX - 1));
                 const vcGroup = vcX == null ? [] : rowItems.filter((it) => X(it) >= vcX - 1);
 
-                // Free space to the RIGHT of the label text, up to the next cell
                 const slot = (group, fallbackLeft, rightLimit) => {
                   const left = group.length ? Math.max(...group.map(R)) + GAP : fallbackLeft;
                   return { left, width: rightLimit - left };
@@ -1040,18 +919,6 @@ async function generateFeedbackReportPDF({
     } catch (outerErr) {
       console.error("[PDF] Append section error:", outerErr.message);
     }
-  }
-
-  if (isPreview) {
-    pdfDoc.getPages().slice(summaryPages.length).forEach((pg) => {
-      const { width, height } = pg.getSize();
-      try {
-        pg.drawText("PREVIEW", {
-          x: width * 0.22, y: height * 0.3, size: Math.min(width, height) * 0.18, font: boldFont,
-          color: rgb(0.85, 0.85, 0.85), rotate: degrees(30), opacity: 0.45,
-        });
-      } catch (e) {}
-    });
   }
 
   return Buffer.from(await pdfDoc.save());
