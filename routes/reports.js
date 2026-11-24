@@ -51,15 +51,64 @@ function cleanReports(arr) {
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** Strip prefixes (Dr., Prof., Mr., Ms., Mrs., Shri, Smt, Er) and suffixes (Ph.D., HOD, etc.) */
+function stripAffixes(name) {
+  if (!name || typeof name !== 'string') return '';
+  return name
+    .trim()
+    .replace(/^(?:Dr|Prof|Mr|Ms|Mrs|Shri|Smt|Er)\.?\s+/i, '')
+    .replace(/\s+(?:Ph\.?D|M\.?Tech|B\.?Tech|M\.?E|B\.?E|MBA|MCA|HOD|VC|Dean|Sir|Ji)$/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 /** Get the full name of a user (without title prefix) for fallback name-regex matching */
 async function getFacultyFullName(userId) {
   try {
     const User = require('../models/User');
     const user = await User.findById(userId).select('name');
     if (!user || !user.name) return null;
-    // Remove title prefixes (Dr., Prof., Mr., Ms., Mrs., etc.)
-    return user.name.replace(/^(Dr\.?|Prof\.?|Mr\.?|Ms\.?|Mrs\.?)\s+/i, '').trim();
+    return stripAffixes(user.name);
   } catch { return null; }
+}
+
+/** Robust faculty user lookup ignoring prefixes/suffixes (Dr., Mr., Ms., etc.) and trailing whitespaces */
+async function findFacultyUserByName(rawFacultyName) {
+  if (!rawFacultyName || typeof rawFacultyName !== 'string') return null;
+  const User = require('../models/User');
+  const cleanName = stripAffixes(rawFacultyName);
+  if (!cleanName) return null;
+
+  const escaped = cleanName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+  // 1. Direct regex match ignoring optional title prefixes, degrees/suffixes and spaces
+  const regexPattern = new RegExp(
+    `^\\s*(?:(?:Dr|Prof|Mr|Ms|Mrs|Shri|Smt|Er)\\.?\\s+)?${escaped}(?:\\s+(?:Ph\\.?D|M\\.?Tech|B\\.?Tech|M\\.?E|B\\.?E|MBA|MCA|HOD|VC|Dean))?\\s*$`,
+    'i'
+  );
+
+  let user = await User.findOne({
+    name: regexPattern,
+    roles: { $in: ['faculty', 'hod'] }
+  });
+
+  if (!user) {
+    user = await User.findOne({ name: regexPattern });
+  }
+
+  // 2. In-memory normalized fallback across faculty/hod users
+  if (!user) {
+    const candidateUsers = await User.find({ roles: { $in: ['faculty', 'hod'] } }).select('name email roles');
+    user = candidateUsers.find(u => stripAffixes(u.name).toLowerCase() === cleanName.toLowerCase());
+  }
+
+  // 3. Fallback across all users in DB
+  if (!user) {
+    const allUsers = await User.find({}).select('name email roles');
+    user = allUsers.find(u => stripAffixes(u.name).toLowerCase() === cleanName.toLowerCase());
+  }
+
+  return user;
 }
 
 /**
@@ -1361,23 +1410,8 @@ router.post('/:id/send-to-faculty', authMiddleware, requireAnyRole('hod'), async
       });
     }
 
-    // Find faculty user by name
-    const User = require('../models/User');
-    let facultyUser = null;
-    
-    // Try exact match first
-    facultyUser = await User.findOne({ 
-      name: new RegExp(`^${facultyName.trim()}$`, 'i')
-    });
-    
-    // If not found, try full name match (strips title prefix)
-    if (!facultyUser) {
-      const facultyNameClean = facultyName.replace(/^(Dr\.?|Prof\.?|Mr\.?|Ms\.?|Mrs\.?)\s+/i, '').trim();
-      facultyUser = await User.findOne({ 
-        name: new RegExp(`^(Dr\\.?|Prof\\.?|Mr\\.?|Ms\\.?|Mrs\\.?\\s+)?${facultyNameClean.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i'),
-        roles: { $in: ['faculty', 'hod'] }
-      });
-    }
+    // Find faculty user by name (ignoring prefixes like Dr., Mr., Prof. and suffixes)
+    const facultyUser = await findFacultyUserByName(facultyName);
 
     if (!facultyUser) {
       return res.status(400).json({ 
@@ -1483,18 +1517,8 @@ router.post('/bulk-send-to-faculty', authMiddleware, requireAnyRole('hod'), asyn
           continue;
         }
 
-        // Find faculty user
-        let facultyUser = await User.findOne({ 
-          name: new RegExp(`^${facultyName.trim()}$`, 'i')
-        });
-
-        if (!facultyUser) {
-          const facultyNameClean2 = facultyName.replace(/^(Dr\.?|Prof\.?|Mr\.?|Ms\.?|Mrs\.?)\s+/i, '').trim();
-          facultyUser = await User.findOne({ 
-            name: new RegExp(`^(Dr\\.?|Prof\\.?|Mr\\.?|Ms\\.?|Mrs\\.?\\s+)?${facultyNameClean2.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i'),
-            roles: { $in: ['faculty', 'hod'] }
-          });
-        }
+        // Find faculty user (ignoring prefixes like Dr., Mr., Prof. and suffixes)
+        const facultyUser = await findFacultyUserByName(facultyName);
 
         if (!facultyUser) {
           results.failed.push({ 
