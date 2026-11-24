@@ -106,7 +106,7 @@ router.post('/process-one', authMiddleware, async (req, res) => {
   req.setTimeout(120000);
   res.setTimeout(120000);
   try {
-    const { pdfLink, sno, fileHash } = req.body;
+    const { pdfLink, sno, fileHash, department, academicYear, session, feedbackFormNo } = req.body;
     if (!pdfLink) return res.status(400).json({ error: 'No PDF link provided' });
 
     // Check cache first
@@ -191,7 +191,10 @@ router.post('/process-one', authMiddleware, async (req, res) => {
         commentPercentages: result.commentPercentages || {},
         status: 'processed',
         analyzedAt: result.analyzedAt,
-        fileHash: fileHash || existingReport.fileHash || ''
+        fileHash: fileHash || existingReport.fileHash || '',
+        ...(academicYear && { academicYear }),
+        ...(session && { session }),
+        ...(feedbackFormNo && { feedbackFormNo }),
       }, { new: true });
     } else {
       // Save to DB as new report
@@ -201,6 +204,10 @@ router.post('/process-one', authMiddleware, async (req, res) => {
         subjectCode: meta.subjectCode || '',
         programme: meta.programme || '',
         semester: meta.semester || '',
+        branch: meta.branch || department || req.user.department || '',
+        academicYear: academicYear || new Date().getFullYear().toString(),
+        session: session || '',
+        feedbackFormNo: feedbackFormNo || 'I',
         pdfLink,
         driveLink: pdfLink,
         appreciation: result.appreciation,
@@ -489,6 +496,8 @@ router.post('/upload-batch', authMiddleware, batchUpload.any(), async (req, res)
               branch: pdfMeta.branch || department || user?.department || '',
               section: pdfMeta.section || '',
               academicYear: academicYear || new Date().getFullYear().toString(),
+              session: session || '',
+              feedbackFormNo: feedbackFormNo || 'I',
               pdfLink: driveResult.webViewLink || driveResult.localFilePath || '',
               driveLink: driveResult.webViewLink || '',
               pdfFilePath: driveResult.localFilePath || '',

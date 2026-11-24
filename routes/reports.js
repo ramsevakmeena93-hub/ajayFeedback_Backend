@@ -324,7 +324,11 @@ router.delete('/my/all', authMiddleware, requireAnyRole('hod'), async (req, res)
 
 router.get('/my/export', authMiddleware, requireAnyRole('hod'), async (req, res) => {
   try {
-    const reports = await FacultyReport.find({ hodId: req.user.id });
+    const Submission = require('../models/Submission');
+    const submissions = await Submission.find({ hodId: req.user.id }).select('reports').lean();
+    const submittedIds = new Set(submissions.flatMap(s => (s.reports || []).map(r => String(r?._id || r))));
+    const allReports = await FacultyReport.find({ hodId: req.user.id });
+    const reports = allReports.filter(r => !submittedIds.has(String(r._id)));
     const rows = [
       ['S.No','Faculty Name','Subject Code','Course Name','Branch','Section','FFI Score',
        'Response %','Appreciation','Attention','Status','Faculty Acknowledged','HOD Remarks','Action Taken','Year'],
@@ -751,7 +755,9 @@ router.patch('/:id/remarks', authMiddleware, requireAnyRole('hod'), async (req, 
 
 const handleHODExportPDF = async (req, res) => {
   try {
+    const mongoose = require('mongoose');
     const User = require('../models/User');
+    const Submission = require('../models/Submission');
     const vcUser = await User.findOne({ role: 'vc' }).select('name signatureImage');
     const hodUser = await User.findById(req.user.id).select('name email department signatureImage');
     
@@ -768,42 +774,61 @@ const handleHODExportPDF = async (req, res) => {
     // Filter by specific report IDs (if provided)
     const reportIds = req.body?.reportIds || (req.query?.reportIds ? req.query.reportIds.split(',') : null);
     if (reportIds && reportIds.length > 0) {
-      query._id = { $in: reportIds };
+      query._id = { $in: reportIds.map(id => (typeof id === 'string' && mongoose.Types.ObjectId.isValid(id) ? new mongoose.Types.ObjectId(id) : id)) };
+    } else {
+      // By default, exclude reports that have already been submitted to VC (only export currently active in HOD dashboard)
+      const submissions = await Submission.find({ hodId: req.user.id }).select('reports').lean();
+      const submittedIds = submissions.flatMap(s => (s.reports || []).map(r => String(r?._id || r))).filter(Boolean);
+      if (submittedIds.length > 0) {
+        query._id = { $nin: submittedIds.map(id => new mongoose.Types.ObjectId(id)) };
+      }
     }
     
-    // Filter by semester (NEW)
+    // Filter by semester
     const semesterFilter = req.body?.semester || req.query?.semester;
     if (semesterFilter && semesterFilter !== 'all') {
       query.semester = semesterFilter;
       console.log('[HOD Export] Filtering by semester:', semesterFilter);
     }
     
-    // Filter by academic year (NEW)
+    // Filter by academic year
     const academicYearFilter = req.body?.academicYear || req.query?.academicYear;
     if (academicYearFilter && academicYearFilter !== 'all') {
       query.academicYear = academicYearFilter;
       console.log('[HOD Export] Filtering by academic year:', academicYearFilter);
     }
     
-    // Filter by session (NEW)
+    // Filter by session
     const sessionFilter = req.body?.session || req.query?.session;
     if (sessionFilter && sessionFilter !== 'all') {
       query.session = sessionFilter;
       console.log('[HOD Export] Filtering by session:', sessionFilter);
     }
 
+    // Filter by feedback form (Feedback 1 / Form I vs Feedback 2 / Form II)
+    const feedbackFormNoFilter = req.body?.feedbackFormNo || req.query?.feedbackFormNo;
+    if (feedbackFormNoFilter && feedbackFormNoFilter !== 'all') {
+      console.log('[HOD Export] Filtering by feedbackFormNo:', feedbackFormNoFilter);
+      if (feedbackFormNoFilter === 'I') {
+        // Form I or legacy documents where feedbackFormNo is not set
+        query.$or = [
+          { feedbackFormNo: 'I' },
+          { feedbackFormNo: { $exists: false } },
+          { feedbackFormNo: null },
+          { feedbackFormNo: '' }
+        ];
+      } else {
+        query.feedbackFormNo = feedbackFormNoFilter;
+      }
+    }
+
     console.log('[HOD Export] Query filters:', JSON.stringify(query, null, 2));
 
-    let reports = await FacultyReport.find(query).sort({ createdAt: -1 });
+    const reports = await FacultyReport.find(query).sort({ createdAt: -1 });
     if (reports.length === 0) {
-      // Fallback: check any reports belonging to HOD (without filters)
-      reports = await FacultyReport.find({ hodId: req.user.id });
-      console.log('[HOD Export] No reports with filters, fallback found:', reports.length);
-    }
-    if (reports.length === 0) {
-      return res.status(400).json({ 
-        error: 'No reports found to export',
-        filters: { semester: semesterFilter, academicYear: academicYearFilter, session: sessionFilter }
+      return res.status(404).json({ 
+        error: 'No active reports found matching the selected filters in your dashboard',
+        filters: { semester: semesterFilter, academicYear: academicYearFilter, session: sessionFilter, feedbackFormNo: feedbackFormNoFilter }
       });
     }
 
@@ -813,23 +838,30 @@ const handleHODExportPDF = async (req, res) => {
       session: reports[0]?.session,
       semester: reports[0]?.semester,
       facultyName: reports[0]?.facultyName,
+      feedbackFormNo: reports[0]?.feedbackFormNo,
       hasHodRemarks: !!reports[0]?.hodRemarks
     });
     
     // Get unique semesters from filtered reports for display
     const semesters = [...new Set(reports.map(r => r.semester).filter(Boolean))].sort();
+
+    // Determine target feedbackFormNo for submission title (e.g. "I" or "II")
+    const targetFormNo = (feedbackFormNoFilter && feedbackFormNoFilter !== 'all')
+      ? feedbackFormNoFilter
+      : (reports[0]?.feedbackFormNo || 'I');
     
     const submissionParams = {
-      academicYear: reports[0]?.academicYear || '2026-2027',
-      session: reports[0]?.session || '',  // Add session for HOD comment lookup
+      academicYear: academicYearFilter && academicYearFilter !== 'all' ? academicYearFilter : (reports[0]?.academicYear || '2026-2027'),
+      session: sessionFilter && sessionFilter !== 'all' ? sessionFilter : (reports[0]?.session || ''),
       department: req.user.department || hodUser?.department || '',
-      feedbackFormNo: 'I',
+      feedbackFormNo: targetFormNo,
       submissionDate: new Date(),
       finalReportDate: new Date(),
       // Add filter info for display in PDF
       filterInfo: {
         semester: semesterFilter && semesterFilter !== 'all' ? semesterFilter : null,
         semesters: semesters.length > 0 ? semesters.join(', ') : null,
+        feedbackFormNo: targetFormNo,
         totalReports: reports.length
       }
     };
@@ -844,13 +876,16 @@ const handleHODExportPDF = async (req, res) => {
       hodUser,
       vcUser,
       approvedAt: new Date(),  // Set approval date to enable signatures
-      isPreview: false,  // ✓ FIXED: Generate with attached individual PDFs
-      withoutSignatures: false, // Show HOD & Faculty signatures (Pro-VC signature hidden via hideVCSignature flag)
+      isPreview: false,  // Generate with attached individual PDFs
+      withoutSignatures: false, // Show HOD & Faculty signatures
       hideVCSignature: true, // Hide Pro-VC signature in Export PDF (only HOD downloads this)
     });
 
     // Generate dynamic filename based on filters
     let filename = 'hod-feedback-report';
+    if (targetFormNo) {
+      filename += `-form-${targetFormNo}`;
+    }
     if (semesterFilter && semesterFilter !== 'all') {
       filename += `-sem${semesterFilter}`;
     }
@@ -875,31 +910,41 @@ router.get('/my/export-pdf', authMiddleware, requireAnyRole('hod'), handleHODExp
 router.post('/my/export-pdf', authMiddleware, requireAnyRole('hod'), handleHODExportPDF);
 
 // ─────────────────────────────────────────────────────────────────────────────
-// HOD: Get available filter options for export
+// HOD: Get available filter options for export (only active, unsubmitted reports)
 // ─────────────────────────────────────────────────────────────────────────────
 router.get('/my/export-filters', authMiddleware, requireAnyRole('hod'), async (req, res) => {
   try {
-    const reports = await FacultyReport.find({ hodId: req.user.id }).lean();
+    const Submission = require('../models/Submission');
+    const submissions = await Submission.find({ hodId: req.user.id }).select('reports').lean();
+    const submittedIds = new Set(submissions.flatMap(s => (s.reports || []).map(r => String(r?._id || r))).filter(Boolean));
+
+    const allReports = await FacultyReport.find({ hodId: req.user.id }).lean();
+    // Exclude previously submitted reports so modal reflects only active dashboard reports
+    const activeReports = allReports.filter(r => !submittedIds.has(String(r._id)));
     
-    if (reports.length === 0) {
+    if (activeReports.length === 0) {
       return res.json({
         semesters: [],
         academicYears: [],
         sessions: [],
+        feedbackFormNos: ['I', 'II'],
         totalReports: 0
       });
     }
     
-    // Extract unique values
-    const semesters = [...new Set(reports.map(r => r.semester).filter(Boolean))].sort((a, b) => a - b);
-    const academicYears = [...new Set(reports.map(r => r.academicYear).filter(Boolean))].sort();
-    const sessions = [...new Set(reports.map(r => r.session).filter(Boolean))].sort();
+    // Extract unique values from active reports
+    const semesters = [...new Set(activeReports.map(r => r.semester).filter(Boolean))].sort((a, b) => a - b);
+    const academicYears = [...new Set(activeReports.map(r => r.academicYear).filter(Boolean))].sort();
+    const sessions = [...new Set(activeReports.map(r => r.session).filter(Boolean))].sort();
+    const rawFormNos = [...new Set(activeReports.map(r => r.feedbackFormNo || 'I'))].filter(Boolean);
+    const feedbackFormNos = rawFormNos.length > 0 ? (rawFormNos.includes('II') ? ['I', 'II'] : ['I']) : ['I', 'II'];
     
     res.json({
       semesters,
       academicYears,
       sessions,
-      totalReports: reports.length
+      feedbackFormNos,
+      totalReports: activeReports.length
     });
   } catch (err) {
     console.error('[Export Filters Error]:', err);

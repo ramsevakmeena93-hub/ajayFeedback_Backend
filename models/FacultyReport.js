@@ -61,6 +61,8 @@ const facultyReportSchema = new mongoose.Schema({
   errorMessage: { type: String },
   analyzedAt: { type: Date },
   academicYear: { type: String, default: () => new Date().getFullYear().toString() }, // e.g. "2025"
+  session: { type: String, default: '' }, // e.g. "July – December" or "January – June"
+  feedbackFormNo: { type: String, default: 'I' }, // "I" (Feedback 1) or "II" (Feedback 2)
   fileHash: { type: String, default: '' }, // MD5 hash of uploaded CSV file to detect duplicates
 }, { timestamps: true });
 
