@@ -22,28 +22,25 @@ function escapeRegExp(s) {
 // Normalizes a faculty name for comparison
 // Normalizes a faculty name for comparison
 function normalizeName(name) {
+  // Return empty string for falsy input
   if (!name) return "";
-  let n = String(name).toLowerCase().trim();
-  // Common misspelling handling
-  n = n.replace(/\bmithoon\b/g, "mithun");
-  // Normalize Dr. Manjaree Pandit variations
-  n = n.replace(/\bdr\.?\s*manjaree\s*pandit\b/g, "dr. manjaree pandit");
-  // Also handle missing dot or extra spaces
-  n = n.replace(/\bd\.?\s*manjaree\s*pandit\b/g, "dr. manjaree pandit");
-  // Catch common typo without 'e' or with extra letters
-  n = n.replace(/\bd\.?\s*manjara?e?\s*pandit\b/g, "dr. manjaree pandit");
-  // Remove extra spaces and optional dot, ensure proper spacing
-  n = n.replace(/\bd\.?\s*manjaree\s*pandit\b/g, "d. manjaree pandit");
-  // Catch common typo without 'e' or with extra letters
-  n = n.replace(/\bd\.?\s*manjara?e?\s*pandit\b/g, "d. manjaree pandit");
-  return n;
+  const original = String(name).toLowerCase().trim();
+  // Normalize known misspellings and map to the canonical full name
+  // Mithun / Mithoon variations
+  if (/^mithun$|^mithoon$/i.test(original)) {
+    return "mithun sahay shrivastava";
+  }
+  if (/mithoon\s+sahay\s+shrivastava/i.test(original) || /mithun\s+sahay\s+shrivastava/i.test(original)) {
+    return "mithun sahay shrivastava";
+  }
+  // Dr. Manjaree Pandit variations
+  if (/^dr\.?\s*manjaree\s*pandit$/i.test(original) || /^d\.?\s*manjaree\s*pandit$/i.test(original)) {
+    return "dr. manjaree pandit";
+  }
+  // Fallback: return the cleaned lower‑cased string
+  return original;
 }
-  if (!name) return "";
-  let n = String(name).toLowerCase().trim();
-  // Common misspelling handling
-  n = n.replace(/\bmithoon\b/g, "mithun");
-  return n;
-}
+
   return String(s || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
