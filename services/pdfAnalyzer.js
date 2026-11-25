@@ -1193,11 +1193,21 @@ async function extractRatingStatistics(buffer) {
                 const total = belowAvg + average + good + veryGood + excellent;
                 
                 if (total > 0) {
-                    console.log(`[PDF] ✓ Found rating statistics: G=${good}, VG=${veryGood}, E=${excellent}, Total=${total}`);
+                    const goodPct = Number(((good / total) * 100).toFixed(2));
+                    const veryGoodPct = Number(((veryGood / total) * 100).toFixed(2));
+                    const excellentPct = Number(((excellent / total) * 100).toFixed(2));
+                    const positiveResponses = good + veryGood + excellent;
+                    const positivePercent = Number(((positiveResponses / total) * 100).toFixed(2));
+
+                    console.log(`[PDF] ✓ Found rating statistics: Total=${total}, Good=${good} (${goodPct}%), Very Good=${veryGood} (${veryGoodPct}%), Excellent=${excellent} (${excellentPct}%), Positive=${positiveResponses} (${positivePercent}%)`);
                     return {
-                        'Good': Math.round((good / total) * 100),
-                        'Very Good': Math.round((veryGood / total) * 100),
-                        'Excellent': Math.round((excellent / total) * 100),
+                        'Good': goodPct,
+                        'Very Good': veryGoodPct,
+                        'Excellent': excellentPct,
+                        'Total Positive': positivePercent,
+                        totalResponses: total,
+                        positiveResponses,
+                        positivePercent,
                         counts: { good, veryGood, excellent, average, belowAvg, total }
                     };
                 }
@@ -1270,8 +1280,23 @@ function calculateCommentPercentages(allComments, responseCount) {
 
     for (const [label, count] of Object.entries(counts)) {
         if (count > 0) {
-            result[label] = Math.round((count / total) * 100);
+            result[label] = Number(((count / total) * 100).toFixed(2));
         }
+    }
+
+    const positiveResponses = (counts['Good'] || 0) + (counts['Very Good'] || 0) + (counts['Excellent'] || 0);
+    if (total > 0 && positiveResponses > 0) {
+        const positivePercent = Number(((positiveResponses / total) * 100).toFixed(2));
+        result['Total Positive'] = positivePercent;
+        result.totalResponses = total;
+        result.positiveResponses = positiveResponses;
+        result.positivePercent = positivePercent;
+        result.counts = {
+            good: counts['Good'] || 0,
+            veryGood: counts['Very Good'] || 0,
+            excellent: counts['Excellent'] || 0,
+            total
+        };
     }
 
     console.log(`[PDF] Comment percentages calculated:`, result);

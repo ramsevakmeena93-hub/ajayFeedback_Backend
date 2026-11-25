@@ -599,11 +599,18 @@ const nameA = normalizeName(a.facultyName);
     const { app: appList, att: attList } = collectComments(r);
     const attText = bullets(attList).join("\n") || "-";
     const pcts = r.commentPercentages || {};
-    const pctLines = Object.entries(pcts)
-      .filter(([, v]) => v > 0)
-      .sort((a, b) => b[1] - a[1])
-      .map(([k, v]) => "\u2022 " + k + ": " + v + "%")
-      .join("\n");
+    const standardOrder = ['Good', 'Very Good', 'Excellent'];
+    const pctItems = [];
+    standardOrder.forEach(k => {
+      if (typeof pcts[k] === 'number' && pcts[k] > 0) {
+        pctItems.push(`\u2022 ${k}: ${pcts[k].toFixed(2)}%`);
+      }
+    });
+    const totalPosPct = pcts.positivePercent ?? pcts['Total Positive'];
+    if (typeof totalPosPct === 'number' && totalPosPct > 0) {
+      pctItems.push(`\u2022 Positive Feedback (Good+VG+Exc): ${totalPosPct.toFixed(2)}%`);
+    }
+    const pctLines = pctItems.join("\n");
     const appText = [pctLines, ...bullets(appList)].filter(Boolean).join("\n") || "-";
     console.log(`[PDF] #${i + 1} ${r.facultyName}: appreciation=${appList.length}, needsAttention=${attList.length}`);
     const actionText = String(toText(r.actionTaken || r.action_taken || r.hodAction || r.hodActionTaken) || "-");
