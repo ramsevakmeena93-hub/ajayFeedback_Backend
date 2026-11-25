@@ -15,33 +15,34 @@ try {
 const FILTER_RATING_ROWS = true;
 
 function escapeRegExp(s) {
-  // Escape special regex characters
-  return String(s || "").replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&");
+  return String(s || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 // Normalizes a faculty name for comparison
-// Normalizes a faculty name for comparison
 function normalizeName(name) {
-  // Return empty string for falsy input
   if (!name) return "";
   const original = String(name).toLowerCase().trim();
-  // Normalize known misspellings and map to the canonical full name
-  // Mithun / Mithoon variations
   if (/^mithun$|^mithoon$/i.test(original)) {
     return "mithun sahay shrivastava";
   }
   if (/mithoon\s+sahay\s+shrivastava/i.test(original) || /mithun\s+sahay\s+shrivastava/i.test(original)) {
     return "mithun sahay shrivastava";
   }
-  // Dr. Manjaree Pandit variations
-  if (/^dr\.?\s*manjaree\s*pandit$/i.test(original) || /^d\.?\s*manjaree\s*pandit$/i.test(original)) {
+  if (/^dr\.?\s*manjaree\s*pandit$/i.test(original) || /^d\.?\s*manjaree\s*pandit$/i.test(original) || /manjuree/i.test(original)) {
     return "dr. manjaree pandit";
   }
-  // Fallback: return the cleaned lower‑cased string
   return original;
 }
 
-  return String(s || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+// Format faculty name for user-facing display in PDF
+function formatFacultyName(name) {
+  if (!name) return "";
+  let n = String(name).trim();
+  n = n.replace(/\bmithoon\b/gi, "Mithun");
+  n = n.replace(/\bdr\.?\s*manjuree\s*pandit\b/gi, "Dr. Manjaree Pandit");
+  n = n.replace(/\bdr\.?\s*manjaree\s*pandit\b/gi, "Dr. Manjaree Pandit");
+  n = n.replace(/\bmanjuree\b/gi, "Manjaree");
+  return n;
 }
 
 // Small concurrency limiter (no external dependency).
@@ -104,7 +105,7 @@ async function generateFeedbackReportPDF({
   reports.forEach((r) => {
     if (r.hodRemarks && String(r.hodRemarks).trim()) {
       individualComments.push({
-        facultyName: r.facultyName || "Unknown",
+        facultyName: formatFacultyName(r.facultyName) || "Unknown",
         subjectCode: r.subjectCode || "",
         remark: String(r.hodRemarks).trim(),
       });
@@ -615,11 +616,11 @@ const nameA = normalizeName(a.facultyName);
       : "-";
     const courseName = resolveCourseName(r) || "-";
     const sem = r.semester != null && r.semester !== "" ? String(r.semester) : r.sem != null ? String(r.sem) : "-";
-    const facKey = (r.facultyName || "").toLowerCase().trim();
+    const facKey = normalizeName(r.facultyName);
     const sigImg = facultySigMap[facKey] || null;
     const cells = [
       { lines: single(String(i + 1)), font: timesBoldFont, center: true },
-      { lines: wrapIn(r.facultyName || "-", 1), font: timesFont },
+      { lines: wrapIn(formatFacultyName(r.facultyName) || "-", 1), font: timesFont },
       { lines: wrapIn(codeBatch, 2), font: timesFont },
       { lines: wrapIn(courseName, 3), font: timesFont },
       { lines: single(sem), font: timesFont, center: true },
@@ -631,7 +632,7 @@ const nameA = normalizeName(a.facultyName);
       { lines: [], font: timesFont },
     ];
     const sigCol = COLS[sigColIdx];
-    const sigNameLines = wrapName(r.facultyName || "", sigCol.w - 6, font, SIG_NAME_FS);
+    const sigNameLines = wrapName(formatFacultyName(r.facultyName) || "", sigCol.w - 6, font, SIG_NAME_FS);
     const sigImgH = sigImg ? SIG_IMG_H : 0;
     const sigNeeded = PAD_TOP + sigImgH + (sigImg ? 2 : 0) + sigNameLines.length * SIG_NAME_LH + PAD_BOT;
     let pending = cells.map((c) => c.lines.slice());
@@ -900,7 +901,7 @@ const nameA = normalizeName(a.facultyName);
                   });
                 };
 
-                const fSig = facultySigMap[(rp.facultyName || "").toLowerCase().trim()];
+                const fSig = facultySigMap[normalizeName(rp.facultyName)];
                 if (fSig) drawStamp(fSig, slot(facGroup, 20, hodX - GAP));
                 if (hodSig) drawStamp(hodSig, slot(hodGroup, hodX + 40, (vcX != null ? vcX : RIGHT_EDGE) - GAP));
                 if (vcSig && !hideVCSignature && vcX != null) drawStamp(vcSig, slot(vcGroup, vcX + 50, RIGHT_EDGE));
