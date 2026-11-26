@@ -791,10 +791,11 @@ const handleHODExportPDF = async (req, res) => {
       console.log('[HOD Export] Filtering by semester:', semesterFilter);
     }
     
-    // Filter by academic year
+    // Filter by academic year (supports "2026" or "2026-2027")
     const academicYearFilter = req.body?.academicYear || req.query?.academicYear;
     if (academicYearFilter && academicYearFilter !== 'all') {
-      query.academicYear = academicYearFilter;
+      const yearPrefix = academicYearFilter.split('-')[0].trim();
+      query.academicYear = { $regex: new RegExp(`^${yearPrefix}`, 'i') };
       console.log('[HOD Export] Filtering by academic year:', academicYearFilter);
     }
     
@@ -813,9 +814,15 @@ const handleHODExportPDF = async (req, res) => {
         // Form I or legacy documents where feedbackFormNo is not set
         query.$or = [
           { feedbackFormNo: 'I' },
+          { feedbackFormNo: '1' },
           { feedbackFormNo: { $exists: false } },
           { feedbackFormNo: null },
           { feedbackFormNo: '' }
+        ];
+      } else if (feedbackFormNoFilter === 'II') {
+        query.$or = [
+          { feedbackFormNo: 'II' },
+          { feedbackFormNo: '2' }
         ];
       } else {
         query.feedbackFormNo = feedbackFormNoFilter;
